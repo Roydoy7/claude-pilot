@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Python - ignore pip and all installed packages
+# Keep only: embedded runtime (.pyd, .dll, .exe, .zip) and get-pip.py
+# All packages are installed to site-packages/ directory
+
+# Ignore site-packages (all installed packages)
+packages/python-3.13.9-embed-amd64/site-packages/
+
+# Ignore pip-created directories
+packages/python-3.13.9-embed-amd64/Scripts/
+packages/python-3.13.9-embed-amd64/Lib/
+packages/python-3.13.9-embed-amd64/bin/
+
+# Python cache
+packages/python-3.13.9-embed-amd64/__pycache__/
+packages/python-3.13.9-embed-amd64/**/__pycache__/
+packages/python-3.13.9-embed-amd64/**/*.pyc
+
+# User data and runtime files (should not be committed)
+# Session data with SQLite checkpoints
+.claude-pilot/
+~/.claude-pilot/
+
+# SQLite database files
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+
+# Electron user data
+electron-user-data/
+
+# VSCode settings (optional - uncomment if you want to share workspace settings)
+# .vscode/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

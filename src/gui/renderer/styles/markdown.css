@@ -1,0 +1,132 @@
+/**
+ * Copyright (c) 2025 Ray <roydoy7@gmail.com>
+ *
+ * Markdown and Code Highlighting Styles
+ */
+
+/* Import highlight.js theme */
+@import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
+@import 'highlight.js/styles/atom-one-light.css' (prefers-color-scheme: light);
+
+/* Override highlight.js background for message bubbles */
+.message-bubble pre {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  padding: 0.5rem !important;
+  border-radius: 4px !important;
+  overflow-x: auto !important;
+  margin: 0.25em 0 !important;
+  max-width: 100% !important;
+  width: 0 !important; /* Force pre to respect parent constraints */
+  min-width: 100% !important; /* But fill available space */
+  box-sizing: border-box !important;
+}
+
+.message-user .message-bubble pre {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.message-bubble code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: 0.9em;
+}
+
+.message-bubble pre code {
+  display: block !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+}
+
+/* Inline code styling */
+.message-bubble p code {
+  padding: 0.125em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+/* Markdown typography */
+.message-bubble h1,
+.message-bubble h2,
+.message-bubble h3,
+.message-bubble h4,
+.message-bubble h5,
+.message-bubble h6 {
+  margin: 1em 0 0.5em 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.message-bubble h1 { font-size: 1.5em; }
+.message-bubble h2 { font-size: 1.3em; }
+.message-bubble h3 { font-size: 1.1em; }
+
+.message-bubble p:first-child {
+  margin-top: 0;
+}
+
+.message-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.message-bubble hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  opacity: 0.5;
+}
+
+.message-bubble table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.message-bubble th,
+.message-bubble td {
+  border: 1px solid var(--border);
+  padding: 0.5em;
+  text-align: left;
+}
+
+.message-bubble th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+/* Streaming cursor animation */
+.streaming-cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1em;
+  background-color: currentColor;
+  margin-left: 0.2em;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  50.01%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Scrollbar for code blocks */
+.message-bubble pre::-webkit-scrollbar {
+  height: 6px;
+}
+
+.message-bubble pre::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.message-bubble pre::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.message-bubble pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}

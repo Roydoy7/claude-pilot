@@ -1,0 +1,73 @@
+/**
+ * Copyright (c) 2025 Ray <roydoy7@gmail.com>
+ *
+ * Theme CSS Variables - Light and Dark themes
+ */
+
+/* Light Theme (Default) */
+:root[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f3f5;
+  --bg-hover: #e9ecef;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-tertiary: #adb5bd;
+  --border: #dee2e6;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --user-bubble: #3b82f6;
+  --user-bubble-text: #ffffff;
+  --ai-bubble: #e9ecef;
+  --ai-bubble-text: #212529;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-hover: rgba(0, 0, 0, 0.15);
+  --input-bg: #ffffff;
+  --input-border: #dee2e6;
+  --input-focus: #3b82f6;
+  --error: #dc3545;
+  --warning: #ffc107;
+  --success: #28a745;
+}
+
+/* Dark Theme */
+:root[data-theme='dark'] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #242424;
+  --bg-tertiary: #2d2d2d;
+  --bg-hover: #333333;
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --border: #374151;
+  --accent: #60a5fa;
+  --accent-hover: #3b82f6;
+  --user-bubble: #2563eb;
+  --user-bubble-text: #ffffff;
+  --ai-bubble: #2d2d2d;
+  --ai-bubble-text: #e5e7eb;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-hover: rgba(0, 0, 0, 0.5);
+  --input-bg: #2d2d2d;
+  --input-border: #374151;
+  --input-focus: #60a5fa;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+}
+
+/* Transitions for theme switching */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Disable transitions on specific elements to avoid flicker */
+*:not(.theme-transition) {
+  transition-property: none;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

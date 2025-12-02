@@ -1,0 +1,339 @@
+/**
+ * Copyright (c) 2025 Ray <roydoy7@gmail.com>
+ *
+ * Preload types - Type definitions for Electron IPC API
+ * Updated for Claude-only architecture (no multi-provider support)
+ */
+
+import type { RoleType } from '../../core/roles/role-enum.js';
+import type { Session } from '../../core/sessions/session-manager.js';
+import type { PromptTemplate } from '../../core/templates/template-manager.js';
+import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
+import type { AgentState, StreamEvent } from '../../core/agents/claude-agent.js';
+import type { MessageContent } from '../../core/types/message-types.js';
+import type { ModelInfo } from '../../core/providers/model-list-manager.js';
+
+/**
+ * Re-export types for consistency
+ */
+export type { MessageContent, OAuthResult };
+
+/**
+ * Service initialization request (no longer needs apiKey)
+ */
+export interface ServiceInitRequest {
+  // Empty for now - kept for backwards compatibility
+}
+
+/**
+ * Service initialization response
+ */
+export interface ServiceInitResponse {
+  success: boolean;
+  sessions: Session[];
+  currentSession?: Session;
+  templates: PromptTemplate[];
+  error?: string;
+}
+
+/**
+ * Token usage metadata
+ */
+export interface UsageMetadata {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}
+
+/**
+ * Chat request
+ */
+export interface ChatRequest {
+  message: MessageContent;
+  sessionId?: string;
+}
+
+/**
+ * Chat response
+ */
+export interface ChatResponse {
+  success: boolean;
+  data?: string;
+  error?: string;
+  sessionId?: string;
+  usage?: UsageMetadata;
+}
+
+/**
+ * Stream chunk
+ */
+export interface StreamChunk {
+  sessionId?: string;
+  chunk: string;
+}
+
+/**
+ * Tool call information
+ */
+export interface ToolCallInfo {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/**
+ * Tool response/result
+ */
+export interface ToolResponse {
+  tool_call_id: string;
+  output: string;
+  error?: string;
+}
+
+/**
+ * Tool execution progress entry
+ */
+export interface ToolProgressEntry {
+  type: 'stdout' | 'stderr' | 'start' | 'end' | 'error';
+  message: string;
+  timestamp: number;
+}
+
+/**
+ * File tree node for workspace browser
+ */
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileTreeNode[];
+}
+
+/**
+ * Message list item - unified type for messages, tool calls, status indicators, and thinking
+ */
+export interface MessageListItem {
+  type: 'message' | 'tool_call' | 'status' | 'thinking';
+  id: string;
+  timestamp: number;
+
+  // Message type fields
+  role?: 'user' | 'assistant';
+  content?: MessageContent;
+  usage?: UsageMetadata;
+
+  // Tool call type fields
+  toolCall?: ToolCallInfo;
+  toolResponse?: ToolResponse;
+  needsApproval?: boolean;
+  wasRejected?: boolean;
+  progress?: ToolProgressEntry[];
+
+  // Status type fields
+  agentState?: AgentState;
+
+  // Thinking type fields (extended thinking)
+  thinking?: string;
+}
+
+/**
+ * Tool interrupt/approval request event
+ */
+export interface ToolInterruptEvent {
+  sessionId?: string;
+  toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }>;
+  interruptId: string;
+}
+
+/**
+ * History update event
+ */
+export interface HistoryUpdateEvent {
+  sessionId: string;
+}
+
+/**
+ * Agent state change event
+ */
+export interface AgentStateChangeEvent {
+  sessionId: string;
+  state: AgentState;
+}
+
+/**
+ * Stream event data - unified streaming event from backend
+ */
+export interface StreamEventData {
+  sessionId: string;
+  event: StreamEvent;
+}
+
+/**
+ * Agent initialization request
+ */
+export interface AgentInitRequest {
+  sessionId?: string;
+  role?: RoleType;
+  modelName?: string;
+  apiKey?: string;
+}
+
+/**
+ * Current agent information
+ */
+export interface CurrentAgentInfo {
+  sessionId: string;
+  role: RoleType;
+  modelName: string;
+}
+
+/**
+ * Session create request
+ */
+export interface SessionCreateRequest {
+  title: string;
+  role: RoleType;
+  modelName: string;
+  cwd: string;
+}
+
+/**
+ * Session switch request
+ */
+export interface SessionSwitchRequest {
+  sessionId: string;
+}
+
+/**
+ * Cache stats
+ */
+export interface CacheStats {
+  size: number;
+  maxSize: number;
+  sessionIds: string[];
+}
+
+/**
+ * Template create request
+ */
+export interface TemplateCreateRequest {
+  name: string;
+  content: string;
+}
+
+/**
+ * Template update request
+ */
+export interface TemplateUpdateRequest {
+  id: string;
+  updates: {
+    name?: string;
+    content?: string;
+  };
+}
+
+/**
+ * Electron API exposed to renderer process
+ */
+export interface ElectronAPI {
+  // Service initialization
+  service: {
+    initialize: (request?: ServiceInitRequest) => Promise<ServiceInitResponse>;
+    isInitialized: () => Promise<boolean>;
+  };
+
+  // Agent operations
+  agent: {
+    chat: (request: ChatRequest) => Promise<ChatResponse>;
+    getCurrentInfo: () => Promise<{ success: boolean; data?: CurrentAgentInfo }>;
+    onStreamEvent: (callback: (data: StreamEventData) => void) => void;
+    cancelRequest: (sessionId?: string) => Promise<{ success: boolean; error?: string }>;
+    approveTools: (baseInterruptId: string, indexedInterruptIds: string[]) => Promise<{ success: boolean; error?: string }>;
+    rejectTools: (baseInterruptId: string, indexedInterruptIds: string[], feedback?: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  // Session management
+  session: {
+    list: () => Promise<Session[]>;
+    getHistory: (sessionId: string) => Promise<Array<{
+      role: string;
+      content: MessageContent;
+      usage?: UsageMetadata;
+      tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
+      tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
+    }>>;
+    create: (request: SessionCreateRequest) => Promise<{ success: boolean; session?: Session; error?: string }>;
+    switch: (request: SessionSwitchRequest) => Promise<{ success: boolean; error?: string }>;
+    delete: (sessionId: string) => Promise<{ success: boolean; sessionId: string }>;
+    updateTitle: (sessionId: string, newTitle: string) => Promise<{ success: boolean; session: Session }>;
+    getLastCwd: () => Promise<string>;
+    addAdditionalDirectory: (sessionId: string, directory: string) => Promise<{ success: boolean }>;
+    removeAdditionalDirectory: (sessionId: string, directory: string) => Promise<{ success: boolean }>;
+    getAdditionalDirectories: (sessionId: string) => Promise<string[]>;
+    clearAdditionalDirectories: (sessionId: string) => Promise<{ success: boolean }>;
+    getFileTree: (sessionId: string) => Promise<Array<{
+      directoryType: 'cwd' | 'additional';
+      directoryPath: string;
+      directoryLabel: string;
+      tree: FileTreeNode | null;
+    }>>;
+  };
+
+  // Workspace management
+  workspace: {
+    selectDirectory: () => Promise<string | null>;
+    list: () => Promise<string[]>;
+    add: (dir: string) => Promise<boolean>;
+    remove: (dir: string) => Promise<boolean>;
+    clear: () => Promise<boolean>;
+    update: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    getFileTree: () => Promise<Array<{
+      workspaceIndex: number;
+      workspacePath: string;
+      tree: FileTreeNode | null;
+    }>>;
+  };
+
+  // Cache management
+  cache: {
+    getStats: () => Promise<CacheStats>;
+  };
+
+  // Template management
+  templates: {
+    list: () => Promise<{ success: boolean; templates?: PromptTemplate[] }>;
+    get: (id: string) => Promise<{ success: boolean; template?: PromptTemplate }>;
+    create: (request: TemplateCreateRequest) => Promise<{ success: boolean; template?: PromptTemplate }>;
+    update: (id: string, updates: { name?: string; content?: string }) => Promise<{ success: boolean }>;
+    delete: (id: string) => Promise<{ success: boolean }>;
+  };
+
+  // Model management - Claude only
+  models: {
+    list: (options?: { forceRefresh?: boolean }) => Promise<ModelInfo[]>;
+    getDefault: () => Promise<string>;
+  };
+
+  // Authentication - Claude only
+  auth: {
+    isAuthenticated: () => Promise<AuthStatus>;
+    loginWithOAuth: (options: OAuthLoginOptions) => Promise<OAuthResult>;
+    logout: () => Promise<{ success: boolean }>;
+    getOAuthInfo: () => Promise<{
+      authenticated: boolean;
+      subscriptionType?: string | null;
+      expiresAt?: number;
+      scopes?: string[];
+    }>;
+  };
+
+  // Utility
+  ping: () => Promise<string>;
+}
+
+// Extend Window interface
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}

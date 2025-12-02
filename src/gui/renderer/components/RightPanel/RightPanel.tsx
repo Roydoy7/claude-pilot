@@ -1,0 +1,91 @@
+/**
+ * Copyright (c) 2025 Ray <roydoy7@gmail.com>
+ *
+ * RightPanel Component - Tabbed panel with Workspace and Prompts tabs
+ */
+
+import { useState, useEffect } from 'react';
+import { SessionsTab } from './SessionsTab';
+import { WorkspaceTab } from './WorkspaceTab';
+import { PromptsTab } from './PromptsTab';
+import { useLanguage } from '../../i18n/LanguageContext';
+import type { Session } from '../../../../core/sessions/session-manager';
+
+type TabType = 'sessions' | 'workspace' | 'prompts';
+
+interface RightPanelProps {
+  sessionId?: string;
+  onClose?: () => void;
+  onSessionSelect?: (session: Session) => void;
+  onApplyTemplate?: (content: string) => void;
+}
+
+export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplate }: RightPanelProps) {
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<TabType>('sessions');
+
+  // Expose switchToWorkspace method globally
+  useEffect(() => {
+    (window as any).__rightPanelSwitchToWorkspace = () => {
+      setActiveTab('workspace');
+    };
+    return () => {
+      delete (window as any).__rightPanelSwitchToWorkspace;
+    };
+  }, []);
+
+  return (
+    <div className="right-panel">
+      {/* Tab Bar */}
+      <div className="tab-bar">
+        <button
+          className="tab-button"
+          data-active={activeTab === 'sessions'}
+          onClick={() => setActiveTab('sessions')}
+          title={t.rightPanel.sessions}
+        >
+          <span>💬</span>
+          <span>{t.rightPanel.sessions}</span>
+        </button>
+        <button
+          className="tab-button"
+          data-active={activeTab === 'workspace'}
+          onClick={() => setActiveTab('workspace')}
+          title={t.rightPanel.workspace}
+        >
+          <span>📁</span>
+          <span>{t.rightPanel.workspace}</span>
+        </button>
+        <button
+          className="tab-button"
+          data-active={activeTab === 'prompts'}
+          onClick={() => setActiveTab('prompts')}
+          title={t.rightPanel.prompts}
+        >
+          <span>📝</span>
+          <span>{t.rightPanel.prompts}</span>
+        </button>
+        <button
+          className="tab-button close-button"
+          onClick={onClose}
+          title={t.rightPanel.closePanel}
+        >
+          <span>❌</span>
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="tab-content">
+        <div style={{ display: activeTab === 'sessions' ? 'block' : 'none' }}>
+          <SessionsTab currentSessionId={sessionId} onSessionSelect={onSessionSelect} />
+        </div>
+        <div style={{ display: activeTab === 'workspace' ? 'block' : 'none' }}>
+          <WorkspaceTab sessionId={sessionId} />
+        </div>
+        <div style={{ display: activeTab === 'prompts' ? 'block' : 'none' }}>
+          <PromptsTab onApplyTemplate={onApplyTemplate || (() => {})} />
+        </div>
+      </div>
+    </div>
+  );
+}

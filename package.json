@@ -1,0 +1,100 @@
+{
+  "name": "claude-pilot",
+  "version": "0.1.0",
+  "description": "Claude-powered AI assistant application",
+  "main": "dist/main/main.js",
+  "author": "Ray <roydoy7@gmail.com>",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "concurrently \"npm run dev\" \"wait-on tcp:127.0.0.1:5173 && electron dist/main/main.js\" -k",
+    "dev:vscode": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron:dev": "vite",
+    "electron:build": "vite build && electron-builder",
+    "postinstall": "patch-package && node scripts/setup-python-env.js && node scripts/beautify-cli.js",
+    "setup:python": "node scripts/setup-python-env.js",
+    "beautify:cli": "node scripts/beautify-cli.js",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.59",
+    "@mohtasham/md-to-docx": "^2.4.0",
+    "@types/adm-zip": "^0.5.7",
+    "@types/diff": "^8.0.0",
+    "@types/pdfkit": "^0.17.3",
+    "@types/xml2js": "^0.4.14",
+    "adm-zip": "^0.5.16",
+    "chokidar": "^4.0.3",
+    "diff": "^8.0.2",
+    "markitdown-ts": "^0.0.7",
+    "open": "^10.2.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.17.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
+    "xml2js": "^0.6.2",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "@types/react": "^19.2.4",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/ui": "^3.2.4",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^37.7.6",
+    "electron-builder": "^26.0.12",
+    "patch-package": "^8.0.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^3.2.4",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.claude.pilot",
+    "productName": "Claude Pilot",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python-env",
+        "to": "python-env",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis",
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -1,0 +1,326 @@
+/**
+ * Copyright (c) 2025 Ray <roydoy7@gmail.com>
+ *
+ * Message Component - Displays a single chat message with Markdown support
+ */
+
+import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import type { MessageContent } from '../../../preload/preload-types';
+
+export interface UsageMetadata {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  // Anthropic prompt caching fields (optional)
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+/**
+ * Message data structure (simplified - no tool_calls, they are separate ToolCallItems now)
+ */
+export interface MessageData {
+  id: string;
+  role: 'user' | 'assistant';
+  content: MessageContent; // Supports both text and multimodal content
+  usage?: UsageMetadata;
+}
+
+interface MessageProps {
+  message: MessageData;
+}
+
+export function Message({ message }: MessageProps) {
+  const isUser = message.role === 'user';
+  const [isSaving, setIsSaving] = useState(false);
+  const [viewingImage, setViewingImage] = useState<{ data: string; mimeType: string } | null>(null);
+
+  // Handle ESC key to close image modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && viewingImage) {
+        setViewingImage(null);
+      }
+    };
+
+    if (viewingImage) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [viewingImage]);
+
+  // Parse multimodal content (text + images)
+  let textContent = '';
+  let images: Array<{ data: string; mimeType: string }> = [];
+
+  if (typeof message.content === 'string') {
+    textContent = message.content;
+  } else if (Array.isArray(message.content)) {
+    // Handle ContentBlock array (multimodal content)
+    for (const block of message.content) {
+      // Type guard for text blocks
+      if (block.type === 'text' && 'text' in block && typeof block.text === 'string') {
+        textContent += block.text;
+      }
+      // Type guard for image blocks (Claude SDK format: { type: 'image', source: { type: 'base64', media_type, data } })
+      else if (block.type === 'image' && 'source' in block && block.source) {
+        const source = block.source as { type: string; media_type: string; data: string };
+        if (source.type === 'base64' && source.data && source.media_type) {
+          images.push({
+            data: source.data,
+            mimeType: source.media_type,
+          });
+        }
+      }
+    }
+  } else {
+    // Fallback for unknown format
+    textContent = JSON.stringify(message.content);
+  }
+
+  const contentString = textContent;
+
+  // Handle save as template
+  const handleSaveAsTemplate = async () => {
+    if (!contentString || contentString.trim() === '') return;
+
+    setIsSaving(true);
+    try {
+      await window.electronAPI.templates.create({
+        name: contentString.length > 50
+          ? contentString.substring(0, 47) + '...'
+          : contentString,
+        content: contentString,
+      });
+
+      // Refresh templates list if PromptsTab is open
+      if ((window as any).__promptsTabRefresh) {
+        (window as any).__promptsTabRefresh();
+      }
+
+      // Show success feedback briefly
+      setTimeout(() => setIsSaving(false), 1000);
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className={`message ${isUser ? 'message-user' : 'message-ai'}`}>
+      {/* Avatar */}
+      <div className="message-avatar">
+        {isUser ? (
+          <div className="avatar-icon user-avatar">U</div>
+        ) : (
+          <div className="avatar-icon ai-avatar">AI</div>
+        )}
+      </div>
+      <div className="message-content">
+        {/* Message bubble - only show if there's content */}
+        {contentString && contentString.trim() !== '' && (
+          <div className="message-bubble">
+            {/* Main message content */}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                // Custom renderers for better styling
+                p: ({ children }) => <p style={{ margin: '0.5em 0' }}>{children}</p>,
+                code: ({ node, className, children, ...props }: any) => {
+                  const inline = !className;
+                  // For block code, ReactMarkdown automatically wraps in <pre><code>
+                  // We just need to style the code tag
+                  return inline ? (
+                    <code
+                      className={className}
+                      style={{
+                        backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+                        padding: '0.125em 0.25em',
+                        borderRadius: '3px',
+                        fontSize: '0.9em',
+                      }}
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                },
+                a: ({ children, href }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: isUser ? 'rgba(255,255,255,0.9)' : 'var(--accent)',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {children}
+                  </a>
+                ),
+                ul: ({ children }) => (
+                  <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>
+                ),
+                blockquote: ({ children }) => (
+                  <blockquote
+                    style={{
+                      margin: '0.5em 0',
+                      paddingLeft: '1em',
+                      borderLeft: `3px solid ${isUser ? 'rgba(255,255,255,0.3)' : 'var(--border)'}`,
+                      opacity: 0.9,
+                    }}
+                  >
+                    {children}
+                  </blockquote>
+                ),
+              }}
+            >
+              {contentString}
+            </ReactMarkdown>
+
+            {/* Display images if present */}
+            {images.length > 0 && (
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                marginTop: contentString ? '8px' : '0',
+                flexWrap: 'wrap',
+              }}>
+                {images.map((img, index) => (
+                  <img
+                    key={index}
+                    src={`data:${img.mimeType};base64,${img.data}`}
+                    alt={`Attachment ${index + 1}`}
+                    style={{
+                      maxWidth: '300px',
+                      maxHeight: '300px',
+                      borderRadius: '8px',
+                      objectFit: 'contain',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      // Open image in modal overlay
+                      setViewingImage(img);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="message-footer">
+          {message.usage && !isUser && (
+            <div className="message-usage">
+              <span title="Input tokens">{message.usage.input_tokens}↑</span>
+              <span title="Output tokens">{message.usage.output_tokens}↓</span>
+              <span title="Total tokens">{message.usage.total_tokens}Σ</span>
+              {/* Prompt caching info - only show if cache was used or created */}
+              {((message.usage.cache_read_input_tokens || 0) > 0 || (message.usage.cache_creation_input_tokens || 0) > 0) && (
+                <>
+                  <span style={{ margin: '0 0.25rem', color: 'var(--text-tertiary)' }}>|</span>
+                  {(message.usage.cache_read_input_tokens || 0) > 0 && (
+                    <span
+                      title={`Cache hit: ${message.usage.cache_read_input_tokens} tokens read from cache (90% cost reduction)`}
+                      style={{ color: '#10b981', fontWeight: '600' }}
+                    >
+                      💾{message.usage.cache_read_input_tokens}
+                    </span>
+                  )}
+                  {(message.usage.cache_creation_input_tokens || 0) > 0 && (
+                    <span
+                      title={`Cache write: ${message.usage.cache_creation_input_tokens} tokens written to cache (25% cost increase, valid for 5 min)`}
+                      style={{ color: '#f59e0b' }}
+                    >
+                      📝{message.usage.cache_creation_input_tokens}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {/* Save as Template button - only for user messages */}
+          {isUser && contentString && contentString.trim() !== '' && (
+            <button
+              onClick={handleSaveAsTemplate}
+              disabled={isSaving}
+              title={isSaving ? 'Saved!' : 'Save as template'}
+              style={{
+                marginLeft: 'auto',
+                padding: '4px 8px',
+                fontSize: '1rem',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '4px',
+                backgroundColor: isSaving ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.1)',
+                color: isSaving ? '#4caf50' : 'rgba(255,255,255,0.8)',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                opacity: 0.7,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaving) {
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '0.7';
+                e.currentTarget.style.backgroundColor = isSaving ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.1)';
+              }}
+            >
+              {isSaving ? '✓' : '📝'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Image modal overlay */}
+      {viewingImage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            cursor: 'pointer',
+          }}
+          onClick={() => setViewingImage(null)}
+        >
+          <img
+            src={`data:${viewingImage.mimeType};base64,${viewingImage.data}`}
+            alt="Full size view"
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              objectFit: 'contain',
+              cursor: 'default',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}

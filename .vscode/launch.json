@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Electron",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:vscode"],
+      "env": {
+        "NODE_ENV": "development",
+        "ELECTRON_IS_DEV": "1",
+        "VSCODE_DEBUG": "1"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/dist/**",
+        "http://localhost:5173/**",
+        "!**/node_modules/**"
+      ],
+      "outputCapture": "std"
+    }
+  ]
+}

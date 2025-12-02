@@ -1,0 +1,277 @@
+/**
+ * Copyright (c) 2025 Ray <roydoy7@gmail.com>
+ *
+ * i18n types - Type definitions for internationalization
+ */
+
+export type Language = 'en' | 'zh' | 'ja';
+
+export interface Translation {
+  // Common
+  common: {
+    appName: string;
+    loading: string;
+    buttons: {
+      save: string;
+      cancel: string;
+      delete: string;
+      edit: string;
+      apply: string;
+      close: string;
+      clear: string;
+      remove: string;
+      approve: string;
+      reject: string;
+      send: string;
+      upload: string;
+      copyCode: string;
+      copied: string;
+    };
+    messages: {
+      success: string;
+      error: string;
+      confirm: string;
+    };
+    status: {
+      pending: string;
+      inProgress: string;
+      completed: string;
+      failed: string;
+      rejected: string;
+    };
+    time: {
+      today: string;
+      yesterday: string;
+      daysAgo: (days: number) => string;
+    };
+  };
+
+  // Header
+  header: {
+    hideRightPanel: string;
+    showRightPanel: string;
+    roles: {
+      officeAssistant: string;
+      translator: string;
+    };
+    providers: {
+      openai: string;
+      anthropic: string;
+      google: string;
+      lmstudio: string;
+    };
+  };
+
+  // Session Configuration
+  sessionConfig: {
+    title: string;
+    chooseRole: string;
+    chooseRoleDescription: string;
+    selectProviderModel: string;
+    selectProviderModelDescription: string;
+    workspaceInstruction: string;
+    workspaceLink: string;
+    startConversationInstruction: string;
+    loadingConfiguration: string;
+    authMethod: string;
+    oauth: string;
+    apiKey: string;
+    authStatus: string;
+    authenticated: string;
+    notAuthenticated: string;
+    authRequired: string;
+    authRequiredShort: string;
+    noApiKey: string;
+    configureApiKey: string;
+    noAuthRequired: string;
+    usingProvider: (provider: string) => string;
+    usingOAuth: string;
+    oauthNotAuthenticated: string;
+    clickOAuthToAuthenticate: string;
+    apiKeyNotConfigured: (key: string) => string;
+    setEnvironmentVariable: (key: string) => string;
+    setEnvironmentVariableToUse: string;
+    noModelsAvailable: string;
+    logout: string;
+    selectWorkingDirectory: string;
+    selectWorkingDirectoryDescription: string;
+    noDirectorySelected: string;
+    browseDirectory: string;
+  };
+
+  // Input Area
+  inputArea: {
+    placeholder: string;
+    browseWorkspace: string;
+    bold: string;
+    italic: string;
+    code: string;
+    clear: string;
+    uploadImage: string;
+    cancelRequest: string;
+    sendMessage: string;
+    removeImage: string;
+  };
+
+  // Message
+  message: {
+    saveAsTemplate: string;
+    saved: string;
+    attachment: (index: number) => string;
+    tokens: {
+      input: string;
+      output: string;
+      total: string;
+      cacheHit: (count: number) => string;
+      cacheWrite: (count: number) => string;
+    };
+  };
+
+  // Message List
+  messageList: {
+    noMessages: string;
+    newMessages: string;
+    scrollToBottom: string;
+  };
+
+  // Tool Call
+  toolCall: {
+    showCode: string;
+    hideCode: string;
+    showResult: string;
+    hideResult: string;
+    showDetails: string;
+    hideDetails: string;
+    showTasks: string;
+    hideTasks: string;
+    error: string;
+    output: string;
+    agentType: string;
+    requirements: string;
+    workingDirectory: string;
+    file: string;
+    operation: string;
+    pages: string;
+    query: string;
+    outputFile: string;
+    sources: string;
+  };
+
+  // Status
+  status: {
+    aiThinking: string;
+    executingTool: (toolName: string) => string;
+    waitingForApproval: string;
+  };
+
+  // Workspace Browser
+  workspaceBrowser: {
+    title: string;
+    description: string;
+    addWorkspace: string;
+    addWorkspaceTooltip: string;
+    loading: string;
+    noWorkspacesTitle: string;
+    noWorkspacesDescription: string;
+    workspaceLabel: (index: number) => string;
+    remove: string;
+    removeTooltip: string;
+    failedToRead: string;
+    selectedCount: (count: number) => string;
+    clearSelection: string;
+    insertPaths: string;
+    close: string;
+  };
+
+  // Right Panel
+  rightPanel: {
+    sessions: string;
+    workspace: string;
+    prompts: string;
+    closePanel: string;
+
+    // Sessions Tab
+    sessionsTab: {
+      loading: string;
+      newSession: string;
+      noSessions: string;
+      newSessionFallback: string;
+      deleteAllTooltip: (count: number) => string;
+      noSessionsToDelete: string;
+      deleteAllConfirm: (count: number) => string;
+      deleteSessionConfirm: string;
+    };
+
+    // Prompts Tab
+    promptsTab: {
+      title: string;
+      description: string;
+      newTemplate: string;
+      clearAll: string;
+      noTemplates: string;
+      editTooltip: string;
+      deleteTooltip: string;
+      deleteConfirm: string;
+      deleteAllConfirm: (count: number) => string;
+    };
+
+    // Workspace Tab
+    workspaceTab: {
+      title: string;
+      description: string;
+      pending: (count: number) => string;
+      applied: (count: number) => string;
+      addWorkspace: string;
+      applyToSession: string;
+      removeTooltip: string;
+      noSessionTooltip: string;
+      addWorkspacesTooltip: string;
+      applyWorkspacesTooltip: string;
+      noSessionWarning: string;
+      addWorkspacesInfo: string;
+      workspaceLabel: (index: number) => string;
+    };
+  };
+
+  // Template Editor
+  templateEditor: {
+    title: string;
+    namePlaceholder: string;
+    contentPlaceholder: string;
+    edit: string;
+    preview: string;
+    bold: string;
+    italic: string;
+    codeBlock: string;
+    inlineCode: string;
+    link: string;
+    bulletList: string;
+    numberedList: string;
+    heading: string;
+    cancel: string;
+    save: string;
+    saving: string;
+    noContent: string;
+  };
+
+  // Error Messages
+  errors: {
+    failedToCancel: string;
+    failedToCreateSession: string;
+    failedToLoadModels: string;
+    failedToUpdateTitle: string;
+    failedToSendMessage: string;
+    failedToSaveTemplate: string;
+    failedToDeleteTemplate: string;
+    failedToDeleteAllTemplates: string;
+    failedToDeleteSession: string;
+    failedToLoadSessions: string;
+    failedToLoadTemplates: string;
+    failedToLoadWorkspaces: string;
+    failedToAddWorkspace: string;
+    failedToRemoveWorkspace: string;
+    failedToApplyWorkspaces: string;
+    failedToReadImage: string;
+    failedToPasteImage: string;
+  };
+}
