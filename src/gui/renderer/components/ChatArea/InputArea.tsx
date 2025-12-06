@@ -15,6 +15,16 @@ import { useLanguage } from '../../i18n/LanguageContext';
 type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk';
 
 /**
+ * Setting source type - matches SDK SettingSource
+ */
+type SettingSource = 'user' | 'project' | 'local';
+
+/**
+ * All available setting sources
+ */
+const ALL_SETTING_SOURCES: SettingSource[] = ['user', 'project', 'local'];
+
+/**
  * Permission mode display config
  */
 interface PermissionModeConfig {
@@ -22,6 +32,16 @@ interface PermissionModeConfig {
   color: string;
   bgColor: string;
 }
+
+/**
+ * SVG icon for setting sources
+ */
+const SettingSourcesIcon = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+  </svg>
+);
 
 /**
  * SVG icons for permission modes
@@ -106,6 +126,15 @@ interface AttachedImage {
   preview: string; // data URL for preview
 }
 
+/**
+ * Context usage information for display
+ */
+interface ContextUsage {
+  usedTokens: number;
+  totalTokens: number;
+  percentUsed: number;
+}
+
 interface InputAreaProps {
   sessionId?: string;
   onSend: (message: MessageContent) => void;
@@ -117,6 +146,9 @@ interface InputAreaProps {
   onTemplateApplied?: () => void;
   permissionMode?: PermissionMode;
   onPermissionModeChange?: (mode: PermissionMode) => void;
+  settingSources?: SettingSource[];
+  onSettingSourcesChange?: (sources: SettingSource[]) => void;
+  contextUsage?: ContextUsage;
 }
 
 export function InputArea({
@@ -130,15 +162,20 @@ export function InputArea({
   onTemplateApplied,
   permissionMode = 'default',
   onPermissionModeChange,
+  settingSources = [...ALL_SETTING_SOURCES],
+  onSettingSourcesChange,
+  contextUsage,
 }: InputAreaProps) {
   const { t } = useLanguage();
   const [message, setMessage] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [showWorkspaceBrowser, setShowWorkspaceBrowser] = useState(false);
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
+  const [showSettingSourcesMenu, setShowSettingSourcesMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const permissionMenuRef = useRef<HTMLDivElement>(null);
+  const settingSourcesMenuRef = useRef<HTMLDivElement>(null);
 
   // Close permission menu when clicking outside
   useEffect(() => {
@@ -166,6 +203,44 @@ export function InputArea({
   const getModeInfo = useCallback((mode: PermissionMode) => {
     const modeTranslations = t.inputArea.permissionMode.modes;
     return modeTranslations[mode];
+  }, [t]);
+
+  // Close setting sources menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingSourcesMenuRef.current && !settingSourcesMenuRef.current.contains(event.target as Node)) {
+        setShowSettingSourcesMenu(false);
+      }
+    };
+
+    if (showSettingSourcesMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSettingSourcesMenu]);
+
+  // Handle setting source toggle
+  const handleSettingSourceToggle = useCallback((source: SettingSource) => {
+    if (!onSettingSourcesChange) return;
+
+    const isSelected = settingSources.includes(source);
+    let newSources: SettingSource[];
+
+    if (isSelected) {
+      // Don't allow deselecting all sources - keep at least one
+      if (settingSources.length <= 1) return;
+      newSources = settingSources.filter(s => s !== source);
+    } else {
+      newSources = [...settingSources, source];
+    }
+
+    onSettingSourcesChange(newSources);
+  }, [settingSources, onSettingSourcesChange]);
+
+  // Get localized setting source info
+  const getSettingSourceInfo = useCallback((source: SettingSource) => {
+    const sourceTranslations = t.inputArea.settingSources?.sources;
+    return sourceTranslations?.[source] || { name: source, description: '' };
   }, [t]);
 
   // Apply template content when it changes
@@ -517,8 +592,10 @@ export function InputArea({
           />
         </div>
         <div className="input-actions" style={{ justifyContent: 'space-between' }}>
-          {/* Left side - Permission mode dropdown */}
-          <div ref={permissionMenuRef} style={{ position: 'relative' }}>
+          {/* Left side - Permission mode and Setting sources dropdowns */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* Permission mode dropdown */}
+            <div ref={permissionMenuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setShowPermissionMenu(!showPermissionMenu)}
               disabled={disabled || !onPermissionModeChange}
@@ -613,6 +690,158 @@ export function InputArea({
                     </button>
                   );
                 })}
+              </div>
+            )}
+            </div>
+
+            {/* Setting sources dropdown */}
+            <div ref={settingSourcesMenuRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowSettingSourcesMenu(!showSettingSourcesMenu)}
+                disabled={disabled || !onSettingSourcesChange}
+                title={t.inputArea.settingSources?.label || 'Setting Sources'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  width: 'auto',
+                  height: 'auto',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap',
+                  color: settingSources.length === ALL_SETTING_SOURCES.length ? 'var(--text-secondary)' : '#2196f3',
+                  backgroundColor: settingSources.length === ALL_SETTING_SOURCES.length ? 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))' : 'rgba(33, 150, 243, 0.12)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: onSettingSourcesChange ? 'pointer' : 'default',
+                  opacity: onSettingSourcesChange ? 1 : 0.5,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{SettingSourcesIcon}</span>
+                <span style={{ flexShrink: 0 }}>{settingSources.length}/{ALL_SETTING_SOURCES.length}</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '2px' }}>
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+
+              {/* Dropdown menu */}
+              {showSettingSourcesMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: 0,
+                    marginBottom: '4px',
+                    minWidth: '280px',
+                    backgroundColor: 'var(--bg-primary, #ffffff)',
+                    border: '1px solid var(--border-color, #dee2e6)',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    zIndex: 1000,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color, #dee2e6)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {t.inputArea.settingSources?.label || 'Setting Sources'}
+                  </div>
+                  {ALL_SETTING_SOURCES.map((source) => {
+                    const sourceInfo = getSettingSourceInfo(source);
+                    const isSelected = settingSources.includes(source);
+                    const isDisabled = isSelected && settingSources.length <= 1;
+                    return (
+                      <button
+                        key={source}
+                        onClick={() => handleSettingSourceToggle(source)}
+                        disabled={isDisabled}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          textAlign: 'left',
+                          opacity: isDisabled ? 0.5 : 1,
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isDisabled) e.currentTarget.style.backgroundColor = 'var(--bg-secondary, #f8f9fa)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <span style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '3px',
+                          border: `1.5px solid ${isSelected ? '#2196f3' : 'var(--border-color, #dee2e6)'}`,
+                          backgroundColor: isSelected ? '#2196f3' : 'transparent',
+                          flexShrink: 0,
+                        }}>
+                          {isSelected && (
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 500, color: isSelected ? '#2196f3' : 'var(--text-primary)', marginBottom: '2px' }}>
+                            {sourceInfo.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                            {sourceInfo.description}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Context usage indicator */}
+            {contextUsage && (
+              <div
+                title={`${contextUsage.usedTokens.toLocaleString()} / ${contextUsage.totalTokens.toLocaleString()} tokens`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: contextUsage.percentUsed >= 90 ? '#ef4444' : contextUsage.percentUsed >= 75 ? '#f59e0b' : 'var(--text-secondary)',
+                  backgroundColor: contextUsage.percentUsed >= 90 ? 'rgba(239, 68, 68, 0.12)' : contextUsage.percentUsed >= 75 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))',
+                  borderRadius: '4px',
+                }}
+              >
+                {/* Progress bar */}
+                <div style={{
+                  width: '40px',
+                  height: '4px',
+                  backgroundColor: 'var(--border-color, rgba(128, 128, 128, 0.3))',
+                  borderRadius: '2px',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${Math.min(100, contextUsage.percentUsed)}%`,
+                    height: '100%',
+                    backgroundColor: contextUsage.percentUsed >= 90 ? '#ef4444' : contextUsage.percentUsed >= 75 ? '#f59e0b' : '#10b981',
+                    borderRadius: '2px',
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+                <span>{contextUsage.percentUsed}%</span>
               </div>
             )}
           </div>

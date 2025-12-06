@@ -5,13 +5,45 @@
  * Uses history-based updates instead of complex streaming state management
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { SessionConfig } from './SessionConfig';
-import type { MessageListItem, MessageContent, PermissionMode } from '../../../preload/preload-types';
+import type { MessageListItem, MessageContent, PermissionMode, SettingSource, UsageMetadata } from '../../../preload/preload-types';
 import { RoleType } from '../../../../core/roles/role-enum.js';
 import { SessionAgent, SessionAgentCache } from '../../utils/SessionAgent.js';
+
+/**
+ * Get context window size based on model name
+ * Based on SDK's cm() function logic
+ */
+function getContextWindowSize(modelName: string): number {
+  if (modelName.includes('[1m]')) return 1000000; // 1M context models
+  return 200000; // Default 200K
+}
+
+/**
+ * Get max output tokens based on model name
+ * Based on SDK's zB0() function logic
+ */
+function getMaxOutputTokens(modelName: string): number {
+  const model = modelName.toLowerCase();
+  if (model.includes('3-5')) return 8192;
+  if (model.includes('claude-3-opus')) return 4096;
+  if (model.includes('claude-3-sonnet')) return 8192;
+  if (model.includes('claude-3-haiku')) return 4096;
+  if (model.includes('opus-4-5')) return 64000;
+  if (model.includes('opus-4')) return 32000;
+  if (model.includes('sonnet-4') || model.includes('haiku-4')) return 64000;
+  return 32000;
+}
+
+/**
+ * Calculate total tokens from usage
+ */
+function calculateTotalTokens(usage: UsageMetadata): number {
+  return usage.input_tokens + usage.output_tokens;
+}
 
 interface ChatAreaProps {
   sessionId?: string | null;
@@ -30,6 +62,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   const [rejectedTools, setRejectedTools] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
+  const [settingSources, setSettingSources] = useState<SettingSource[]>(['user', 'project', 'local']);
 
   // Session configuration state (for new sessions)
   const [sessionConfig, setSessionConfig] = useState<{
@@ -53,11 +86,16 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     onRejectedToolsChange: setRejectedTools,
   });
 
-  // Load permission mode on mount
+  // Load permission mode and setting sources on mount
   useEffect(() => {
     window.electronAPI.agent.getPermissionMode().then((result) => {
       if (result.success) {
         setPermissionMode(result.mode);
+      }
+    });
+    window.electronAPI.agent.getSettingSources().then((result) => {
+      if (result.success) {
+        setSettingSources(result.sources);
       }
     });
   }, []);
@@ -142,6 +180,20 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
       }
     } catch (error) {
       console.error('Failed to set permission mode:', error);
+    }
+  };
+
+  // Handle setting sources change
+  const handleSettingSourcesChange = async (sources: SettingSource[]) => {
+    try {
+      const result = await window.electronAPI.agent.setSettingSources(sources);
+      if (result.success) {
+        setSettingSources(sources);
+      } else {
+        console.error('Failed to set setting sources:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to set setting sources:', error);
     }
   };
 
@@ -286,6 +338,29 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     }
   };
 
+  // Calculate context usage from the last assistant message with usage data
+  const contextUsage = useMemo(() => {
+    // Find the last assistant message with usage data
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      if (item.type === 'message' && item.role === 'assistant' && item.usage) {
+        const modelName = sessionConfig.modelName;
+        const contextWindowSize = getContextWindowSize(modelName);
+        const maxOutputTokens = getMaxOutputTokens(modelName);
+        const availableInputTokens = contextWindowSize - maxOutputTokens;
+        const usedTokens = calculateTotalTokens(item.usage);
+        const percentUsed = Math.min(100, Math.round((usedTokens / availableInputTokens) * 100));
+
+        return {
+          usedTokens,
+          totalTokens: availableInputTokens,
+          percentUsed,
+        };
+      }
+    }
+    return undefined;
+  }, [items, sessionConfig.modelName]);
+
   return (
     <div className="chat-area">
       {sessionStarted ? (
@@ -310,6 +385,9 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         onTemplateApplied={onTemplateApplied}
         permissionMode={permissionMode}
         onPermissionModeChange={handlePermissionModeChange}
+        settingSources={settingSources}
+        onSettingSourcesChange={handleSettingSourcesChange}
+        contextUsage={contextUsage}
       />
     </div>
   );
