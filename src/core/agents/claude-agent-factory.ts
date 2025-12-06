@@ -10,7 +10,7 @@ import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { authManager } from '../auth/auth-manager.js';
 import { getRoleSystemPrompt } from '../roles/role-system-prompts.js';
 import { getSystemReminders } from '../context/system-reminders.js';
-import { getAvailableTools, getAutoApprovedTools } from '../roles/role-tool-sets.js';
+import { getAvailableTools, getAutoApprovedTools, getMcpServers } from '../roles/role-tool-sets.js';
 import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel, supportsExtendedThinking } from '../providers/model-list-manager.js';
 
@@ -147,8 +147,10 @@ export async function createAgentFromSessionData(
   // Get tools for this role:
   // - availableTools: All tools the agent CAN use (passed as 'tools')
   // - autoApprovedTools: Safe tools that bypass canUseTool callback (passed as 'allowedTools')
+  // - mcpServers: Custom MCP servers for additional tools (e.g., Python execution)
   const availableTools = getAvailableTools(session.role);
   const autoApprovedTools = getAutoApprovedTools(session.role);
+  const mcpServers = getMcpServers(session.role);
 
   // Build agent config (extends SDK Options)
   // Note: canUseTool is set dynamically in ClaudeAgent.run() when needed
@@ -161,6 +163,7 @@ export async function createAgentFromSessionData(
     systemPrompt,
     tools: [...availableTools], // All tools the agent can use
     allowedTools: [...autoApprovedTools], // Safe tools auto-approved (bypass canUseTool)
+    mcpServers, // Custom MCP servers for Python and other tools
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
     permissionMode: 'default',

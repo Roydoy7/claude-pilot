@@ -7,9 +7,13 @@
  * Two types of tool lists:
  * - availableTools: All tools the role can use (passed to SDK as 'tools')
  * - autoApprovedTools: Safe tools that don't require user approval (passed as 'allowedTools')
+ *
+ * MCP Servers:
+ * - Custom tools provided via MCP servers (e.g., Python execution)
  */
 
 import { RoleType } from './role-enum.js';
+import { pythonMcpServer } from '../tools/python-mcp-server.js';
 
 /**
  * All available Claude SDK built-in tools
@@ -109,4 +113,30 @@ export function getAvailableTools(role: RoleType): readonly string[] {
  */
 export function getAutoApprovedTools(role: RoleType): readonly string[] {
   return ROLE_AUTO_APPROVED_TOOLS[role];
+}
+
+/**
+ * MCP Server type - use typeof to get the actual type
+ */
+type McpServer = typeof pythonMcpServer;
+
+/**
+ * MCP servers configuration for each role
+ * Key is the server name, value is the server instance
+ */
+export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
+  [RoleType.OFFICE_ASSISTANT]: {
+    python: pythonMcpServer,
+  },
+
+  [RoleType.TRANSLATOR]: {},
+
+  [RoleType.CLAUDE_CODE]: {},
+};
+
+/**
+ * Get MCP servers for a specific role
+ */
+export function getMcpServers(role: RoleType): Record<string, McpServer> {
+  return ROLE_MCP_SERVERS[role];
 }
