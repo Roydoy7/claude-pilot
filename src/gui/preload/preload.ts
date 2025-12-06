@@ -17,6 +17,7 @@ import type {
   StreamEventData,
   SessionCreateRequest,
   SessionSwitchRequest,
+  PermissionMode,
 } from './preload-types.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
@@ -56,11 +57,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelRequest: (sessionId?: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('agent:cancelRequest', sessionId),
 
-    approveTools: (baseInterruptId: string, indexedInterruptIds: string[]): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:approveTools', baseInterruptId, indexedInterruptIds),
+    // Tool approval via canUseTool callback
+    onToolApprovalRequest: (callback: (data: { sessionId: string; toolUseId: string; toolName: string; toolInput: Record<string, unknown> }) => void) => {
+      ipcRenderer.on('agent:toolApprovalRequest', (_event, data) => {
+        callback(data);
+      });
+    },
 
-    rejectTools: (baseInterruptId: string, indexedInterruptIds: string[], feedback?: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:rejectTools', baseInterruptId, indexedInterruptIds, feedback),
+    approveTool: (toolUseId: string, updatedInput?: Record<string, unknown>): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('agent:approveTool', toolUseId, updatedInput),
+
+    rejectTool: (toolUseId: string, message?: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('agent:rejectTool', toolUseId, message),
+
+    getPermissionMode: (): Promise<{ success: boolean; mode: PermissionMode }> =>
+      ipcRenderer.invoke('agent:getPermissionMode'),
+
+    setPermissionMode: (mode: PermissionMode): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('agent:setPermissionMode', mode),
   },
 
   // Session management
@@ -77,7 +91,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     switch: (request: SessionSwitchRequest): Promise<ChatResponse> =>
       ipcRenderer.invoke('session:switch', request),
 
-    delete: (sessionId: string): Promise<void> =>
+    delete: (sessionId: string): Promise<{ success: boolean; sessionId: string }> =>
       ipcRenderer.invoke('session:delete', sessionId),
 
     updateTitle: (sessionId: string, newTitle: string) =>

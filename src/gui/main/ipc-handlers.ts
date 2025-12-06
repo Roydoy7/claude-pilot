@@ -7,7 +7,7 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { claudeAgentService } from '../../core/services/claude-agent-service.js';
 import type { ChatRequest, StreamEventCallback } from '../../core/services/claude-agent-service.js';
-import type { StreamEvent } from '../../core/agents/claude-agent.js';
+import type { StreamEvent, ToolApprovalRequestHandler } from '../../core/agents/claude-agent.js';
 import { RoleType } from '../../core/roles/role-enum.js';
 import { SessionManager } from '../../core/sessions/session-manager.js';
 import { modelListManager } from '../../core/providers/model-list-manager.js';
@@ -21,6 +21,28 @@ import path from 'path';
  * Register all IPC handlers
  */
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
+  // Set up tool approval request handler once at initialization
+  // This handler notifies the frontend when a tool needs user approval
+  const toolApprovalRequestHandler: ToolApprovalRequestHandler = (
+    toolUseId: string,
+    toolName: string,
+    toolInput: Record<string, unknown>
+  ) => {
+    console.log('[IPC] toolApprovalRequestHandler invoked:', { toolUseId, toolName });
+    const sessionId = claudeAgentService.getCurrentSessionId();
+    if (sessionId) {
+      mainWindow.webContents.send('agent:toolApprovalRequest', {
+        sessionId,
+        toolUseId,
+        toolName,
+        toolInput,
+      });
+    }
+  };
+
+  // Register the handler with the service
+  claudeAgentService.setToolApprovalRequestHandler(toolApprovalRequestHandler);
+
   /**
    * Initialize service - load sessions and last used agent
    */
@@ -70,37 +92,53 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   });
 
   /**
-   * Approve tool calls - placeholder until full implementation
+   * Approve a tool call
    */
   ipcMain.handle(
-    'agent:approveTools',
+    'agent:approveTool',
     async (
       _event,
-      baseInterruptId: string,
-      indexedInterruptIds: string[]
+      toolUseId: string,
+      updatedInput?: Record<string, unknown>
     ) => {
-      // TODO: Implement tool approval in Claude Agent SDK
-      console.log('[IPC] approveTools called:', { baseInterruptId, indexedInterruptIds });
-      return { success: true };
+      return claudeAgentService.approveToolCall(toolUseId, updatedInput);
     }
   );
 
   /**
-   * Reject tool calls - placeholder until full implementation
+   * Reject a tool call
    */
   ipcMain.handle(
-    'agent:rejectTools',
+    'agent:rejectTool',
     async (
       _event,
-      baseInterruptId: string,
-      indexedInterruptIds: string[],
-      feedback?: string
+      toolUseId: string,
+      message?: string
     ) => {
-      // TODO: Implement tool rejection in Claude Agent SDK
-      console.log('[IPC] rejectTools called:', { baseInterruptId, indexedInterruptIds, feedback });
-      return { success: true };
+      return claudeAgentService.rejectToolCall(toolUseId, message);
     }
   );
+
+  /**
+   * Get current permission mode
+   */
+  ipcMain.handle('agent:getPermissionMode', async () => {
+    const mode = claudeAgentService.getPermissionMode();
+    return { success: true, mode };
+  });
+
+  /**
+   * Set permission mode
+   */
+  ipcMain.handle('agent:setPermissionMode', async (_event, mode: string) => {
+    try {
+      await claudeAgentService.setPermissionMode(mode as import('../../core/agents/claude-agent.js').PermissionMode);
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] setPermissionMode error:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
 
   /**
    * Session Management

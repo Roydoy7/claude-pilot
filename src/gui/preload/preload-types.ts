@@ -9,9 +9,14 @@ import type { RoleType } from '../../core/roles/role-enum.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
-import type { AgentState, StreamEvent } from '../../core/agents/claude-agent.js';
+import type { AgentState, StreamEvent, PermissionMode } from '../../core/agents/claude-agent.js';
 import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
+
+/**
+ * Re-export PermissionMode for frontend use
+ */
+export type { PermissionMode };
 
 /**
  * Re-export types for consistency
@@ -110,10 +115,10 @@ export interface FileTreeNode {
 }
 
 /**
- * Message list item - unified type for messages, tool calls, status indicators, and thinking
+ * Message list item - unified type for messages, tool calls, status indicators, thinking, and cancelled
  */
 export interface MessageListItem {
-  type: 'message' | 'tool_call' | 'status' | 'thinking';
+  type: 'message' | 'tool_call' | 'status' | 'thinking' | 'cancelled';
   id: string;
   timestamp: number;
 
@@ -137,12 +142,13 @@ export interface MessageListItem {
 }
 
 /**
- * Tool interrupt/approval request event
+ * Tool approval request event (canUseTool callback based)
  */
-export interface ToolInterruptEvent {
-  sessionId?: string;
-  toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }>;
-  interruptId: string;
+export interface ToolApprovalRequestEvent {
+  sessionId: string;
+  toolUseId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
 }
 
 /**
@@ -248,8 +254,12 @@ export interface ElectronAPI {
     getCurrentInfo: () => Promise<{ success: boolean; data?: CurrentAgentInfo }>;
     onStreamEvent: (callback: (data: StreamEventData) => void) => void;
     cancelRequest: (sessionId?: string) => Promise<{ success: boolean; error?: string }>;
-    approveTools: (baseInterruptId: string, indexedInterruptIds: string[]) => Promise<{ success: boolean; error?: string }>;
-    rejectTools: (baseInterruptId: string, indexedInterruptIds: string[], feedback?: string) => Promise<{ success: boolean; error?: string }>;
+    // Tool approval via canUseTool callback
+    onToolApprovalRequest: (callback: (data: ToolApprovalRequestEvent) => void) => void;
+    approveTool: (toolUseId: string, updatedInput?: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+    rejectTool: (toolUseId: string, message?: string) => Promise<{ success: boolean; error?: string }>;
+    getPermissionMode: () => Promise<{ success: boolean; mode: PermissionMode }>;
+    setPermissionMode: (mode: PermissionMode) => Promise<{ success: boolean; error?: string }>;
   };
 
   // Session management
