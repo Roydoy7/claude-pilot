@@ -4,9 +4,100 @@
  * InputArea Component - Teams-style layout with consistent theme
  */
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
 import type { MessageContent } from '../../../preload/preload-types';
 import { WorkspaceBrowser } from './WorkspaceBrowser';
+import { useLanguage } from '../../i18n/LanguageContext';
+
+/**
+ * Permission mode type - matches SDK PermissionMode
+ */
+type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk';
+
+/**
+ * Permission mode display config
+ */
+interface PermissionModeConfig {
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+}
+
+/**
+ * SVG icons for permission modes
+ */
+const PermissionIcons = {
+  // Shield icon for default mode
+  shield: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+    </svg>
+  ),
+  // Edit/pencil icon for acceptEdits mode
+  edit: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+  ),
+  // Zap/lightning icon for YOLO mode
+  zap: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </svg>
+  ),
+  // Clipboard icon for plan mode
+  clipboard: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+    </svg>
+  ),
+  // Volume-x icon for dontAsk mode
+  volumeX: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <line x1="23" y1="9" x2="17" y2="15"></line>
+      <line x1="17" y1="9" x2="23" y2="15"></line>
+    </svg>
+  ),
+};
+
+/**
+ * Get permission mode configurations (visual only, labels from i18n)
+ */
+const PERMISSION_MODE_CONFIGS: Record<PermissionMode, PermissionModeConfig> = {
+  default: {
+    icon: PermissionIcons.shield,
+    color: 'var(--text-secondary)',
+    bgColor: 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))',
+  },
+  acceptEdits: {
+    icon: PermissionIcons.edit,
+    color: '#4caf50',
+    bgColor: 'rgba(76, 175, 80, 0.12)',
+  },
+  bypassPermissions: {
+    icon: PermissionIcons.zap,
+    color: '#ff9800',
+    bgColor: 'rgba(255, 152, 0, 0.12)',
+  },
+  plan: {
+    icon: PermissionIcons.clipboard,
+    color: '#2196f3',
+    bgColor: 'rgba(33, 150, 243, 0.12)',
+  },
+  dontAsk: {
+    icon: PermissionIcons.volumeX,
+    color: '#9c27b0',
+    bgColor: 'rgba(156, 39, 176, 0.12)',
+  },
+};
+
+/**
+ * All permission modes in order
+ */
+const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk'];
 
 interface AttachedImage {
   id: string;
@@ -24,6 +115,8 @@ interface InputAreaProps {
   placeholder?: string;
   templateContent?: string;
   onTemplateApplied?: () => void;
+  permissionMode?: PermissionMode;
+  onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
 export function InputArea({
@@ -35,12 +128,45 @@ export function InputArea({
   placeholder = 'Type a message',
   templateContent,
   onTemplateApplied,
+  permissionMode = 'default',
+  onPermissionModeChange,
 }: InputAreaProps) {
+  const { t } = useLanguage();
   const [message, setMessage] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [showWorkspaceBrowser, setShowWorkspaceBrowser] = useState(false);
+  const [showPermissionMenu, setShowPermissionMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const permissionMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close permission menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (permissionMenuRef.current && !permissionMenuRef.current.contains(event.target as Node)) {
+        setShowPermissionMenu(false);
+      }
+    };
+
+    if (showPermissionMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showPermissionMenu]);
+
+  // Handle permission mode selection
+  const handlePermissionModeSelect = useCallback((mode: PermissionMode) => {
+    if (onPermissionModeChange) {
+      onPermissionModeChange(mode);
+    }
+    setShowPermissionMenu(false);
+  }, [onPermissionModeChange]);
+
+  // Get localized mode info
+  const getModeInfo = useCallback((mode: PermissionMode) => {
+    const modeTranslations = t.inputArea.permissionMode.modes;
+    return modeTranslations[mode];
+  }, [t]);
 
   // Apply template content when it changes
   useEffect(() => {
@@ -390,46 +516,149 @@ export function InputArea({
             }}
           />
         </div>
-        <div className="input-actions">
-          <button
-            className="toolbar-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Upload Image"
-            disabled={disabled}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <circle cx="8.5" cy="8.5" r="1.5"></circle>
-              <polyline points="21 15 16 10 5 21"></polyline>
-            </svg>
-          </button>
-          {isProcessing ? (
+        <div className="input-actions" style={{ justifyContent: 'space-between' }}>
+          {/* Left side - Permission mode dropdown */}
+          <div ref={permissionMenuRef} style={{ position: 'relative' }}>
             <button
-              className="toolbar-btn cancel-btn"
-              onClick={onCancel}
-              title="Cancel Request"
+              onClick={() => setShowPermissionMenu(!showPermissionMenu)}
+              disabled={disabled || !onPermissionModeChange}
+              title={getModeInfo(permissionMode).description}
               style={{
-                backgroundColor: 'var(--error, #dc3545)',
-                color: 'white',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                width: 'auto',
+                height: 'auto',
+                fontSize: '11px',
+                fontWeight: 500,
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                color: PERMISSION_MODE_CONFIGS[permissionMode].color,
+                backgroundColor: PERMISSION_MODE_CONFIGS[permissionMode].bgColor,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: onPermissionModeChange ? 'pointer' : 'default',
+                opacity: onPermissionModeChange ? 1 : 0.5,
+                transition: 'all 0.15s ease',
               }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{PERMISSION_MODE_CONFIGS[permissionMode].icon}</span>
+              <span style={{ flexShrink: 0 }}>{getModeInfo(permissionMode).name}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '2px' }}>
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            {/* Dropdown menu */}
+            {showPermissionMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: 0,
+                  marginBottom: '4px',
+                  minWidth: '280px',
+                  backgroundColor: 'var(--bg-primary, #ffffff)',
+                  border: '1px solid var(--border-color, #dee2e6)',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  zIndex: 1000,
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color, #dee2e6)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  {t.inputArea.permissionMode.label}
+                </div>
+                {PERMISSION_MODES.map((mode) => {
+                  const config = PERMISSION_MODE_CONFIGS[mode];
+                  const modeInfo = getModeInfo(mode);
+                  const isSelected = mode === permissionMode;
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => handlePermissionModeSelect(mode)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: 'none',
+                        backgroundColor: isSelected ? 'var(--bg-tertiary, rgba(0, 0, 0, 0.05))' : 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-secondary, #f8f9fa)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', color: config.color, flexShrink: 0 }}>
+                        {config.icon}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 500, color: isSelected ? config.color : 'var(--text-primary)', marginBottom: '2px' }}>
+                          {modeInfo.name}
+                          {isSelected && <span style={{ marginLeft: '6px', fontSize: '10px' }}>✓</span>}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                          {modeInfo.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right side - Upload and Send buttons */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="toolbar-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload Image"
+              disabled={disabled}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
               </svg>
             </button>
-          ) : (
-            <button
-              className="toolbar-btn send-btn"
-              onClick={handleSend}
-              disabled={disabled}
-              title="Send (Enter)"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
-          )}
+            {isProcessing ? (
+              <button
+                className="toolbar-btn cancel-btn"
+                onClick={onCancel}
+                title="Cancel Request"
+                style={{
+                  backgroundColor: 'var(--error, #dc3545)',
+                  color: 'white',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                </svg>
+              </button>
+            ) : (
+              <button
+                className="toolbar-btn send-btn"
+                onClick={handleSend}
+                disabled={disabled}
+                title="Send (Enter)"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

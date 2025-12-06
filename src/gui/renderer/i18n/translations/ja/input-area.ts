@@ -15,4 +15,29 @@ export const inputAreaJa = {
   cancelRequest: 'リクエストをキャンセル',
   sendMessage: '送信 (Enter)',
   removeImage: '画像を削除',
+  permissionMode: {
+    label: '権限モード',
+    modes: {
+      default: {
+        name: 'Default',
+        description: 'ファイル編集や危険な操作の前に確認を求める',
+      },
+      acceptEdits: {
+        name: 'Accept Edits',
+        description: 'ファイル編集を自動承認、ただし他の危険な操作（Bashコマンドなど）は確認が必要',
+      },
+      bypassPermissions: {
+        name: 'Bypass Permissions',
+        description: 'ファイル編集やBashコマンドを含むすべての操作を自動承認（YOLOモード）',
+      },
+      plan: {
+        name: 'Plan',
+        description: '分析と計画のみ、ファイルの変更は許可されない',
+      },
+      dontAsk: {
+        name: "Don't Ask",
+        description: 'サイレントモード - すべての確認プロンプトをスキップ、自動化シナリオ用',
+      },
+    },
+  },
 };

@@ -9,7 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { SessionConfig } from './SessionConfig';
-import type { MessageListItem, MessageContent } from '../../../preload/preload-types';
+import type { MessageListItem, MessageContent, PermissionMode } from '../../../preload/preload-types';
 import { RoleType } from '../../../../core/roles/role-enum.js';
 import { SessionAgent, SessionAgentCache } from '../../utils/SessionAgent.js';
 
@@ -29,6 +29,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, string>>(new Map());
   const [rejectedTools, setRejectedTools] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
 
   // Session configuration state (for new sessions)
   const [sessionConfig, setSessionConfig] = useState<{
@@ -51,6 +52,15 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     onPendingApprovalsChange: setPendingApprovals,
     onRejectedToolsChange: setRejectedTools,
   });
+
+  // Load permission mode on mount
+  useEffect(() => {
+    window.electronAPI.agent.getPermissionMode().then((result) => {
+      if (result.success) {
+        setPermissionMode(result.mode);
+      }
+    });
+  }, []);
 
   // Simple session switching - just read data from agent and update UI
   useEffect(() => {
@@ -78,7 +88,10 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     sessionAgentCacheRef.current.switchTo(sessionId);
 
     // Immediately read and display current data from agent
+    // This includes pending approvals and rejected tools for proper tool approval UI restoration
     setItems(agent.getDisplayItems());
+    setPendingApprovals(agent.getPendingApprovals());
+    setRejectedTools(agent.getRejectedTools());
     setCurrentSessionId(sessionId);
     setSessionStarted(true);
   }, [sessionId]);
@@ -115,6 +128,20 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     } catch (error) {
       console.error('Failed to cancel request:', error);
       setIsProcessing(false);
+    }
+  };
+
+  // Handle permission mode change
+  const handlePermissionModeChange = async (mode: PermissionMode) => {
+    try {
+      const result = await window.electronAPI.agent.setPermissionMode(mode);
+      if (result.success) {
+        setPermissionMode(mode);
+      } else {
+        console.error('Failed to set permission mode:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to set permission mode:', error);
     }
   };
 
@@ -281,6 +308,8 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         isProcessing={isProcessing}
         templateContent={templateContent}
         onTemplateApplied={onTemplateApplied}
+        permissionMode={permissionMode}
+        onPermissionModeChange={handlePermissionModeChange}
       />
     </div>
   );
