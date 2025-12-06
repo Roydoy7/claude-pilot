@@ -18,6 +18,7 @@ import type {
   SessionCreateRequest,
   SessionSwitchRequest,
   PermissionMode,
+  SettingSource,
 } from './preload-types.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
@@ -75,6 +76,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     setPermissionMode: (mode: PermissionMode): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('agent:setPermissionMode', mode),
+
+    getSettingSources: (): Promise<{ success: boolean; sources: SettingSource[] }> =>
+      ipcRenderer.invoke('agent:getSettingSources'),
+
+    setSettingSources: (sources: SettingSource[]): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('agent:setSettingSources', sources),
   },
 
   // Session management

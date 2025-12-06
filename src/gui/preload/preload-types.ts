@@ -9,14 +9,14 @@ import type { RoleType } from '../../core/roles/role-enum.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
-import type { AgentState, StreamEvent, PermissionMode } from '../../core/agents/claude-agent.js';
+import type { AgentState, StreamEvent, PermissionMode, SettingSource } from '../../core/agents/claude-agent.js';
 import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
 
 /**
- * Re-export PermissionMode for frontend use
+ * Re-export PermissionMode and SettingSource for frontend use
  */
-export type { PermissionMode };
+export type { PermissionMode, SettingSource };
 
 /**
  * Re-export types for consistency
@@ -260,6 +260,8 @@ export interface ElectronAPI {
     rejectTool: (toolUseId: string, message?: string) => Promise<{ success: boolean; error?: string }>;
     getPermissionMode: () => Promise<{ success: boolean; mode: PermissionMode }>;
     setPermissionMode: (mode: PermissionMode) => Promise<{ success: boolean; error?: string }>;
+    getSettingSources: () => Promise<{ success: boolean; sources: SettingSource[] }>;
+    setSettingSources: (sources: SettingSource[]) => Promise<{ success: boolean; error?: string }>;
   };
 
   // Session management

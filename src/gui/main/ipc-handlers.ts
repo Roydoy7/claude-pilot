@@ -141,6 +141,27 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   });
 
   /**
+   * Get current setting sources
+   */
+  ipcMain.handle('agent:getSettingSources', async () => {
+    const sources = claudeAgentService.getSettingSources();
+    return { success: true, sources };
+  });
+
+  /**
+   * Set setting sources
+   */
+  ipcMain.handle('agent:setSettingSources', async (_event, sources: string[]) => {
+    try {
+      claudeAgentService.setSettingSources(sources as import('../../core/agents/claude-agent.js').SettingSource[]);
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] setSettingSources error:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
+  /**
    * Session Management
    */
 

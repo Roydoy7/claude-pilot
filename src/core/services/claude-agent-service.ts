@@ -13,6 +13,8 @@ import {
   type MessageContent,
   type HistoryMessage,
   type ToolApprovalRequestHandler,
+  type SettingSource,
+  ALL_SETTING_SOURCES,
 } from '../agents/claude-agent.js';
 import {
   createNewAgent,
@@ -622,6 +624,21 @@ export class ClaudeAgentService {
 
   getPermissionMode(): PermissionMode {
     return this.currentAgent?.getPermissionMode() || 'default';
+  }
+
+  /**
+   * Setting Sources Management
+   * Setting sources are managed per-agent via ClaudeAgent.setSettingSources()
+   */
+
+  setSettingSources(sources: SettingSource[]): void {
+    if (this.currentAgent) {
+      this.currentAgent.setSettingSources(sources);
+    }
+  }
+
+  getSettingSources(): SettingSource[] {
+    return this.currentAgent?.getSettingSources() || [...ALL_SETTING_SOURCES];
   }
 }
 
