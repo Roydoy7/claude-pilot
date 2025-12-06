@@ -35,7 +35,8 @@ export const sessionConfigJa = {
   noModelsAvailable: '利用可能なモデルがありません',
   logout: 'ログアウト',
   selectWorkingDirectory: '作業ディレクトリを選択',
-  selectWorkingDirectoryDescription: 'このセッションの主要なディレクトリを選択してください',
+  selectWorkingDirectoryDescription: 'AIは作業ディレクトリ内のファイルにアクセスできます。後から',
+  selectWorkingDirectoryDescriptionSuffix: 'で追加のディレクトリを追加できます',
   noDirectorySelected: 'ディレクトリが選択されていません',
   browseDirectory: '参照...',
 };

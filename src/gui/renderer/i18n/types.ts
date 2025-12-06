@@ -95,6 +95,7 @@ export interface Translation {
     logout: string;
     selectWorkingDirectory: string;
     selectWorkingDirectoryDescription: string;
+    selectWorkingDirectoryDescriptionSuffix: string;
     noDirectorySelected: string;
     browseDirectory: string;
   };
@@ -111,6 +112,31 @@ export interface Translation {
     cancelRequest: string;
     sendMessage: string;
     removeImage: string;
+    permissionMode: {
+      label: string;
+      modes: {
+        default: {
+          name: string;
+          description: string;
+        };
+        acceptEdits: {
+          name: string;
+          description: string;
+        };
+        bypassPermissions: {
+          name: string;
+          description: string;
+        };
+        plan: {
+          name: string;
+          description: string;
+        };
+        dontAsk: {
+          name: string;
+          description: string;
+        };
+      };
+    };
   };
 
   // Message
@@ -230,6 +256,14 @@ export interface Translation {
       noSessionWarning: string;
       addWorkspacesInfo: string;
       workspaceLabel: (index: number) => string;
+      workingDirectory: string;
+      setDuringCreation: string;
+      additionalDirectories: (count: number) => string;
+      addDirectory: string;
+      noAdditionalDirectories: string;
+      directoryLabel: (index: number) => string;
+      removeDirectory: string;
+      accessNote: string;
     };
   };
 

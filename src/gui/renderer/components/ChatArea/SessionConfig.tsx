@@ -519,7 +519,23 @@ export function SessionConfig({
               {t.sessionConfig.selectWorkingDirectory}
             </label>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
-              {t.sessionConfig.selectWorkingDirectoryDescription}
+              {t.sessionConfig.selectWorkingDirectoryDescription}{' '}
+              <span
+                onClick={() => {
+                  if ((window as unknown as { __rightPanelSwitchToWorkspace?: () => void }).__rightPanelSwitchToWorkspace) {
+                    (window as unknown as { __rightPanelSwitchToWorkspace: () => void }).__rightPanelSwitchToWorkspace();
+                  }
+                }}
+                style={{
+                  color: 'var(--accent)',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                {t.sessionConfig.workspaceLink}
+              </span>
+              {t.sessionConfig.selectWorkingDirectoryDescriptionSuffix}
             </p>
           </div>
         </div>
@@ -568,54 +584,6 @@ export function SessionConfig({
         </div>
       </div>
 
-      {/* Workspace Hint */}
-      <div style={{ width: '100%', maxWidth: '900px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--accent)',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.875rem',
-              fontWeight: 700,
-              flexShrink: 0,
-            }}
-          >
-            4
-          </div>
-          <p
-            style={{
-              fontSize: '1rem',
-              fontWeight: '500',
-              color: 'var(--text-primary)',
-              margin: 0,
-            }}
-          >
-            {t.sessionConfig.workspaceInstruction}{' '}
-            <span
-              onClick={() => {
-                if ((window as unknown as { __rightPanelSwitchToWorkspace?: () => void }).__rightPanelSwitchToWorkspace) {
-                  (window as unknown as { __rightPanelSwitchToWorkspace: () => void }).__rightPanelSwitchToWorkspace();
-                }
-              }}
-              style={{
-                color: 'var(--accent)',
-                textDecoration: 'underline',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              {t.sessionConfig.workspaceLink}
-            </span>
-          </p>
-        </div>
-      </div>
-
       {/* Spacer - pushes the following content to bottom */}
       <div style={{ width: '100%' }} />
 
@@ -637,7 +605,7 @@ export function SessionConfig({
               flexShrink: 0,
             }}
           >
-            5
+            4
           </div>
           <p
             style={{

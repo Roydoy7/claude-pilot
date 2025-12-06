@@ -124,7 +124,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
             }}>
-              Working Directory (cwd)
+              {t.rightPanel.workspaceTab.workingDirectory}
             </h4>
             <div style={{
               padding: '0.75rem',
@@ -145,7 +145,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                 color: 'var(--text-secondary)',
                 marginTop: '0.5rem',
               }}>
-                Set during session creation
+                {t.rightPanel.workspaceTab.setDuringCreation}
               </div>
             </div>
           </div>
@@ -160,7 +160,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
             }}>
-              Additional Directories ({additionalDirectories.length})
+              {t.rightPanel.workspaceTab.additionalDirectories(additionalDirectories.length)}
             </h4>
 
             {/* Add Directory Button */}
@@ -172,7 +172,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                 marginBottom: '0.75rem',
               }}
             >
-              + Add Directory
+              {t.rightPanel.workspaceTab.addDirectory}
             </button>
 
             {/* Directory List */}
@@ -185,7 +185,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                 color: 'var(--text-secondary)',
                 fontSize: '0.85rem',
               }}>
-                No additional directories added
+                {t.rightPanel.workspaceTab.noAdditionalDirectories}
               </div>
             ) : (
               <div className="workspace-list">
@@ -198,7 +198,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                         color: 'var(--accent)',
                         flexShrink: 0,
                       }}>
-                        Directory {index + 1}
+                        {t.rightPanel.workspaceTab.directoryLabel(index + 1)}
                       </span>
                       <span
                         className="workspace-path"
@@ -214,7 +214,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                     <button
                       className="workspace-remove"
                       onClick={() => handleRemoveDirectory(path)}
-                      title="Remove directory"
+                      title={t.rightPanel.workspaceTab.removeDirectory}
                     >
                       ×
                     </button>
@@ -235,7 +235,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
             color: 'var(--text-secondary)',
             lineHeight: '1.5',
           }}>
-            <strong style={{ color: 'var(--text-primary)' }}>Note:</strong> The AI can access files in the working directory and all additional directories.
+            {t.rightPanel.workspaceTab.accessNote}
           </div>
         </>
       )}

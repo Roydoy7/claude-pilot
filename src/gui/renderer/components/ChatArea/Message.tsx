@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { MessageContent } from '../../../preload/preload-types';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export interface UsageMetadata {
   input_tokens: number;
@@ -34,6 +35,7 @@ interface MessageProps {
 }
 
 export function Message({ message }: MessageProps) {
+  const { t } = useLanguage();
   const isUser = message.role === 'user';
   const [isSaving, setIsSaving] = useState(false);
   const [viewingImage, setViewingImage] = useState<{ data: string; mimeType: string } | null>(null);
@@ -257,34 +259,48 @@ export function Message({ message }: MessageProps) {
             <button
               onClick={handleSaveAsTemplate}
               disabled={isSaving}
-              title={isSaving ? 'Saved!' : 'Save as template'}
+              title={isSaving ? t.message.saved : t.message.saveAsTemplate}
               style={{
-                marginLeft: 'auto',
-                padding: '4px 8px',
-                fontSize: '1rem',
-                border: '1px solid rgba(255,255,255,0.3)',
+                width: '24px',
+                height: '24px',
+                padding: '4px',
+                border: '1px solid var(--border)',
                 borderRadius: '4px',
-                backgroundColor: isSaving ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.1)',
-                color: isSaving ? '#4caf50' : 'rgba(255,255,255,0.8)',
+                backgroundColor: isSaving ? 'rgba(76,175,80,0.2)' : 'var(--bg-secondary)',
                 cursor: isSaving ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
                 opacity: 0.7,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                color: isSaving ? '#4caf50' : 'var(--text-secondary)',
               }}
               onMouseEnter={(e) => {
                 if (!isSaving) {
                   e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.opacity = '0.7';
-                e.currentTarget.style.backgroundColor = isSaving ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.backgroundColor = isSaving ? 'rgba(76,175,80,0.2)' : 'var(--bg-secondary)';
+                e.currentTarget.style.color = isSaving ? '#4caf50' : 'var(--text-secondary)';
               }}
             >
-              {isSaving ? '✓' : '📝'}
+              {isSaving ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+              )}
             </button>
           )}
         </div>

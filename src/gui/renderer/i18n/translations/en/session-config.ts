@@ -35,7 +35,8 @@ export const sessionConfigEn = {
   noModelsAvailable: 'No models available',
   logout: 'Logout',
   selectWorkingDirectory: 'Select Working Directory',
-  selectWorkingDirectoryDescription: 'Choose the primary directory for this session',
+  selectWorkingDirectoryDescription: 'AI will be allowed to access files in the working directory. You can add more directories later in',
+  selectWorkingDirectoryDescriptionSuffix: '',
   noDirectorySelected: 'No directory selected',
   browseDirectory: 'Browse...',
 };
