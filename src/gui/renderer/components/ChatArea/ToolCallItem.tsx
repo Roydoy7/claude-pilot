@@ -26,6 +26,7 @@ interface ToolConfig {
   icon: string | ReactNode; // Support both emoji string and SVG ReactNode
   getInlineText: (args: Record<string, any>) => string;
   hasDetails: (args: Record<string, any>, response?: ToolResponse) => boolean;
+  defaultExpanded?: boolean; // If true, details are shown by default
   renderButton: (
     args: Record<string, any>,
     showDetails: boolean,
@@ -93,81 +94,6 @@ const WordDocIcon = () => (
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
     <text x="8" y="17" fontSize="7" fontWeight="bold" fill="#2b579a" stroke="none">W</text>
-  </svg>
-);
-
-/**
- * Filesystem operation icons
- */
-const MoveIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M5 12h14" />
-    <path d="m12 5 7 7-7 7" />
-  </svg>
-);
-
-const DeleteIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#ef4444"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-    <line x1="10" x2="10" y1="11" y2="17" />
-    <line x1="14" x2="14" y1="11" y2="17" />
-  </svg>
-);
-
-const CopyIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-  </svg>
-);
-
-const FolderPlusIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 10v6" />
-    <path d="M9 13h6" />
-    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
   </svg>
 );
 
@@ -362,7 +288,102 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
         </div>
       );
     },
-    renderContent: () => null, // Python tool handles rendering separately in the main component
+    renderContent: (args, showResult, response) => {
+      // When showResult is false, show code; when showResult is true, show result
+      if (!showResult) {
+        // Show code block
+        if (!args.code) return null;
+        return (
+          <div
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            {args.description && (
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.7rem' }}>
+                📋 {args.description}
+              </div>
+            )}
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#3b82f6', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
+              {args.code}
+            </pre>
+            {args.requirements && Array.isArray(args.requirements) && args.requirements.length > 0 && (
+              <div style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', fontSize: '0.7rem' }}>
+                📦 Dependencies: {args.requirements.join(', ')}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Show result
+      if (!response) return null;
+
+      let displayOutput = '';
+      const isError = !!response.error;
+
+      if (response.error) {
+        displayOutput = response.error;
+      } else if (response.output) {
+        // MCP tool returns JSON array like [{"type":"text","text":"..."}]
+        try {
+          const parsed = JSON.parse(response.output);
+          if (Array.isArray(parsed)) {
+            // Extract text from MCP content array
+            displayOutput = parsed
+              .filter((item: { type?: string }) => item.type === 'text')
+              .map((item: { text?: string }) => item.text || '')
+              .join('\n');
+          } else if (typeof parsed === 'object' && parsed !== null) {
+            // Handle other object formats
+            if (parsed.text) {
+              displayOutput = parsed.text;
+            } else if (parsed.stdout !== undefined) {
+              displayOutput = parsed.stdout || '(no output)';
+            } else {
+              displayOutput = JSON.stringify(parsed, null, 2);
+            }
+          } else {
+            displayOutput = response.output;
+          }
+        } catch {
+          // Not JSON, use as-is
+          displayOutput = response.output;
+        }
+      }
+
+      if (!displayOutput) {
+        displayOutput = '(no output)';
+      }
+
+      return (
+        <div
+          style={{
+            marginLeft: '1.5rem',
+            marginBottom: '0.5rem',
+            marginTop: '0.5rem',
+            padding: '0.5rem 0.75rem',
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: '4px',
+            border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
+            fontSize: '0.75rem',
+            maxHeight: '300px',
+            overflow: 'auto',
+          }}
+        >
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: isError ? '#ef4444' : 'var(--text-primary)', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
+            {displayOutput}
+          </pre>
+        </div>
+      );
+    },
   },
   pdf: {
     icon: <PdfIcon />,
@@ -888,1189 +909,6 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
       return elements.length > 0 ? <>{elements}</> : null;
     },
   },
-  task: {
-    icon: '🤖',
-    getInlineText: (args) => args.subagent_type || '',
-    hasDetails: (args) => !!args.description,
-    renderButton: (args, showDetails, setShowDetails) => {
-      if (!args.description) return null;
-      return (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDetails(!showDetails);
-          }}
-          style={{
-            padding: '0.125rem 0.5rem',
-            border: '1px solid var(--border)',
-            borderRadius: '3px',
-            backgroundColor: 'var(--bg-secondary)',
-            color: 'var(--text-secondary)',
-            fontSize: '0.7rem',
-            cursor: 'pointer',
-            marginLeft: 'auto',
-          }}
-        >
-          {showDetails ? 'Hide Details' : 'Show Details'}
-        </button>
-      );
-    },
-    renderContent: (args) => {
-      if (!args.description) return null;
-      return (
-        <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
-          <pre
-            style={{
-              margin: 0,
-              padding: '0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              fontSize: '0.75rem',
-              overflow: 'auto',
-              maxHeight: '300px',
-              color: 'var(--text-primary)',
-              whiteSpace: 'pre-wrap',
-              fontFamily: 'monospace',
-              border: '1px solid var(--border)',
-            }}
-          >
-            {args.description}
-          </pre>
-          {args.subagent_type && (
-            <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-              🎯 Agent Type: <code>{args.subagent_type}</code>
-            </div>
-          )}
-        </div>
-      );
-    },
-  },
-  mv: {
-    icon: <MoveIcon />,
-    getInlineText: (args) => {
-      const source = args.source || '';
-      const dest = args.destination || '';
-      const srcName = source.split(/[/\\]/).pop() || source;
-      const destName = dest.split(/[/\\]/).pop() || dest;
-      return `${srcName} → ${destName}`;
-    },
-    hasDetails: (args, response) => !!args.source || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.source;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide Result' : 'Result'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      if (args.source) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>📂 Source: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.source}</span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>📁 Destination: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.destination}</span>
-            </div>
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
-              {response.error ? `❌ ${response.error}` : `✅ ${response.output}`}
-            </span>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  rm: {
-    icon: <DeleteIcon />,
-    getInlineText: (args) => {
-      const path = args.path || '';
-      const fileName = path.split(/[/\\]/).pop() || path;
-      return `🗑️ ${fileName}`;
-    },
-    hasDetails: (args, response) => !!args.path || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.path;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide Result' : 'Result'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      if (args.path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid #ef4444',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ color: '#ef4444', fontWeight: '600' }}>⚠️ Deleting: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
-            </div>
-            {args.force && (
-              <div style={{ color: '#f59e0b', fontSize: '0.7rem' }}>
-                🔥 Force delete enabled
-              </div>
-            )}
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
-              {response.error ? `❌ ${response.error}` : `✅ ${response.output}`}
-            </span>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  cp: {
-    icon: <CopyIcon />,
-    getInlineText: (args) => {
-      const source = args.source || '';
-      const dest = args.destination || '';
-      const srcName = source.split(/[/\\]/).pop() || source;
-      const destName = dest.split(/[/\\]/).pop() || dest;
-      return `${srcName} → ${destName}`;
-    },
-    hasDetails: (args, response) => !!args.source || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.source;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide Result' : 'Result'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      if (args.source) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>📄 Source: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.source}</span>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>📋 Copy to: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.destination}</span>
-            </div>
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
-              {response.error ? `❌ ${response.error}` : `✅ ${response.output}`}
-            </span>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  // deepagents FilesystemMiddleware tools
-  ls: {
-    icon: <FolderIcon />,
-    getInlineText: (args) => {
-      const path = args.path || args.directory || '.';
-      const dirName = path.split(/[/\\]/).pop() || path;
-      return `📂 ${dirName}`;
-    },
-    hasDetails: (args, response) => !!args.path || !!args.directory || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.path || !!args.directory;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide' : 'Files'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      const path = args.path || args.directory;
-      if (path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: 'var(--text-secondary)' }}>📂 Directory: </span>
-            <span style={{ color: 'var(--text-primary)' }}>{path}</span>
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
-              fontSize: '0.75rem',
-              maxHeight: '200px',
-              overflow: 'auto',
-            }}
-          >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
-              {response.error || response.output}
-            </pre>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  read_file: {
-    icon: <FileTextIcon />,
-    getInlineText: (args) => {
-      const path = args.path || args.file_path || '';
-      const fileName = path.split(/[/\\]/).pop() || path;
-      return `📄 ${fileName}`;
-    },
-    hasDetails: (args, response) => !!args.path || !!args.file_path || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.path || !!args.file_path;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide' : 'Content'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      const path = args.path || args.file_path;
-      if (path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: 'var(--text-secondary)' }}>📄 File: </span>
-            <span style={{ color: 'var(--text-primary)' }}>{path}</span>
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
-              fontSize: '0.75rem',
-              maxHeight: '300px',
-              overflow: 'auto',
-            }}
-          >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
-              {response.error || response.output}
-            </pre>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  write_file: {
-    icon: <WriteIcon />,
-    getInlineText: (args) => {
-      const path = args.path || args.file_path || '';
-      const fileName = path.split(/[/\\]/).pop() || path;
-      return `✍️ ${fileName}`;
-    },
-    hasDetails: (args, response) => !!args.path || !!args.file_path || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.path || !!args.file_path;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide Result' : 'Result'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      const path = args.path || args.file_path;
-      if (path) {
-        const contentPreview = args.content
-          ? (args.content.length > 200 ? args.content.substring(0, 200) + '...' : args.content)
-          : null;
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: contentPreview ? '0.25rem' : 0 }}>
-              <span style={{ color: 'var(--text-secondary)' }}>📝 Writing to: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{path}</span>
-            </div>
-            {contentPreview && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-secondary)', fontSize: '0.7rem', fontFamily: 'monospace' }}>
-                  {contentPreview}
-                </pre>
-              </div>
-            )}
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
-              {response.error ? `❌ ${response.error}` : `✅ ${response.output}`}
-            </span>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  edit_file: {
-    icon: <EditIcon />,
-    getInlineText: (args) => {
-      const path = args.path || args.file_path || '';
-      const fileName = path.split(/[/\\]/).pop() || path;
-      return `✏️ ${fileName}`;
-    },
-    hasDetails: (args, response) => !!args.path || !!args.file_path || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.path || !!args.file_path;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide Result' : 'Result'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      const path = args.path || args.file_path;
-      if (path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>✏️ Editing: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{path}</span>
-            </div>
-            {args.old_string && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <div style={{ color: '#ef4444', fontSize: '0.7rem', marginBottom: '0.25rem' }}>- Old:</div>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#ef4444', fontSize: '0.7rem', fontFamily: 'monospace', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '0.25rem', borderRadius: '2px' }}>
-                  {args.old_string.length > 100 ? args.old_string.substring(0, 100) + '...' : args.old_string}
-                </pre>
-              </div>
-            )}
-            {args.new_string && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <div style={{ color: '#10b981', fontSize: '0.7rem', marginBottom: '0.25rem' }}>+ New:</div>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#10b981', fontSize: '0.7rem', fontFamily: 'monospace', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '0.25rem', borderRadius: '2px' }}>
-                  {args.new_string.length > 100 ? args.new_string.substring(0, 100) + '...' : args.new_string}
-                </pre>
-              </div>
-            )}
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
-              {response.error ? `❌ ${response.error}` : `✅ ${response.output}`}
-            </span>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  glob: {
-    icon: <GlobIcon />,
-    getInlineText: (args) => {
-      const pattern = args.pattern || args.glob_pattern || '';
-      return `🔎 ${pattern}`;
-    },
-    hasDetails: (args, response) => !!args.pattern || !!args.glob_pattern || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.pattern || !!args.glob_pattern;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide' : 'Matches'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      const pattern = args.pattern || args.glob_pattern;
-      if (pattern) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: args.path ? '0.25rem' : 0 }}>
-              <span style={{ color: 'var(--text-secondary)' }}>🔎 Pattern: </span>
-              <code style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-secondary)', padding: '0.125rem 0.25rem', borderRadius: '2px' }}>{pattern}</code>
-            </div>
-            {args.path && (
-              <div>
-                <span style={{ color: 'var(--text-secondary)' }}>📂 In: </span>
-                <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
-              </div>
-            )}
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
-              fontSize: '0.75rem',
-              maxHeight: '200px',
-              overflow: 'auto',
-            }}
-          >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
-              {response.error || response.output}
-            </pre>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  grep: {
-    icon: <SearchIcon />,
-    getInlineText: (args) => {
-      const pattern = args.pattern || args.search_pattern || '';
-      const truncated = pattern.length > 30 ? pattern.substring(0, 30) + '...' : pattern;
-      return `🔍 "${truncated}"`;
-    },
-    hasDetails: (args, response) => !!args.pattern || !!args.search_pattern || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.pattern || !!args.search_pattern;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide' : 'Results'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      const pattern = args.pattern || args.search_pattern;
-      if (pattern) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div style={{ marginBottom: args.path ? '0.25rem' : 0 }}>
-              <span style={{ color: 'var(--text-secondary)' }}>🔍 Search: </span>
-              <code style={{ color: '#f59e0b', backgroundColor: 'var(--bg-secondary)', padding: '0.125rem 0.25rem', borderRadius: '2px' }}>{pattern}</code>
-            </div>
-            {args.path && (
-              <div>
-                <span style={{ color: 'var(--text-secondary)' }}>📂 In: </span>
-                <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
-              </div>
-            )}
-            {args.include && (
-              <div>
-                <span style={{ color: 'var(--text-secondary)' }}>📁 Include: </span>
-                <code style={{ color: 'var(--text-primary)' }}>{args.include}</code>
-              </div>
-            )}
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
-              fontSize: '0.75rem',
-              maxHeight: '300px',
-              overflow: 'auto',
-            }}
-          >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
-              {response.error || response.output}
-            </pre>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  mkdir: {
-    icon: <FolderPlusIcon />,
-    getInlineText: (args) => {
-      const path = args.path || '';
-      const dirName = path.split(/[/\\]/).pop() || path;
-      return `📁 ${dirName}`;
-    },
-    hasDetails: (args, response) => !!args.path || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.path;
-      const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide Result' : 'Result'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      if (args.path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>📁 Creating directory: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
-            </div>
-          </div>
-        );
-      }
-      if (showResult && response) {
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
-              {response.error ? `❌ ${response.error}` : `✅ ${response.output}`}
-            </span>
-          </div>
-        );
-      }
-      return elements.length > 0 ? <>{elements}</> : null;
-    },
-  },
-  write_todos: {
-    icon: '📝',
-    getInlineText: (args) => {
-      if (!args.todos || !Array.isArray(args.todos)) return '';
-      return `${args.todos.length} task${args.todos.length > 1 ? 's' : ''}`;
-    },
-    hasDetails: (args) => args.todos && Array.isArray(args.todos) && args.todos.length > 0,
-    renderButton: (args, showDetails, setShowDetails) => {
-      if (!args.todos || args.todos.length === 0) return null;
-      return (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDetails(!showDetails);
-          }}
-          style={{
-            padding: '0.125rem 0.5rem',
-            border: '1px solid var(--border)',
-            borderRadius: '3px',
-            backgroundColor: 'var(--bg-secondary)',
-            color: 'var(--text-secondary)',
-            fontSize: '0.7rem',
-            cursor: 'pointer',
-            marginLeft: 'auto',
-          }}
-        >
-          {showDetails ? 'Hide Tasks' : 'Show Tasks'}
-        </button>
-      );
-    },
-    renderContent: (args) => {
-      if (!args.todos || args.todos.length === 0) return null;
-      return (
-        <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {args.todos.map((todo: any, index: number) => {
-              const statusColor =
-                todo.status === 'completed' ? '#10b981' :
-                todo.status === 'in_progress' ? '#3b82f6' :
-                '#6b7280';
-              const statusEmoji =
-                todo.status === 'completed' ? '✅' :
-                todo.status === 'in_progress' ? '🔄' :
-                '⏳';
-
-              return (
-                <div
-                  key={index}
-                  style={{
-                    padding: '0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                    border: '1px solid var(--border)',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span>{statusEmoji}</span>
-                    <span style={{ color: 'var(--text-primary)', flex: 1 }}>
-                      {todo.content}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        color: statusColor,
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {todo.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                  {todo.activeForm && (
-                    <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                      {todo.activeForm}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    },
-  },
 
   // ============================================
   // Claude Agent SDK Tools (PascalCase naming)
@@ -2080,38 +918,20 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
     icon: <FileTextIcon />,
     getInlineText: (args) => {
       const path = args.file_path || '';
-      const fileName = path.split(/[/\\]/).pop() || path;
       if (args.offset !== undefined || args.limit !== undefined) {
         const range = args.offset && args.limit
           ? `L${args.offset}-${args.offset + args.limit}`
           : args.limit ? `first ${args.limit} lines` : `from L${args.offset}`;
-        return `📄 ${fileName} (${range})`;
+        return `📄 ${path} (${range})`;
       }
-      return `📄 ${fileName}`;
+      return `📄 ${path}`;
     },
-    hasDetails: (args, response) => !!args.file_path || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.file_path;
+    hasDetails: (_args, response) => !!response,
+    renderButton: (_args, _showDetails, _setShowDetails, response, showResult, setShowResult) => {
       const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
+      if (!hasResponse) return null;
       return (
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Path'}
-            </button>
-          )}
           {hasResponse && setShowResult && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
@@ -2131,41 +951,30 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
         </div>
       );
     },
-    renderContent: (args, showResult, response) => {
+    renderContent: (_args, showResult, response) => {
       const elements: ReactNode[] = [];
-      if (args.file_path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>📄 File: </span>
-              <span style={{ color: 'var(--text-primary)' }}>{args.file_path}</span>
-            </div>
-            {(args.offset !== undefined || args.limit !== undefined) && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>📍 Range: </span>
-                <span style={{ color: 'var(--text-primary)' }}>
-                  {args.offset !== undefined && `offset ${args.offset}`}
-                  {args.offset !== undefined && args.limit !== undefined && ', '}
-                  {args.limit !== undefined && `limit ${args.limit}`}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      }
       if (showResult && response) {
+        // Parse structured toolUseResult if available
+        let displayContent = response.error || response.output;
+        let fileInfo: { numLines?: number; startLine?: number; totalLines?: number } | null = null;
+
+        if (!response.error && response.output) {
+          try {
+            const parsed = JSON.parse(response.output);
+            // SDK Read tool returns: { type: "text", file: { filePath, content, numLines, ... } }
+            if (parsed.type === 'text' && parsed.file?.content) {
+              displayContent = parsed.file.content;
+              fileInfo = {
+                numLines: parsed.file.numLines,
+                startLine: parsed.file.startLine,
+                totalLines: parsed.file.totalLines,
+              };
+            }
+          } catch {
+            // Not JSON, use as-is
+          }
+        }
+
         elements.push(
           <div
             key="result"
@@ -2182,8 +991,13 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
               overflow: 'auto',
             }}
           >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
-              {response.error || response.output}
+            {fileInfo && (
+              <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
+                📊 Lines {fileInfo.startLine}-{(fileInfo.startLine || 1) + (fileInfo.numLines || 0) - 1} of {fileInfo.totalLines}
+              </div>
+            )}
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.7rem', lineHeight: '1.4' }}>
+              {displayContent}
             </pre>
           </div>
         );
@@ -2197,13 +1011,20 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
     getInlineText: (args) => {
       const path = args.file_path || '';
       const fileName = path.split(/[/\\]/).pop() || path;
-      const oldLen = args.old_string?.length || 0;
-      const newLen = args.new_string?.length || 0;
-      const diff = newLen - oldLen;
-      const diffStr = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '±0';
-      return `✏️ ${fileName} (${diffStr} chars)`;
+      // Count lines instead of characters
+      const oldLines = args.old_string ? args.old_string.split('\n').length : 0;
+      const newLines = args.new_string ? args.new_string.split('\n').length : 0;
+      const addedLines = Math.max(0, newLines - oldLines);
+      const removedLines = Math.max(0, oldLines - newLines);
+      // Show +N/-M format
+      const diffParts: string[] = [];
+      if (addedLines > 0) diffParts.push(`+${addedLines}`);
+      if (removedLines > 0) diffParts.push(`-${removedLines}`);
+      const diffStr = diffParts.length > 0 ? diffParts.join('/') : '±0';
+      return `✏️ ${fileName} (${diffStr} lines)`;
     },
     hasDetails: (args, response) => !!args.file_path || !!response,
+    defaultExpanded: true, // Show diff by default
     renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
       const hasArgs = !!args.file_path;
       const hasResponse = !!response;
@@ -2272,16 +1093,16 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
             {args.old_string && (
               <div style={{ marginBottom: '0.25rem' }}>
                 <div style={{ color: '#ef4444', fontSize: '0.7rem', marginBottom: '0.125rem' }}>- Old:</div>
-                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '100px', overflow: 'auto' }}>
-                  {args.old_string.length > 200 ? args.old_string.substring(0, 200) + '...' : args.old_string}
+                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {args.old_string}
                 </pre>
               </div>
             )}
             {args.new_string && (
               <div>
                 <div style={{ color: '#10b981', fontSize: '0.7rem', marginBottom: '0.125rem' }}>+ New:</div>
-                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '100px', overflow: 'auto' }}>
-                  {args.new_string.length > 200 ? args.new_string.substring(0, 200) + '...' : args.new_string}
+                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {args.new_string}
                 </pre>
               </div>
             )}
@@ -2426,34 +1247,14 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
     icon: '⚡',
     getInlineText: (args) => {
       const cmd = args.command || '';
-      const desc = args.description || '';
-      if (desc) return `💻 ${desc}`;
-      const truncated = cmd.length > 50 ? cmd.substring(0, 50) + '...' : cmd;
-      return `💻 ${truncated}`;
+      return `$ ${cmd}`;
     },
-    hasDetails: (args, response) => !!args.command || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.command;
+    hasDetails: (_args, response) => !!response,
+    renderButton: (_args, _showDetails, _setShowDetails, response, showResult, setShowResult) => {
       const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
+      if (!hasResponse) return null;
       return (
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Command'}
-            </button>
-          )}
           {hasResponse && setShowResult && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
@@ -2473,56 +1274,32 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
         </div>
       );
     },
-    renderContent: (args, showResult, response) => {
+    renderContent: (_args, showResult, response) => {
       const elements: ReactNode[] = [];
-      if (args.command) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: '#1e1e1e',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            {args.description && (
-              <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.7rem' }}>
-                📋 {args.description}
-              </div>
-            )}
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#10b981', fontFamily: 'monospace' }}>
-              $ {args.command}
-            </pre>
-            {args.timeout && (
-              <div style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', fontSize: '0.7rem' }}>
-                ⏱️ Timeout: {args.timeout}ms
-              </div>
-            )}
-          </div>
-        );
-      }
       if (showResult && response) {
-        // Try to parse JSON output (SDK returns {stdout, stderr, interrupted, isImage})
+        // Parse SDK Bash result: { stdout, stderr, interrupted, isImage }
         let displayOutput = response.error || response.output;
         let hasStderr = false;
         let stderrContent = '';
+        let wasInterrupted = false;
+        const isError = !!response.error;
 
         if (!response.error && response.output) {
           try {
             const parsed = JSON.parse(response.output);
             if (typeof parsed === 'object' && parsed !== null) {
-              // Extract stdout and stderr
+              // Extract stdout
               if (parsed.stdout !== undefined) {
                 displayOutput = parsed.stdout || '(no output)';
               }
+              // Extract stderr
               if (parsed.stderr && parsed.stderr.trim()) {
                 hasStderr = true;
                 stderrContent = parsed.stderr;
+              }
+              // Check if interrupted
+              if (parsed.interrupted) {
+                wasInterrupted = true;
               }
             }
           } catch {
@@ -2538,19 +1315,24 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
               marginBottom: '0.5rem',
               marginTop: '0.5rem',
               padding: '0.5rem 0.75rem',
-              backgroundColor: '#1e1e1e',
+              backgroundColor: 'var(--bg-tertiary)',
               borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              border: isError ? '1px solid #ef4444' : wasInterrupted ? '1px solid #f59e0b' : '1px solid var(--border)',
               fontSize: '0.75rem',
               maxHeight: '300px',
               overflow: 'auto',
             }}
           >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : '#d4d4d4', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
+            {wasInterrupted && (
+              <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.5rem' }}>
+                ⚠️ Command was interrupted
+              </div>
+            )}
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: isError ? '#ef4444' : 'var(--text-primary)', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
               {displayOutput}
             </pre>
             {hasStderr && (
-              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #333' }}>
+              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
                 <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>stderr:</div>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f59e0b', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4', opacity: 0.8 }}>
                   {stderrContent}
@@ -2568,31 +1350,18 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
     icon: <GlobIcon />,
     getInlineText: (args) => {
       const pattern = args.pattern || '';
+      const path = args.path || '';
+      if (path) {
+        return `🔎 ${pattern} in ${path}`;
+      }
       return `🔎 ${pattern}`;
     },
-    hasDetails: (args, response) => !!args.pattern || !!response,
-    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
-      const hasArgs = !!args.pattern;
+    hasDetails: (_args, response) => !!response,
+    renderButton: (_args, _showDetails, _setShowDetails, response, showResult, setShowResult) => {
       const hasResponse = !!response;
-      if (!hasArgs && !hasResponse) return null;
+      if (!hasResponse) return null;
       return (
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasArgs && args.path && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showDetails ? 'Hide' : 'Details'}
-            </button>
-          )}
           {hasResponse && setShowResult && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
@@ -2612,29 +1381,31 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
         </div>
       );
     },
-    renderContent: (args, showResult, response) => {
+    renderContent: (_args, showResult, response) => {
       const elements: ReactNode[] = [];
-      if (args.path) {
-        elements.push(
-          <div
-            key="details"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-            }}
-          >
-            <span style={{ color: 'var(--text-secondary)' }}>📂 In: </span>
-            <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
-          </div>
-        );
-      }
       if (showResult && response) {
+        // Parse structured toolUseResult if available
+        let filenames: string[] = [];
+        let metadata: { durationMs?: number; numFiles?: number; truncated?: boolean } | null = null;
+        let displayContent = response.error || response.output;
+
+        if (!response.error && response.output) {
+          try {
+            const parsed = JSON.parse(response.output);
+            // SDK Glob tool returns: { filenames: [...], durationMs, numFiles, truncated }
+            if (parsed.filenames && Array.isArray(parsed.filenames)) {
+              filenames = parsed.filenames;
+              metadata = {
+                durationMs: parsed.durationMs,
+                numFiles: parsed.numFiles,
+                truncated: parsed.truncated,
+              };
+            }
+          } catch {
+            // Not JSON, use as-is
+          }
+        }
+
         elements.push(
           <div
             key="result"
@@ -2651,9 +1422,32 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
               overflow: 'auto',
             }}
           >
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
-              {response.error || response.output}
-            </pre>
+            {metadata && (
+              <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
+                📊 Found {metadata.numFiles} files in {metadata.durationMs}ms
+                {metadata.truncated && <span style={{ color: '#f59e0b' }}> (truncated)</span>}
+              </div>
+            )}
+            {filenames.length > 0 ? (
+              <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', lineHeight: '1.4' }}>
+                {filenames.map((file, idx) => {
+                  // Show last 2-3 path segments for context (avoid showing just filename which can be duplicate)
+                  const segments = file.split(/[/\\]/);
+                  const displayPath = segments.length > 3
+                    ? '.../' + segments.slice(-3).join('/')
+                    : file;
+                  return (
+                    <div key={idx} style={{ color: 'var(--text-primary)' }}>
+                      📄 {displayPath}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+                {displayContent}
+              </pre>
+            )}
           </div>
         );
       }
@@ -3162,6 +1956,7 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
       return `${args.todos.length} tasks (${completed}✓ ${inProgress}→)`;
     },
     hasDetails: (args) => args.todos && Array.isArray(args.todos) && args.todos.length > 0,
+    defaultExpanded: true, // Show tasks by default
     renderButton: (args, showDetails, setShowDetails) => {
       if (!args.todos || args.todos.length === 0) return null;
       return (
@@ -3448,20 +2243,10 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
 };
 
 /**
- * Tool name aliases - maps legacy/alternative names to canonical Claude SDK names
+ * Tool name aliases - maps MCP tool names to canonical names
  */
 const TOOL_ALIASES: Record<string, string> = {
-  // Legacy LangChain-style names → Claude SDK names
-  read_file: 'Read',
-  write_file: 'Write',
-  edit_file: 'Edit',
-  list_directory: 'LS',
-  glob: 'Glob',
-  grep: 'Grep',
-  ls: 'LS',
-  task: 'Task',
-  write_todos: 'TodoWrite',
-  mkdir: 'Bash', // mkdir is typically a Bash command
+  'mcp__python__run': 'python',
 };
 
 /**
@@ -3510,7 +2295,13 @@ export function ToolCallItem({
     return null;
   }
 
-  const [showDetails, setShowDetails] = useState(false);
+  const { toolCall, toolResponse: response, needsApproval, wasRejected, progress } = item;
+
+  // Get tool configuration first (needed for defaultExpanded)
+  const toolConfig = getToolConfig(toolCall.name);
+
+  // Initialize state with tool's defaultExpanded setting
+  const [showDetails, setShowDetails] = useState(toolConfig.defaultExpanded ?? false);
   const [showResult, setShowResult] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
@@ -3519,10 +2310,10 @@ export function ToolCallItem({
   const [copiedResult, setCopiedResult] = useState(false);
 
   const { t } = useLanguage();
-  const { toolCall, toolResponse: response, needsApproval, wasRejected, progress } = item;
 
-  // Get tool configuration (with alias support)
-  const toolConfig = getToolConfig(toolCall.name);
+  // Resolve tool name (handle MCP aliases like mcp__python__run -> python)
+  const canonicalToolName = TOOL_ALIASES[toolCall.name] || toolCall.name;
+
   const icon = toolConfig.icon;
 
   // Copy code to clipboard
@@ -3561,28 +2352,21 @@ export function ToolCallItem({
     >
       {/* AI Avatar */}
       <div style={{ flexShrink: 0 }}>
-        <div
-          className="avatar-icon ai-avatar"
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--accent)',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-          }}
-        >
-          AI
+        <div className="avatar-icon ai-avatar">
+          {/* AI icon - bot/robot face */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="8" width="18" height="12" rx="2" />
+            <circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none" />
+            <path d="M12 2v4" />
+            <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none" />
+          </svg>
         </div>
       </div>
 
       {/* Tool call content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Tool call - one line */}
+        {/* Tool call - first line: icon, name, inline text */}
         <div
           style={{
             display: 'flex',
@@ -3594,44 +2378,63 @@ export function ToolCallItem({
           <span style={{ display: 'inline-flex', alignItems: 'center' }}>
             {typeof icon === 'string' ? icon : icon}
           </span>
-        <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-          {toolCall.name}
-        </span>
-        {inlineText && (
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-            {inlineText}
+          <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+            {toolCall.name}
           </span>
-        )}
-        {/* Tool-specific details button */}
-        {hasDetails && toolConfig.renderButton(toolCall.args, showDetails, setShowDetails, response, showResult, setShowResult)}
-        {wasRejected && !response && (
-          <span
+          {inlineText && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              {inlineText}
+            </span>
+          )}
+        </div>
+
+        {/* Second line: status + action buttons */}
+        {(response || wasRejected || hasDetails) && (
+          <div
             style={{
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              color: '#f59e0b',
-              marginLeft: hasDetails ? '0.5rem' : 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              marginBottom: '0.25rem',
+              marginLeft: '1.5rem',
             }}
           >
-            REJECTED
-          </span>
+            {/* Status badge */}
+            {wasRejected && !response && (
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: '600',
+                  color: '#f59e0b',
+                  padding: '0.125rem 0.375rem',
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  borderRadius: '3px',
+                }}
+              >
+                REJECTED
+              </span>
+            )}
+            {response && (
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: '600',
+                  color: response.error ? '#ef4444' : '#10b981',
+                  padding: '0.125rem 0.375rem',
+                  backgroundColor: response.error ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '3px',
+                }}
+              >
+                {response.error ? 'FAIL' : 'SUCCESS'}
+              </span>
+            )}
+            {/* Tool-specific action buttons */}
+            {hasDetails && toolConfig.renderButton(toolCall.args, showDetails, setShowDetails, response, showResult, setShowResult)}
+          </div>
         )}
-        {response && (
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              color: response.error ? '#ef4444' : '#10b981',
-              marginLeft: hasDetails ? '0.5rem' : 'auto',
-            }}
-          >
-            {response.error ? 'FAIL' : 'SUCCESS'}
-          </span>
-        )}
-      </div>
 
       {/* Tool-specific details content (below the header) */}
-      {toolCall.name === 'python' ? (
+      {canonicalToolName === 'python' ? (
         // Special rendering for Python tool - separate code and result
         <>
           {showDetails && ((): React.ReactNode => {
@@ -3735,7 +2538,7 @@ export function ToolCallItem({
                   <div
                     style={{
                       margin: 0,
-                      backgroundColor: '#1e1e1e',
+                      backgroundColor: 'var(--bg-tertiary)',
                       borderRadius: '4px',
                       overflow: 'auto',
                       maxHeight: '300px',
@@ -3756,7 +2559,7 @@ export function ToolCallItem({
                             margin: 0,
                             padding: '0.75rem',
                             fontSize: '0.75rem',
-                            color: '#d4d4d4',
+                            color: 'var(--text-primary)',
                             whiteSpace: 'pre',
                             fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
                             lineHeight: '1.4',
@@ -3891,80 +2694,112 @@ export function ToolCallItem({
             </div>
           )}
 
-          {showResult && response && (
-            <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
-              <div style={{ position: 'relative' }}>
-                <div
-                  style={{
-                    margin: 0,
-                    padding: '0.75rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    overflow: 'auto',
-                    maxHeight: '300px',
-                    color: response.error ? '#ef4444' : 'var(--text-primary)',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
-                  }}
-                >
-                  {response.error ? (
-                    <>
-                      <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#ef4444' }}>
-                        ❌ Error:
-                      </div>
-                      {response.error}
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#10b981' }}>
-                        ✅ Output:
-                      </div>
-                      {response.output}
-                    </>
-                  )}
-                </div>
+          {showResult && response && ((): React.ReactNode => {
+            // Parse MCP tool output format: [{"type":"text","text":"..."}]
+            let displayOutput = '';
+            const isError = !!response.error;
 
-                {/* Copy Result Button */}
-                <button
-                  onClick={() => handleCopyResult(response.error || response.output)}
-                  style={{
-                    position: 'absolute',
-                    top: '1.05rem',
-                    right: '1.25rem',
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.7rem',
-                    backgroundColor: copiedResult ? '#10b981' : 'var(--bg-secondary)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s',
-                    zIndex: 10,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!copiedResult) {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!copiedResult) {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                    }
-                  }}
-                >
-                  {copiedResult ? t.common.buttons.copied : t.common.buttons.copyCode}
-                </button>
+            if (response.error) {
+              displayOutput = response.error;
+            } else if (response.output) {
+              try {
+                const parsed = JSON.parse(response.output);
+                if (Array.isArray(parsed)) {
+                  // Extract text from MCP content array
+                  displayOutput = parsed
+                    .filter((item: { type?: string }) => item.type === 'text')
+                    .map((item: { text?: string }) => item.text || '')
+                    .join('\n');
+                } else if (typeof parsed === 'object' && parsed !== null && parsed.text) {
+                  displayOutput = parsed.text;
+                } else {
+                  displayOutput = response.output;
+                }
+              } catch {
+                // Not JSON, use as-is
+                displayOutput = response.output;
+              }
+            }
+
+            if (!displayOutput) {
+              displayOutput = '(no output)';
+            }
+
+            return (
+              <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      margin: 0,
+                      padding: '0.75rem',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      overflow: 'auto',
+                      maxHeight: '300px',
+                      color: isError ? '#ef4444' : 'var(--text-primary)',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
+                    }}
+                  >
+                    {isError ? (
+                      <>
+                        <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#ef4444' }}>
+                          ❌ Error:
+                        </div>
+                        {displayOutput}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#10b981' }}>
+                          ✅ Output:
+                        </div>
+                        {displayOutput}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Copy Result Button */}
+                  <button
+                    onClick={() => handleCopyResult(displayOutput)}
+                    style={{
+                      position: 'absolute',
+                      top: '1.05rem',
+                      right: '1.25rem',
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.7rem',
+                      backgroundColor: copiedResult ? '#10b981' : 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                      zIndex: 10,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!copiedResult) {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!copiedResult) {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+                      }
+                    }}
+                  >
+                    {copiedResult ? t.common.buttons.copied : t.common.buttons.copyCode}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </>
-      ) : (toolCall.name === 'pdf' || toolCall.name === 'markitdown') ? (
-        // Specialized rendering for pdf and markitdown tools - separate details and result
+      ) : (toolCall.name === 'pdf' || toolCall.name === 'markitdown' || toolCall.name === 'python') ? (
+        // Specialized rendering for pdf, markitdown, and python tools - separate details and result
         <>
           {showDetails && toolConfig.renderContent(toolCall.args, false, undefined)}
-          {showResult && response && toolConfig.renderContent({}, true, response)}
+          {showResult && response && toolConfig.renderContent(toolCall.args, true, response)}
         </>
       ) : (
         // Default rendering for other tools
