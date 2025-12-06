@@ -165,10 +165,16 @@ function extractToolInfo(content: MessageContent, toolUseResult?: SDKToolUseResu
         outputContent = typeof block.content === 'string' ? block.content : JSON.stringify(block.content || '');
       }
 
+      // When is_error is true, the content contains the actual error message
+      // Put it in the error field so UI can display it correctly
+      const errorContent = block.is_error
+        ? (typeof block.content === 'string' ? block.content : JSON.stringify(block.content || 'Tool execution failed'))
+        : undefined;
+
       toolResponses.push({
         tool_call_id: block.tool_use_id,
-        output: outputContent,
-        error: block.is_error ? 'Tool execution failed' : undefined,
+        output: block.is_error ? '' : outputContent,
+        error: errorContent,
       });
     }
   }
