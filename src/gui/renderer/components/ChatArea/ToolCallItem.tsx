@@ -2071,7 +2071,1415 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
       );
     },
   },
+
+  // ============================================
+  // Claude Agent SDK Tools (PascalCase naming)
+  // ============================================
+
+  Read: {
+    icon: <FileTextIcon />,
+    getInlineText: (args) => {
+      const path = args.file_path || '';
+      const fileName = path.split(/[/\\]/).pop() || path;
+      if (args.offset !== undefined || args.limit !== undefined) {
+        const range = args.offset && args.limit
+          ? `L${args.offset}-${args.offset + args.limit}`
+          : args.limit ? `first ${args.limit} lines` : `from L${args.offset}`;
+        return `📄 ${fileName} (${range})`;
+      }
+      return `📄 ${fileName}`;
+    },
+    hasDetails: (args, response) => !!args.file_path || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.file_path;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Path'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Content'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.file_path) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div>
+              <span style={{ color: 'var(--text-secondary)' }}>📄 File: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{args.file_path}</span>
+            </div>
+            {(args.offset !== undefined || args.limit !== undefined) && (
+              <div style={{ marginTop: '0.25rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>📍 Range: </span>
+                <span style={{ color: 'var(--text-primary)' }}>
+                  {args.offset !== undefined && `offset ${args.offset}`}
+                  {args.offset !== undefined && args.limit !== undefined && ', '}
+                  {args.limit !== undefined && `limit ${args.limit}`}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+              {response.error || response.output}
+            </pre>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  Edit: {
+    icon: <EditIcon />,
+    getInlineText: (args) => {
+      const path = args.file_path || '';
+      const fileName = path.split(/[/\\]/).pop() || path;
+      const oldLen = args.old_string?.length || 0;
+      const newLen = args.new_string?.length || 0;
+      const diff = newLen - oldLen;
+      const diffStr = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '±0';
+      return `✏️ ${fileName} (${diffStr} chars)`;
+    },
+    hasDetails: (args, response) => !!args.file_path || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.file_path;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Diff'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.file_path) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ marginBottom: '0.5rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>📄 File: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{args.file_path}</span>
+              {args.replace_all && (
+                <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontSize: '0.7rem' }}>(replace all)</span>
+              )}
+            </div>
+            {args.old_string && (
+              <div style={{ marginBottom: '0.25rem' }}>
+                <div style={{ color: '#ef4444', fontSize: '0.7rem', marginBottom: '0.125rem' }}>- Old:</div>
+                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '100px', overflow: 'auto' }}>
+                  {args.old_string.length > 200 ? args.old_string.substring(0, 200) + '...' : args.old_string}
+                </pre>
+              </div>
+            )}
+            {args.new_string && (
+              <div>
+                <div style={{ color: '#10b981', fontSize: '0.7rem', marginBottom: '0.125rem' }}>+ New:</div>
+                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '100px', overflow: 'auto' }}>
+                  {args.new_string.length > 200 ? args.new_string.substring(0, 200) + '...' : args.new_string}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
+              fontSize: '0.75rem',
+            }}
+          >
+            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+              {response.error ? `❌ ${response.error}` : '✅ Edit applied successfully'}
+            </span>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  Write: {
+    icon: <WriteIcon />,
+    getInlineText: (args) => {
+      const path = args.file_path || '';
+      const fileName = path.split(/[/\\]/).pop() || path;
+      const contentLen = args.content?.length || 0;
+      return `✍️ ${fileName} (${contentLen} chars)`;
+    },
+    hasDetails: (args, response) => !!args.file_path || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.file_path;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Preview'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.file_path) {
+        const contentPreview = args.content
+          ? (args.content.length > 300 ? args.content.substring(0, 300) + '...' : args.content)
+          : null;
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid #10b981',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ marginBottom: contentPreview ? '0.25rem' : 0 }}>
+              <span style={{ color: 'var(--text-secondary)' }}>📝 Creating: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{args.file_path}</span>
+            </div>
+            {contentPreview && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-secondary)', fontSize: '0.7rem', fontFamily: 'monospace', maxHeight: '150px', overflow: 'auto' }}>
+                  {contentPreview}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
+              fontSize: '0.75rem',
+            }}
+          >
+            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+              {response.error ? `❌ ${response.error}` : '✅ File created successfully'}
+            </span>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  Bash: {
+    icon: '⚡',
+    getInlineText: (args) => {
+      const cmd = args.command || '';
+      const desc = args.description || '';
+      if (desc) return `💻 ${desc}`;
+      const truncated = cmd.length > 50 ? cmd.substring(0, 50) + '...' : cmd;
+      return `💻 ${truncated}`;
+    },
+    hasDetails: (args, response) => !!args.command || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.command;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Command'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Output'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.command) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: '#1e1e1e',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            {args.description && (
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.7rem' }}>
+                📋 {args.description}
+              </div>
+            )}
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#10b981', fontFamily: 'monospace' }}>
+              $ {args.command}
+            </pre>
+            {args.timeout && (
+              <div style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', fontSize: '0.7rem' }}>
+                ⏱️ Timeout: {args.timeout}ms
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        // Try to parse JSON output (SDK returns {stdout, stderr, interrupted, isImage})
+        let displayOutput = response.error || response.output;
+        let hasStderr = false;
+        let stderrContent = '';
+
+        if (!response.error && response.output) {
+          try {
+            const parsed = JSON.parse(response.output);
+            if (typeof parsed === 'object' && parsed !== null) {
+              // Extract stdout and stderr
+              if (parsed.stdout !== undefined) {
+                displayOutput = parsed.stdout || '(no output)';
+              }
+              if (parsed.stderr && parsed.stderr.trim()) {
+                hasStderr = true;
+                stderrContent = parsed.stderr;
+              }
+            }
+          } catch {
+            // Not JSON, use as-is
+          }
+        }
+
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: '#1e1e1e',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : '#d4d4d4', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
+              {displayOutput}
+            </pre>
+            {hasStderr && (
+              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #333' }}>
+                <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>stderr:</div>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f59e0b', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4', opacity: 0.8 }}>
+                  {stderrContent}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  Glob: {
+    icon: <GlobIcon />,
+    getInlineText: (args) => {
+      const pattern = args.pattern || '';
+      return `🔎 ${pattern}`;
+    },
+    hasDetails: (args, response) => !!args.pattern || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.pattern;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && args.path && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Details'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Files'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.path) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <span style={{ color: 'var(--text-secondary)' }}>📂 In: </span>
+            <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+              {response.error || response.output}
+            </pre>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  Grep: {
+    icon: <SearchIcon />,
+    getInlineText: (args) => {
+      const pattern = args.pattern || '';
+      const truncated = pattern.length > 30 ? pattern.substring(0, 30) + '...' : pattern;
+      return `🔍 "${truncated}"`;
+    },
+    hasDetails: (args, response) => !!args.pattern || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.pattern;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Details'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Matches'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.pattern) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ marginBottom: args.path ? '0.25rem' : 0 }}>
+              <span style={{ color: 'var(--text-secondary)' }}>🔍 Pattern: </span>
+              <code style={{ color: '#f59e0b', backgroundColor: 'var(--bg-secondary)', padding: '0.125rem 0.25rem', borderRadius: '2px' }}>{args.pattern}</code>
+            </div>
+            {args.path && (
+              <div style={{ marginBottom: args.glob ? '0.25rem' : 0 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>📂 In: </span>
+                <span style={{ color: 'var(--text-primary)' }}>{args.path}</span>
+              </div>
+            )}
+            {args.glob && (
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>📁 Filter: </span>
+                <code style={{ color: 'var(--text-primary)' }}>{args.glob}</code>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+              {response.error || response.output}
+            </pre>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  LS: {
+    icon: <FolderIcon />,
+    getInlineText: (args) => {
+      const path = args.path || '.';
+      const dirName = path.split(/[/\\]/).pop() || path;
+      return `📂 ${dirName}`;
+    },
+    hasDetails: (_args, response) => !!response,
+    renderButton: (_args, _showDetails, _setShowDetails, response, showResult, setShowResult) => {
+      if (!response) return null;
+      return (
+        <button
+          onClick={(e) => { e.stopPropagation(); if (setShowResult) setShowResult(!showResult); }}
+          style={{
+            padding: '0.125rem 0.5rem',
+            border: '1px solid var(--border)',
+            borderRadius: '3px',
+            backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: showResult ? '#ffffff' : 'var(--text-secondary)',
+            fontSize: '0.7rem',
+            cursor: 'pointer',
+          }}
+        >
+          {showResult ? 'Hide' : 'Contents'}
+        </button>
+      );
+    },
+    renderContent: (_args, showResult, response) => {
+      if (!showResult || !response) return null;
+      return (
+        <div
+          style={{
+            marginLeft: '1.5rem',
+            marginBottom: '0.5rem',
+            marginTop: '0.5rem',
+            padding: '0.5rem 0.75rem',
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: '4px',
+            border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+            fontSize: '0.75rem',
+            maxHeight: '300px',
+            overflow: 'auto',
+          }}
+        >
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+            {response.error || response.output}
+          </pre>
+        </div>
+      );
+    },
+  },
+
+  Task: {
+    icon: '🤖',
+    getInlineText: (args) => {
+      const desc = args.description || '';
+      const agentType = args.subagent_type || '';
+      if (desc) return `${agentType ? `[${agentType}] ` : ''}${desc}`;
+      return agentType || 'Sub-agent task';
+    },
+    hasDetails: (args, response) => !!args.prompt || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasPrompt = !!args.prompt;
+      const hasResponse = !!response;
+      if (!hasPrompt && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasPrompt && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Prompt'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.prompt) {
+        const promptPreview = args.prompt.length > 500 ? args.prompt.substring(0, 500) + '...' : args.prompt;
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            {args.subagent_type && (
+              <div style={{ marginBottom: '0.25rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>🤖 Agent: </span>
+                <span style={{ color: '#3b82f6', fontWeight: '500' }}>{args.subagent_type}</span>
+              </div>
+            )}
+            <div>
+              <span style={{ color: 'var(--text-secondary)' }}>📋 Task: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{promptPreview}</span>
+            </div>
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+              {response.error || response.output}
+            </pre>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  WebFetch: {
+    icon: '🌐',
+    getInlineText: (args) => {
+      const url = args.url || '';
+      try {
+        const hostname = new URL(url).hostname;
+        return `🌐 ${hostname}`;
+      } catch {
+        return `🌐 ${url.substring(0, 30)}${url.length > 30 ? '...' : ''}`;
+      }
+    },
+    hasDetails: (args, response) => !!args.url || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.url;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'URL'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Content'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.url) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ marginBottom: args.prompt ? '0.25rem' : 0 }}>
+              <span style={{ color: 'var(--text-secondary)' }}>🔗 URL: </span>
+              <a href={args.url} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>
+                {args.url}
+              </a>
+            </div>
+            {args.prompt && (
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>💬 Prompt: </span>
+                <span style={{ color: 'var(--text-primary)' }}>{args.prompt}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+              {response.error || response.output}
+            </pre>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  WebSearch: {
+    icon: '🔎',
+    getInlineText: (args) => {
+      const query = args.query || '';
+      const truncated = query.length > 40 ? query.substring(0, 40) + '...' : query;
+      return `🔎 "${truncated}"`;
+    },
+    hasDetails: (args, response) => !!args.query || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.query;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (args.allowed_domains || args.blocked_domains) && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Filters'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Results'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.allowed_domains || args.blocked_domains) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            {args.allowed_domains && (
+              <div style={{ marginBottom: args.blocked_domains ? '0.25rem' : 0 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>✅ Only: </span>
+                <span style={{ color: '#10b981' }}>{args.allowed_domains.join(', ')}</span>
+              </div>
+            )}
+            {args.blocked_domains && (
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>🚫 Exclude: </span>
+                <span style={{ color: '#ef4444' }}>{args.blocked_domains.join(', ')}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: response.error ? '#ef4444' : 'var(--text-primary)', fontFamily: 'monospace' }}>
+              {response.error || response.output}
+            </pre>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  TodoWrite: {
+    icon: '📋',
+    getInlineText: (args) => {
+      if (!args.todos || !Array.isArray(args.todos)) return '';
+      const completed = args.todos.filter((t: { status: string }) => t.status === 'completed').length;
+      const inProgress = args.todos.filter((t: { status: string }) => t.status === 'in_progress').length;
+      return `${args.todos.length} tasks (${completed}✓ ${inProgress}→)`;
+    },
+    hasDetails: (args) => args.todos && Array.isArray(args.todos) && args.todos.length > 0,
+    renderButton: (args, showDetails, setShowDetails) => {
+      if (!args.todos || args.todos.length === 0) return null;
+      return (
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+          style={{
+            padding: '0.125rem 0.5rem',
+            border: '1px solid var(--border)',
+            borderRadius: '3px',
+            backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+            fontSize: '0.7rem',
+            cursor: 'pointer',
+          }}
+        >
+          {showDetails ? 'Hide Tasks' : 'Show Tasks'}
+        </button>
+      );
+    },
+    renderContent: (args) => {
+      if (!args.todos || args.todos.length === 0) return null;
+      return (
+        <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+            {args.todos.map((todo: { status: string; content: string; activeForm?: string }, index: number) => {
+              const statusColor =
+                todo.status === 'completed' ? '#10b981' :
+                todo.status === 'in_progress' ? '#3b82f6' :
+                '#6b7280';
+              const statusIcon =
+                todo.status === 'completed' ? '✅' :
+                todo.status === 'in_progress' ? '🔄' :
+                '⏳';
+              return (
+                <div
+                  key={index}
+                  style={{
+                    padding: '0.375rem 0.5rem',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    borderRadius: '4px',
+                    border: `1px solid ${todo.status === 'in_progress' ? '#3b82f6' : 'var(--border)'}`,
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>{statusIcon}</span>
+                    <span style={{ color: 'var(--text-primary)', flex: 1, textDecoration: todo.status === 'completed' ? 'line-through' : 'none', opacity: todo.status === 'completed' ? 0.7 : 1 }}>
+                      {todo.content}
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: statusColor, fontWeight: '600' }}>
+                      {todo.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+  },
+
+  MultiEdit: {
+    icon: <EditIcon />,
+    getInlineText: (args) => {
+      const path = args.file_path || '';
+      const fileName = path.split(/[/\\]/).pop() || path;
+      const editsCount = args.edits?.length || 0;
+      return `✏️ ${fileName} (${editsCount} edits)`;
+    },
+    hasDetails: (args, response) => !!args.file_path || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.file_path;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Edits'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.file_path && args.edits) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ marginBottom: '0.5rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>📄 File: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{args.file_path}</span>
+            </div>
+            {args.edits.map((edit: { old_string: string; new_string: string }, idx: number) => (
+              <div key={idx} style={{ marginBottom: idx < args.edits.length - 1 ? '0.5rem' : 0, paddingLeft: '0.5rem', borderLeft: '2px solid var(--border)' }}>
+                <div style={{ color: '#ef4444', fontSize: '0.7rem' }}>
+                  - {(edit.old_string?.length > 50 ? edit.old_string.substring(0, 50) + '...' : edit.old_string) || '(empty)'}
+                </div>
+                <div style={{ color: '#10b981', fontSize: '0.7rem' }}>
+                  + {(edit.new_string?.length > 50 ? edit.new_string.substring(0, 50) + '...' : edit.new_string) || '(empty)'}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
+              fontSize: '0.75rem',
+            }}
+          >
+            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+              {response.error ? `❌ ${response.error}` : '✅ All edits applied successfully'}
+            </span>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+
+  NotebookEdit: {
+    icon: '📓',
+    getInlineText: (args) => {
+      const path = args.notebook_path || '';
+      const fileName = path.split(/[/\\]/).pop() || path;
+      const mode = args.edit_mode || 'replace';
+      return `📓 ${fileName} (${mode})`;
+    },
+    hasDetails: (args, response) => !!args.notebook_path || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.notebook_path;
+      const hasResponse = !!response;
+      if (!hasArgs && !hasResponse) return null;
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide' : 'Details'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide' : 'Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+      if (args.notebook_path) {
+        elements.push(
+          <div
+            key="details"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ marginBottom: '0.25rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>📓 Notebook: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{args.notebook_path}</span>
+            </div>
+            {args.cell_type && (
+              <div style={{ marginBottom: '0.25rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>📝 Cell type: </span>
+                <span style={{ color: 'var(--text-primary)' }}>{args.cell_type}</span>
+              </div>
+            )}
+            {args.edit_mode && (
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>⚙️ Mode: </span>
+                <span style={{ color: args.edit_mode === 'delete' ? '#ef4444' : args.edit_mode === 'insert' ? '#10b981' : '#3b82f6' }}>
+                  {args.edit_mode}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
+      if (showResult && response) {
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
+              fontSize: '0.75rem',
+            }}
+          >
+            <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+              {response.error ? `❌ ${response.error}` : '✅ Notebook updated'}
+            </span>
+          </div>
+        );
+      }
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
 };
+
+/**
+ * Tool name aliases - maps legacy/alternative names to canonical Claude SDK names
+ */
+const TOOL_ALIASES: Record<string, string> = {
+  // Legacy LangChain-style names → Claude SDK names
+  read_file: 'Read',
+  write_file: 'Write',
+  edit_file: 'Edit',
+  list_directory: 'LS',
+  glob: 'Glob',
+  grep: 'Grep',
+  ls: 'LS',
+  task: 'Task',
+  write_todos: 'TodoWrite',
+  mkdir: 'Bash', // mkdir is typically a Bash command
+};
+
+/**
+ * Get tool config, checking aliases first
+ */
+function getToolConfig(toolName: string): ToolConfig {
+  // Check for exact match first
+  if (TOOL_CONFIGS[toolName]) {
+    return TOOL_CONFIGS[toolName];
+  }
+  // Check aliases
+  const aliasedName = TOOL_ALIASES[toolName];
+  if (aliasedName && TOOL_CONFIGS[aliasedName]) {
+    return TOOL_CONFIGS[aliasedName];
+  }
+  // Return default
+  return DEFAULT_TOOL_CONFIG;
+}
 
 /**
  * Default tool config for unknown tools
@@ -2113,8 +3521,8 @@ export function ToolCallItem({
   const { t } = useLanguage();
   const { toolCall, toolResponse: response, needsApproval, wasRejected, progress } = item;
 
-  // Get tool configuration
-  const toolConfig = TOOL_CONFIGS[toolCall.name] || DEFAULT_TOOL_CONFIG;
+  // Get tool configuration (with alias support)
+  const toolConfig = getToolConfig(toolCall.name);
   const icon = toolConfig.icon;
 
   // Copy code to clipboard
