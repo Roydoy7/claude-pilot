@@ -5,7 +5,7 @@
  * Manages event filtering, history updates, and streaming for a single session
  */
 
-import type { MessageListItem, UsageMetadata, ToolInterruptEvent, MessageContent } from '../../preload/preload-types';
+import type { MessageListItem, UsageMetadata, MessageContent } from '../../preload/preload-types';
 import type { AgentState, StreamEvent } from '../../../core/agents/claude-agent.js';
 
 interface SessionAgentCallbacks {
@@ -21,7 +21,7 @@ interface SessionAgentCallbacks {
  * Features:
  * - Event filtering by sessionId (multi-session isolation)
  * - History-based updates (single source of truth)
- * - Tool approval interrupt handling
+ * - Tool approval handling via canUseTool callback
  * - Per-session pending approvals and rejected tools state
  */
 export class SessionAgent {
@@ -33,7 +33,7 @@ export class SessionAgent {
   // Single source of truth: displayItems contains both history and streaming items
   private displayItems: MessageListItem[] = [];
 
-  private pendingApprovals: Map<string, string> = new Map(); // toolCallId -> interruptId
+  private pendingApprovals: Map<string, string> = new Map(); // toolCallId -> toolUseId
   private rejectedTools: Set<string> = new Set(); // Set of rejected toolCallIds
 
   // Streaming message buffer (for real-time text display)
@@ -42,14 +42,13 @@ export class SessionAgent {
   private streamingItemIndex: number = -1; // Index of streaming item in displayItems (-1 if none)
   private streamingUsage: UsageMetadata | undefined = undefined; // Store usage from first delta
 
-  // Streaming tool calls buffer (for interrupt matching)
+  // Streaming tool calls buffer (for tracking in-progress tool calls)
   private streamingToolCalls: Map<string, MessageListItem> = new Map(); // toolCallId -> MessageListItem
 
   // Event queue for sequential processing - ALL events to preserve order during debugging
   private eventQueue: Array<{
-    type: 'streamEvent' | 'historyUpdate' | 'toolInterrupt';
+    type: 'streamEvent' | 'historyUpdate';
     streamEvent?: StreamEvent;
-    data?: ToolInterruptEvent;
   }> = [];
   private isProcessingQueue: boolean = false;
 
@@ -76,6 +75,45 @@ export class SessionAgent {
       // Add ALL events to queue to preserve order during debugging
       // When debugging with breakpoints, events can accumulate and arrive out of order
       this.enqueueEvent({ type: 'streamEvent', streamEvent: event });
+    });
+
+    // Listen for tool approval requests (from canUseTool callback)
+    window.electronAPI.agent.onToolApprovalRequest((data) => {
+      // Filter by sessionId
+      if (!this.isActive || data.sessionId !== this.sessionId) {
+        return;
+      }
+
+      // Find the tool call item and mark it as needing approval
+      const toolItemIndex = this.displayItems.findIndex(
+        (item) => item.type === 'tool_call' && item.toolCall?.id === data.toolUseId
+      );
+
+      if (toolItemIndex !== -1) {
+        // Update existing tool item
+        const existingItem = this.displayItems[toolItemIndex];
+        this.displayItems[toolItemIndex] = {
+          ...existingItem,
+          needsApproval: true,
+        };
+
+        // Add to pending approvals
+        this.pendingApprovals.set(data.toolUseId, data.toolUseId);
+
+        // Notify callbacks
+        this.notifyDisplayItemsChanged();
+        if (this.callbacks.onPendingApprovalsChange) {
+          this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
+        }
+      } else {
+        // Tool call item not found yet - store for later matching
+        // This can happen if approval request arrives before tool_start event
+        console.warn('[SessionAgent] Tool approval request for unknown tool:', data.toolUseId);
+        this.pendingApprovals.set(data.toolUseId, data.toolUseId);
+        if (this.callbacks.onPendingApprovalsChange) {
+          this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
+        }
+      }
     });
   }
 
@@ -224,6 +262,10 @@ export class SessionAgent {
           parsedArgs = { _error: 'Invalid argument type' };
         }
 
+        // Check if this tool already has a pending approval request
+        // (toolApprovalRequest may arrive before tool_start)
+        const hasPendingApproval = this.pendingApprovals.has(event.toolCallId);
+
         const toolStartItem: MessageListItem = {
           type: 'tool_call',
           id: `tool-${event.toolCallId}`,
@@ -233,13 +275,13 @@ export class SessionAgent {
             name: event.toolName,
             args: parsedArgs,
           },
-          // Don't set needsApproval here - wait for interrupt event
+          needsApproval: hasPendingApproval, // Set if approval request already received
         };
 
         // Add to displayItems immediately (so it's displayed)
         this.displayItems.push(toolStartItem);
 
-        // Store in streaming tool calls buffer (for interrupt matching)
+        // Store in streaming tool calls buffer
         this.streamingToolCalls.set(event.toolCallId, toolStartItem);
 
         // Notify UI
@@ -281,7 +323,7 @@ export class SessionAgent {
           // Update displayItems entry
           this.displayItems[toolItemIndex] = updatedToolItem;
 
-          // Also update streamingToolCalls (for interrupt matching)
+          // Also update streamingToolCalls buffer
           this.streamingToolCalls.set(event.toolCallId, updatedToolItem);
 
           // Notify UI
@@ -338,18 +380,6 @@ export class SessionAgent {
         break;
       }      
 
-      case 'interrupt':
-        // Tool approval needed - add to event queue
-        this.enqueueEvent({
-          type: 'toolInterrupt',
-          data: {
-            sessionId: this.sessionId,
-            toolCalls: event.toolCalls,
-            interruptId: event.interruptId, // Use interrupt ID from backend
-          },
-        });
-        break;
-
       case 'checkpoint':
         // Checkpoint: current streaming item is complete, finalize it
         // Streaming item is already in displayItems, just clear buffers
@@ -373,6 +403,23 @@ export class SessionAgent {
         };
 
         this.displayItems.push(errorMessageItem);
+
+        // Clear status item (set to idle)
+        this.updateStatusItem({ thinking: false });
+
+        // Notify UI
+        this.notifyDisplayItemsChanged();
+        break;
+
+      case 'cancelled':
+        // User cancelled the request - show as inline status (not message bubble)
+        const cancelledItem: MessageListItem = {
+          type: 'cancelled',
+          id: `cancelled-${Date.now()}`,
+          timestamp: Date.now(),
+        };
+
+        this.displayItems.push(cancelledItem);
 
         // Clear status item (set to idle)
         this.updateStatusItem({ thinking: false });
@@ -425,7 +472,7 @@ export class SessionAgent {
   /**
    * Add event to queue and start processing
    */
-  private enqueueEvent(event: { type: 'streamEvent' | 'historyUpdate' | 'toolInterrupt'; streamEvent?: StreamEvent; data?: ToolInterruptEvent }) {
+  private enqueueEvent(event: { type: 'streamEvent' | 'historyUpdate'; streamEvent?: StreamEvent }) {
     this.eventQueue.push(event);
     this.processEventQueue();
   }
@@ -451,69 +498,10 @@ export class SessionAgent {
           this.processStreamEvent(event.streamEvent!);
         } else if (event.type === 'historyUpdate') {
           await this.fetchAndUpdateHistory();
-        } else if (event.type === 'toolInterrupt') {
-          await this.handleToolInterrupt(event.data!);
         }
       }
     } finally {
       this.isProcessingQueue = false;
-    }
-  }
-
-  /**
-   * Handle tool interrupt event
-   * Matches actionRequests (name + args) with streaming tool calls
-   */
-  private async handleToolInterrupt(event: ToolInterruptEvent) {
-    try {
-      if (this.streamingToolCalls.size === 0 || event.toolCalls.length === 0) {
-        return;
-      }
-
-      // Match action requests (name + args) with streaming tool calls
-      for (const [toolCallId, toolItem] of this.streamingToolCalls.entries()) {
-        if (!toolItem.toolCall) continue;
-
-        // Find matching action request by name and args
-        const matchingRequest = event.toolCalls.find((req) => {
-          if (req.name !== toolItem.toolCall!.name) return false;
-          // Deep comparison of args (simple JSON stringify comparison)
-          return JSON.stringify(req.args) === JSON.stringify(toolItem.toolCall!.args);
-        });
-
-        if (matchingRequest) {
-          // Map tool call ID to indexed interrupt ID (e.g., "interruptId-0")
-          // The index encodes the order of this actionRequest in the interrupt
-          this.pendingApprovals.set(toolCallId, matchingRequest.id!);
-
-          // Update tool item with needsApproval flag
-          const updatedToolItem: MessageListItem = {
-            ...toolItem,
-            needsApproval: true,
-          };
-
-          // Update both streamingToolCalls buffer and displayItems
-          this.streamingToolCalls.set(toolCallId, updatedToolItem);
-
-          // Find and update in displayItems
-          const displayIndex = this.displayItems.findIndex(
-            (item: MessageListItem) => item.type === 'tool_call' && item.toolCall?.id === toolCallId
-          );
-          if (displayIndex !== -1) {
-            this.displayItems[displayIndex] = updatedToolItem;
-          }
-
-          // Notify UI
-          this.notifyDisplayItemsChanged();
-        }
-      }
-
-      // Notify callback
-      if (this.callbacks.onPendingApprovalsChange) {
-        this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-      }
-    } catch (error) {
-      console.error('[SessionAgent] Failed to process tool interrupt:', error);
     }
   }
 
@@ -555,8 +543,26 @@ export class SessionAgent {
         // Process content: preserve MessageContent type (string | Array<ContentBlock>)
         // For messages with tool_calls, extract text only if content is JSON string
         let displayContent: MessageContent = msg.content;
+        let thinkingContent: string | undefined;
 
-        if (msg.tool_calls && msg.tool_calls.length > 0 && typeof msg.content === 'string') {
+        // Handle array content (ContentBlock[]) - extract thinking and filter content
+        if (Array.isArray(msg.content)) {
+          const blocks = msg.content as Array<{ type: string; text?: string; thinking?: string }>;
+
+          // Extract thinking content
+          const thinkingBlocks = blocks.filter(block => block.type === 'thinking');
+          if (thinkingBlocks.length > 0) {
+            thinkingContent = thinkingBlocks.map(b => b.thinking || '').join('\n');
+          }
+
+          // Filter to only text blocks for display content
+          const textBlocks = blocks.filter(block => block.type === 'text');
+          if (textBlocks.length > 0) {
+            displayContent = textBlocks as MessageContent;
+          } else {
+            displayContent = [];
+          }
+        } else if (msg.tool_calls && msg.tool_calls.length > 0 && typeof msg.content === 'string') {
           try {
             const parsed = JSON.parse(msg.content);
             if (Array.isArray(parsed)) {
@@ -571,13 +577,29 @@ export class SessionAgent {
           }
         }
 
+        // Create thinking item FIRST (before message) if thinking content exists
+        if (thinkingContent && thinkingContent.trim()) {
+          const thinkingItem: MessageListItem = {
+            type: 'thinking',
+            id: `${this.sessionId}-thinking-${msgIndex}`,
+            timestamp: msg.timestamp || Date.now(),
+            thinking: thinkingContent,
+          };
+          items.push(thinkingItem);
+          itemIndex++;
+        }
+
         // Check if content is empty (for both string and array types)
         let isEmpty = false;
         if (typeof displayContent === 'string') {
           const trimmed = displayContent.trim();
           isEmpty = trimmed === '[]' || trimmed === '{}' || trimmed === '';
         } else if (Array.isArray(displayContent)) {
-          isEmpty = displayContent.length === 0;
+          // Check if array has any text content
+          const hasTextContent = displayContent.some(
+            (block: { type: string; text?: string }) => block.type === 'text' && block.text?.trim()
+          );
+          isEmpty = !hasTextContent;
         }
 
         // Create message item only if content is not empty (skip empty assistant messages)
@@ -635,30 +657,9 @@ export class SessionAgent {
 
   /**
    * Approve tool calls
+   * Uses new canUseTool callback-based API (single tool per call)
    */
   async approveTools(toolCallIds: string[]): Promise<void> {
-    // Convert toolCallIds to indexed interrupt IDs
-    const indexedInterruptIds: string[] = [];
-    let baseInterruptId = '';
-
-    for (const toolCallId of toolCallIds) {
-      const indexedId = this.pendingApprovals.get(toolCallId);
-      if (indexedId) {
-        indexedInterruptIds.push(indexedId);
-        // Extract base interrupt ID from first indexed ID (e.g., "interruptId-0" -> "interruptId")
-        if (!baseInterruptId) {
-          const parts = indexedId.split('-');
-          parts.pop(); // Remove index
-          baseInterruptId = parts.join('-');
-        }
-      }
-    }
-
-    if (indexedInterruptIds.length === 0) {
-      console.error('[SessionAgent] No indexed interrupt IDs found for tool calls:', toolCallIds);
-      return;
-    }
-
     // Remove from pending approvals
     toolCallIds.forEach(id => this.pendingApprovals.delete(id));
 
@@ -681,42 +682,23 @@ export class SessionAgent {
     // Notify UI to re-render with updated displayItems
     this.notifyDisplayItemsChanged();
 
-    // Call backend with indexed interrupt IDs (e.g., ["interruptId-0"])
-    try {
-      await window.electronAPI.agent.approveTools(baseInterruptId, indexedInterruptIds);
-    } catch (error) {
-      console.error('[SessionAgent] Failed to approve tools:', error);
+    // Call backend for each tool (new canUseTool callback-based API)
+    for (const toolCallId of toolCallIds) {
+      try {
+        await window.electronAPI.agent.approveTool(toolCallId);
+      } catch (error) {
+        console.error('[SessionAgent] Failed to approve tool:', toolCallId, error);
+      }
     }
   }
 
   /**
    * Reject tool calls
+   * Uses new canUseTool callback-based API (single tool per call)
    * @param toolCallIds - Array of tool call IDs to reject
    * @param feedback - Optional message explaining why the tools were rejected (sent to LLM)
    */
   async rejectTools(toolCallIds: string[], feedback?: string): Promise<void> {
-    // Convert toolCallIds to indexed interrupt IDs
-    const indexedInterruptIds: string[] = [];
-    let baseInterruptId = '';
-
-    for (const toolCallId of toolCallIds) {
-      const indexedId = this.pendingApprovals.get(toolCallId);
-      if (indexedId) {
-        indexedInterruptIds.push(indexedId);
-        // Extract base interrupt ID from first indexed ID (e.g., "interruptId-0" -> "interruptId")
-        if (!baseInterruptId) {
-          const parts = indexedId.split('-');
-          parts.pop(); // Remove index
-          baseInterruptId = parts.join('-');
-        }
-      }
-    }
-
-    if (indexedInterruptIds.length === 0) {
-      console.error('[SessionAgent] No indexed interrupt IDs found for tool calls:', toolCallIds);
-      return;
-    }
-
     // Remove from pending approvals and add to rejected
     toolCallIds.forEach(id => {
       this.pendingApprovals.delete(id);
@@ -746,11 +728,13 @@ export class SessionAgent {
     // Notify UI to re-render with updated displayItems
     this.notifyDisplayItemsChanged();
 
-    // Call backend with indexed interrupt IDs (e.g., ["interruptId-0"])
-    try {
-      await window.electronAPI.agent.rejectTools(baseInterruptId, indexedInterruptIds, feedback);
-    } catch (error) {
-      console.error('[SessionAgent] Failed to reject tools:', error);
+    // Call backend for each tool (new canUseTool callback-based API)
+    for (const toolCallId of toolCallIds) {
+      try {
+        await window.electronAPI.agent.rejectTool(toolCallId, feedback);
+      } catch (error) {
+        console.error('[SessionAgent] Failed to reject tool:', toolCallId, error);
+      }
     }
   }
 
