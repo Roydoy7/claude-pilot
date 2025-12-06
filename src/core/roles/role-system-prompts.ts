@@ -17,6 +17,10 @@ export const ROLE_SYSTEM_PROMPTS: Record<RoleType, string> = {
 - Back-translation verification when needed
 
 Always preserve the original meaning while adapting for cultural appropriateness.`,
+
+  // CLAUDE_CODE role uses SDK's preset system prompt, not this custom prompt
+  // This is kept empty as a placeholder to satisfy TypeScript Record type
+  [RoleType.CLAUDE_CODE]: '',
 };
 
 /**

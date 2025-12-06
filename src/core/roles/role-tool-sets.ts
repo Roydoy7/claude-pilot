@@ -2,7 +2,11 @@
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
  * Role Tool Sets - Configure allowed tools for each role
- * Provides allowedTools configuration for Claude Agent SDK
+ * Provides tool configuration for Claude Agent SDK
+ *
+ * Two types of tool lists:
+ * - availableTools: All tools the role can use (passed to SDK as 'tools')
+ * - autoApprovedTools: Safe tools that don't require user approval (passed as 'allowedTools')
  */
 
 import { RoleType } from './role-enum.js';
@@ -22,40 +26,87 @@ export const ALL_SDK_TOOLS = [
   'TodoWrite',
 ] as const;
 
+/**
+ * Safe read-only tools that don't modify files or execute commands
+ * These are auto-approved and won't trigger canUseTool callback
+ */
+const SAFE_READ_TOOLS = ['Read', 'Glob', 'Grep'] as const;
 
 /**
- * Full file operation tools (including write)
+ * Safe web tools (read-only web operations)
  */
-const FILE_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep'] as const;
+const SAFE_WEB_TOOLS = ['WebFetch', 'WebSearch'] as const;
 
 /**
- * Web tools
+ * Dangerous tools that require user approval
+ * - Write/Edit: Modify files
+ * - Bash: Execute arbitrary commands
+ * - TodoWrite: Modify todo state (less dangerous but still modifying)
  */
-const WEB_TOOLS = ['WebFetch', 'WebSearch'] as const;
+const DANGEROUS_TOOLS = ['Write', 'Edit', 'Bash', 'TodoWrite'] as const;
 
 /**
- * Allowed tools for each role
+ * Full file operation tools (read + write)
  */
-export const ROLE_ALLOWED_TOOLS: Record<RoleType, readonly string[]> = {
+const FILE_TOOLS = [...SAFE_READ_TOOLS, 'Write', 'Edit'] as const;
+
+/**
+ * Available tools for each role (what tools the agent CAN use)
+ * Passed to SDK as 'tools' parameter
+ */
+export const ROLE_AVAILABLE_TOOLS: Record<RoleType, readonly string[]> = {
   [RoleType.OFFICE_ASSISTANT]: [
-    ...ALL_SDK_TOOLS,
+    ...FILE_TOOLS,
+    ...SAFE_WEB_TOOLS,
   ],
 
   [RoleType.TRANSLATOR]: [
+    ...FILE_TOOLS,
+  ],
+
+  [RoleType.CLAUDE_CODE]: [
     ...ALL_SDK_TOOLS,
   ],
 };
 
 /**
- * Get the allowed tools for a specific role
+ * Auto-approved tools for each role (what tools DON'T need user approval)
+ * Passed to SDK as 'allowedTools' parameter - these bypass canUseTool callback
  */
-export function getAllowedTools(role: RoleType): readonly string[] {
-  return ROLE_ALLOWED_TOOLS[role];
+export const ROLE_AUTO_APPROVED_TOOLS: Record<RoleType, readonly string[]> = {
+  [RoleType.OFFICE_ASSISTANT]: [
+    ...SAFE_READ_TOOLS,
+    ...SAFE_WEB_TOOLS,
+  ],
+
+  [RoleType.TRANSLATOR]: [
+    ...SAFE_READ_TOOLS,
+  ],
+
+  [RoleType.CLAUDE_CODE]: [
+    ...SAFE_READ_TOOLS,
+    ...SAFE_WEB_TOOLS,
+  ],
+};
+
+/**
+ * Legacy: Get all allowed tools for a role (for backward compatibility)
+ * @deprecated Use getAvailableTools and getAutoApprovedTools instead
+ */
+export const ROLE_ALLOWED_TOOLS = ROLE_AVAILABLE_TOOLS;
+
+/**
+ * Get the available tools for a specific role
+ * These are the tools the agent CAN use
+ */
+export function getAvailableTools(role: RoleType): readonly string[] {
+  return ROLE_AVAILABLE_TOOLS[role];
 }
 
 /**
- * Check if a role can use a specific tool
+ * Get the auto-approved tools for a specific role
+ * These tools don't require user approval (bypass canUseTool)
  */
-export function canUseTool(role: RoleType, toolName: string): boolean {
-  return ROLE_ALLOWED_TOOLS[role].includes(toolName);
+export function getAutoApprovedTools(role: RoleType): readonly string[] {
+  return ROLE_AUTO_APPROVED_TOOLS[role];
 }
