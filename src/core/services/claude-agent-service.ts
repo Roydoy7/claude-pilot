@@ -12,6 +12,7 @@ import {
   type StreamEvent,
   type MessageContent,
   type HistoryMessage,
+  type ToolApprovalRequestHandler,
 } from '../agents/claude-agent.js';
 import {
   createNewAgent,
@@ -26,7 +27,8 @@ import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel } from '../providers/model-list-manager.js';
 import { authManager, type AuthStatus } from '../auth/auth-manager.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
-import { permissionManager, type PermissionMode } from './permission-manager.js';
+import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
+import { deleteTranscript } from '../sessions/transcript-manager.js';
 
 /**
  * Extract text content from MessageContent for use as session title
@@ -61,11 +63,6 @@ export interface AgentInitConfig {
 export type StreamEventCallback = (sessionId: string, event: StreamEvent) => void;
 
 /**
- * Tool approval callback type
- */
-export type ToolApprovalCallback = (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
-
-/**
  * Chat request parameters
  */
 export interface ChatRequest {
@@ -92,7 +89,7 @@ export class ClaudeAgentService {
   private currentAgent: ClaudeAgent | null = null;
   private sessionManager: SessionManager;
   private initialized: boolean = false;
-  private toolApprovalCallback: ToolApprovalCallback | null = null;
+  private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null;
 
   private constructor() {
     this.sessionManager = SessionManager.getInstance();
@@ -109,10 +106,17 @@ export class ClaudeAgentService {
   }
 
   /**
-   * Set tool approval callback
+   * Set tool approval request handler
+   * This handler is called when SDK needs user approval for a tool
    */
-  setToolApprovalCallback(callback: ToolApprovalCallback | null): void {
-    this.toolApprovalCallback = callback;
+  setToolApprovalRequestHandler(handler: ToolApprovalRequestHandler | null): void {
+    console.log('[ClaudeAgentService] setToolApprovalRequestHandler called, handler:', handler ? 'provided' : 'null');
+    this.toolApprovalRequestHandler = handler;
+    // Also set on current agent if exists
+    if (this.currentAgent) {
+      console.log('[ClaudeAgentService] Applying handler to current agent');
+      this.currentAgent.setToolApprovalRequestHandler(handler);
+    }
   }
 
   /**
@@ -141,11 +145,12 @@ export class ClaudeAgentService {
       const lastSession = sessions[0];
 
       try {
-        this.currentAgent = await createAgentFromSession(
-          lastSession.id,
-          false,
-          this.toolApprovalCallback || undefined
-        );
+        this.currentAgent = await createAgentFromSession(lastSession.id, false);
+
+        // Apply tool approval handler
+        if (this.toolApprovalRequestHandler) {
+          this.currentAgent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
+        }
 
         this.initialized = true;
 
@@ -196,22 +201,18 @@ export class ClaudeAgentService {
     } = config;
 
     if (sessionId) {
-      this.currentAgent = await switchToSession(
-        sessionId,
-        false,
-        this.toolApprovalCallback || undefined
-      );
+      this.currentAgent = await switchToSession(sessionId, false);
     } else {
       const sessionTitle = title || `New ${role} session`;
       // Use last selected cwd or default to user home directory
       const cwd = this.sessionManager.getLastCwd();
-      this.currentAgent = await createNewAgent(
-        sessionTitle,
-        role,
-        modelName,
-        cwd,
-        this.toolApprovalCallback || undefined
-      );
+      this.currentAgent = await createNewAgent(sessionTitle, role, modelName, cwd);
+    }
+
+    // Apply tool approval handler to new agent
+    console.log('[ClaudeAgentService.initializeAgent] toolApprovalRequestHandler:', this.toolApprovalRequestHandler ? 'set' : 'not set');
+    if (this.toolApprovalRequestHandler) {
+      this.currentAgent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
     }
 
     return this.currentAgent;
@@ -243,7 +244,6 @@ export class ClaudeAgentService {
       }
 
       const agentSessionId = this.currentAgent.getSessionId();
-
       const eventStream = this.currentAgent.run(message);
 
       for await (const event of eventStream) {
@@ -301,6 +301,36 @@ export class ClaudeAgentService {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Approve a pending tool call
+   */
+  approveToolCall(
+    toolUseId: string,
+    updatedInput?: Record<string, unknown>
+  ): { success: boolean; error?: string } {
+    if (!this.currentAgent) {
+      return { success: false, error: 'No active agent' };
+    }
+
+    const result = this.currentAgent.approveToolCall(toolUseId, updatedInput);
+    return { success: result, error: result ? undefined : 'No pending approval for this tool' };
+  }
+
+  /**
+   * Reject a pending tool call
+   */
+  rejectToolCall(
+    toolUseId: string,
+    message?: string
+  ): { success: boolean; error?: string } {
+    if (!this.currentAgent) {
+      return { success: false, error: 'No active agent' };
+    }
+
+    const result = this.currentAgent.rejectToolCall(toolUseId, message);
+    return { success: result, error: result ? undefined : 'No pending approval for this tool' };
   }
 
   /**
@@ -393,10 +423,18 @@ export class ClaudeAgentService {
    */
   deleteSession(sessionId: string): { success: boolean; sessionId: string } {
     try {
+      // Get session info before deletion to access claudeSessionId and cwd
+      const session = this.sessionManager.loadSession(sessionId);
+
       clearAgentCache(sessionId);
 
       if (this.currentAgent && this.currentAgent.getSessionId() === sessionId) {
         this.currentAgent = null;
+      }
+
+      // Delete SDK transcript file if session has claudeSessionId
+      if (session?.claudeSessionId && session?.cwd) {
+        deleteTranscript(session.claudeSessionId, session.cwd);
       }
 
       this.sessionManager.deleteSession(sessionId);
@@ -416,11 +454,12 @@ export class ClaudeAgentService {
    */
   async switchSession(sessionId: string): Promise<ChatResponse> {
     try {
-      this.currentAgent = await switchToSession(
-        sessionId,
-        false,
-        this.toolApprovalCallback || undefined
-      );
+      this.currentAgent = await switchToSession(sessionId, false);
+
+      // Apply tool approval handler
+      if (this.toolApprovalRequestHandler) {
+        this.currentAgent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
+      }
 
       return {
         success: true,
@@ -445,13 +484,12 @@ export class ClaudeAgentService {
     cwd: string
   ): Promise<{ success: boolean; session?: Session; error?: string }> {
     try {
-      this.currentAgent = await createNewAgent(
-        title,
-        role,
-        modelName,
-        cwd,
-        this.toolApprovalCallback || undefined
-      );
+      this.currentAgent = await createNewAgent(title, role, modelName, cwd);
+
+      // Apply tool approval handler
+      if (this.toolApprovalRequestHandler) {
+        this.currentAgent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
+      }
 
       const session = this.sessionManager.loadSession(this.currentAgent.getSessionId());
       if (!session) {
@@ -511,11 +549,12 @@ export class ClaudeAgentService {
         throw new Error(`Session ${sessionId} not found`);
       }
 
-      this.currentAgent = await createAgentFromSession(
-        sessionId,
-        true,
-        this.toolApprovalCallback || undefined
-      );
+      this.currentAgent = await createAgentFromSession(sessionId, true);
+
+      // Apply tool approval handler
+      if (this.toolApprovalRequestHandler) {
+        this.currentAgent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
+      }
 
       return {
         success: true,
@@ -572,26 +611,17 @@ export class ClaudeAgentService {
 
   /**
    * Permission Management
+   * Permission mode is now managed per-agent via ClaudeAgent.setPermissionMode()
    */
 
-  setPermissionMode(mode: PermissionMode): void {
-    permissionManager.setPermissionMode(mode);
+  async setPermissionMode(mode: PermissionMode): Promise<void> {
+    if (this.currentAgent) {
+      await this.currentAgent.setPermissionMode(mode);
+    }
   }
 
   getPermissionMode(): PermissionMode {
-    return permissionManager.getPermissionMode();
-  }
-
-  getPermissionConfig() {
-    return permissionManager.getConfigSummary();
-  }
-
-  setAllowedTools(tools: string[]): void {
-    permissionManager.setAllowedTools(tools);
-  }
-
-  setDeniedTools(tools: string[]): void {
-    permissionManager.setDeniedTools(tools);
+    return this.currentAgent?.getPermissionMode() || 'default';
   }
 }
 

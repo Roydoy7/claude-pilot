@@ -16,6 +16,7 @@ export {
   type TodoItem,
   type StreamEvent,
   type HistoryMessage,
+  type ToolApprovalRequestHandler,
 } from './agents/claude-agent.js';
 
 export {
@@ -33,7 +34,6 @@ export {
   claudeAgentService,
   type AgentInitConfig,
   type StreamEventCallback,
-  type ToolApprovalCallback,
   type ChatRequest,
   type ChatResponse,
 } from './services/claude-agent-service.js';
@@ -57,8 +57,6 @@ export {
 } from './roles/role-system-prompts.js';
 
 export {
-  getAllowedTools,
-  canUseTool,
   ALL_SDK_TOOLS,
   ROLE_ALLOWED_TOOLS,
 } from './roles/role-tool-sets.js';
@@ -104,11 +102,5 @@ export {
   getConfigDir,
 } from './storage/storage.js';
 
-// Permission exports
-export {
-  permissionManager,
-  PermissionManager,
-  ToolRiskLevel,
-  type PermissionMode,
-  type PermissionConfig,
-} from './services/permission-manager.js';
+// Permission mode type re-exported from SDK
+export type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';

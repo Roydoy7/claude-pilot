@@ -5,16 +5,14 @@
  * Uses Claude Agent SDK instead of LangChain/DeepAgents
  */
 
-import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk';
 import { ClaudeAgent, type ClaudeAgentConfig } from './claude-agent.js';
 import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { authManager } from '../auth/auth-manager.js';
 import { getRoleSystemPrompt } from '../roles/role-system-prompts.js';
 import { getSystemReminders } from '../context/system-reminders.js';
-import { getAllowedTools } from '../roles/role-tool-sets.js';
+import { getAvailableTools, getAutoApprovedTools } from '../roles/role-tool-sets.js';
 import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel, supportsExtendedThinking } from '../providers/model-list-manager.js';
-import { permissionManager } from '../services/permission-manager.js';
 
 /**
  * Agent cache - stores created agents by session ID
@@ -98,76 +96,11 @@ ${reminders}`;
 }
 
 /**
- * Permission result for allowing tool execution
- */
-interface AllowPermission {
-  behavior: 'allow';
-  updatedInput: Record<string, unknown>;
-}
-
-/**
- * Permission result for denying tool execution
- */
-interface DenyPermission {
-  behavior: 'deny';
-  message: string;
-  interrupt?: boolean;
-}
-
-type PermissionResult = AllowPermission | DenyPermission;
-
-/**
- * Create canUseTool callback for tool approval
- * Uses PermissionManager for risk-based permission control
- */
-function createCanUseToolCallback(
-  onToolApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
-): CanUseTool | undefined {
-  if (!onToolApproval) {
-    return undefined;
-  }
-
-  return async (
-    toolName: string,
-    toolInput: Record<string, unknown>,
-    _options: { signal: AbortSignal; toolUseID: string }
-  ): Promise<PermissionResult> => {
-    // Check if tool is explicitly denied
-    if (permissionManager.isToolDenied(toolName)) {
-      return {
-        behavior: 'deny',
-        message: `Tool '${toolName}' is explicitly denied`,
-        interrupt: true,
-      };
-    }
-
-    // Check if tool requires approval based on current permission mode
-    if (permissionManager.requiresApproval(toolName)) {
-      const approved = await onToolApproval(toolName, toolInput);
-      if (!approved) {
-        return {
-          behavior: 'deny',
-          message: 'Tool execution was rejected by user',
-          interrupt: false,
-        };
-      }
-    }
-
-    // Tool is approved (either explicitly or by permission mode)
-    return {
-      behavior: 'allow',
-      updatedInput: toolInput,
-    };
-  };
-}
-
-/**
  * Create agent from existing session (with caching)
  */
 export async function createAgentFromSession(
   sessionId: string,
-  forceRecreate: boolean = false,
-  onToolApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
+  forceRecreate: boolean = false
 ): Promise<ClaudeAgent> {
   const sessionManager = SessionManager.getInstance();
   const session = sessionManager.loadSession(sessionId);
@@ -184,7 +117,7 @@ export async function createAgentFromSession(
     }
   }
 
-  const agent = await createAgentFromSessionData(session, onToolApproval);
+  const agent = await createAgentFromSessionData(session);
   cacheAgent(sessionId, agent);
 
   return agent;
@@ -192,10 +125,10 @@ export async function createAgentFromSession(
 
 /**
  * Create agent from session data
+ * Note: Tool approval is handled at runtime via ClaudeAgent.run() callback
  */
 export async function createAgentFromSessionData(
-  session: Session,
-  onToolApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
+  session: Session
 ): Promise<ClaudeAgent> {
 
   // Validate API key
@@ -205,15 +138,20 @@ export async function createAgentFromSessionData(
   }
 
   // Build system prompt with real paths
-  const systemPrompt = buildSystemPrompt(session.role);
+  // For CLAUDE_CODE role, use preset; for others, use custom system prompt
+  const systemPrompt: string | { type: 'preset'; preset: 'claude_code'; append?: string } =
+    session.role === RoleType.CLAUDE_CODE
+      ? { type: 'preset', preset: 'claude_code' }
+      : buildSystemPrompt(session.role);
 
-  // Create canUseTool callback for tool approval
-  const canUseTool = createCanUseToolCallback(onToolApproval);
-
-  // Get allowed tools for this role
-  const allowedTools = getAllowedTools(session.role);
+  // Get tools for this role:
+  // - availableTools: All tools the agent CAN use (passed as 'tools')
+  // - autoApprovedTools: Safe tools that bypass canUseTool callback (passed as 'allowedTools')
+  const availableTools = getAvailableTools(session.role);
+  const autoApprovedTools = getAutoApprovedTools(session.role);
 
   // Build agent config (extends SDK Options)
+  // Note: canUseTool is set dynamically in ClaudeAgent.run() when needed
   const agentConfig: ClaudeAgentConfig = {
     // Agent metadata
     role: session.role,
@@ -221,11 +159,11 @@ export async function createAgentFromSessionData(
 
     // SDK Options
     systemPrompt,
-    allowedTools: [...allowedTools],
-    canUseTool,
+    tools: [...availableTools], // All tools the agent can use
+    allowedTools: [...autoApprovedTools], // Safe tools auto-approved (bypass canUseTool)
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
-    permissionMode: permissionManager.getPermissionMode(),
+    permissionMode: 'default',
     // Enable extended thinking only for supported models
     maxThinkingTokens: supportsExtendedThinking(session.modelName) ? 10000 : undefined,
   };
@@ -241,8 +179,7 @@ export async function createNewAgent(
   title: string,
   role: RoleType,
   modelName: string = ClaudeModel.SONNET_4,
-  cwd: string,
-  onToolApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
+  cwd: string
 ): Promise<ClaudeAgent> {
   const sessionManager = SessionManager.getInstance();
 
@@ -250,7 +187,7 @@ export async function createNewAgent(
   const session = sessionManager.createSession(title, role, modelName, cwd);
 
   // Create agent from session
-  const agent = await createAgentFromSessionData(session, onToolApproval);
+  const agent = await createAgentFromSessionData(session);
 
   // Cache the new agent
   cacheAgent(session.id, agent);
@@ -263,8 +200,7 @@ export async function createNewAgent(
  */
 export async function switchToSession(
   sessionId: string,
-  forceRecreate: boolean = false,
-  onToolApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
+  forceRecreate: boolean = false
 ): Promise<ClaudeAgent> {
   const sessionManager = SessionManager.getInstance();
 
@@ -272,5 +208,5 @@ export async function switchToSession(
   sessionManager.switchSession(sessionId);
 
   // Create agent for this session
-  return await createAgentFromSession(sessionId, forceRecreate, onToolApproval);
+  return await createAgentFromSession(sessionId, forceRecreate);
 }

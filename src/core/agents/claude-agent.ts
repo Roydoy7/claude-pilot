@@ -20,9 +20,12 @@ import type {
   SDKToolProgressMessage,
   SDKAuthStatusMessage,
   Options,
+  PermissionMode,
+  CanUseTool,
 } from '@anthropic-ai/claude-agent-sdk';
 import { RoleType, getRoleDisplayName } from '../roles/role-enum.js';
 import { SessionManager } from '../sessions/session-manager.js';
+import { readTranscript } from '../sessions/transcript-manager.js';
 import { createRequire } from 'module';
 import path from 'path';
 import type { ContentBlock, MessageContent } from '../types/message-types.js';
@@ -31,6 +34,11 @@ import type { ContentBlock, MessageContent } from '../types/message-types.js';
  * Re-export message types for backward compatibility
  */
 export type { ContentBlock, MessageContent };
+
+/**
+ * Re-export PermissionMode type from SDK
+ */
+export type { PermissionMode };
 
 /**
  * Get the path to Claude Agent SDK's cli.js
@@ -98,6 +106,7 @@ export type StreamEvent =
   | { type: 'tool_progress'; toolName: string; toolCallId?: string; progressType: string; message: string; timestamp: number }
   | { type: 'interrupt'; interruptId: string; toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> }
   | { type: 'error'; error: string; details?: string }
+  | { type: 'cancelled'; reason: string }
   | { type: 'checkpoint' }
   | { type: 'done'; usage?: UsageMetadata };
 
@@ -130,6 +139,34 @@ export interface ClaudeAgentConfig extends Options {
  * Claude Agent instance
  * Wraps Claude Agent SDK with session context
  */
+/**
+ * Tool approval result - allow or deny tool execution
+ */
+interface ToolApprovalResult {
+  approved: boolean;
+  updatedInput?: Record<string, unknown>;
+  message?: string;
+}
+
+/**
+ * Pending tool approval - stores the resolve function for async approval
+ */
+interface PendingToolApproval {
+  toolUseId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  resolve: (result: ToolApprovalResult) => void;
+}
+
+/**
+ * Handler for tool approval requests - notifies UI to show approval dialog
+ */
+export type ToolApprovalRequestHandler = (
+  toolUseId: string,
+  toolName: string,
+  toolInput: Record<string, unknown>
+) => void;
+
 export class ClaudeAgent {
   public readonly config: ClaudeAgentConfig;
   public readonly sessionId: string; //This is our local UUID session ID, created by frontend
@@ -139,6 +176,10 @@ export class ClaudeAgent {
   private conversationHistory: HistoryMessage[] = [];
   private claudeSessionId: string | undefined; // Claude SDK's session ID for resuming (from system init message)
   private cwd: string; // Session's working directory for transcript file lookup
+  private currentQuery: Query | null = null; // Current query instance for runtime control
+  private permissionMode: PermissionMode; // Current permission mode, persists across turns
+  private pendingToolApproval: PendingToolApproval | null = null; // Current pending tool approval
+  private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null; // Handler for notifying UI
 
   constructor(
     config: ClaudeAgentConfig,
@@ -150,6 +191,12 @@ export class ClaudeAgent {
     this.sessionId = sessionId;
     this.cwd = cwd;
     this.claudeSessionId = claudeSessionId;
+    this.permissionMode = config.permissionMode || 'default';
+
+    // Load conversation history from transcript file if claudeSessionId exists
+    if (claudeSessionId) {
+      this.conversationHistory = readTranscript(claudeSessionId, cwd);
+    }
   }
 
   /**
@@ -170,6 +217,161 @@ export class ClaudeAgent {
   }
 
   /**
+   * Get current permission mode
+   */
+  getPermissionMode(): PermissionMode {
+    return this.permissionMode;
+  }
+
+  /**
+   * Set permission mode for current and future queries
+   * If a query is running, updates it immediately
+   * Also saves the mode for next query initialization
+   */
+  async setPermissionMode(mode: PermissionMode): Promise<void> {
+    this.permissionMode = mode;
+    if (this.currentQuery) {
+      await this.currentQuery.setPermissionMode(mode);
+    }
+  }
+
+  /**
+   * Set model for the current query
+   * Only available when a query is running
+   */
+  async setModel(model?: string): Promise<void> {
+    if (this.currentQuery) {
+      await this.currentQuery.setModel(model);
+    }
+  }
+
+  /**
+   * Set max thinking tokens for the current query
+   * Only available when a query is running
+   */
+  async setMaxThinkingTokens(maxThinkingTokens: number | null): Promise<void> {
+    if (this.currentQuery) {
+      await this.currentQuery.setMaxThinkingTokens(maxThinkingTokens);
+    }
+  }
+
+  /**
+   * Set handler for tool approval requests
+   * This handler is called when SDK needs user approval for a tool
+   */
+  setToolApprovalRequestHandler(handler: ToolApprovalRequestHandler | null): void {
+    this.toolApprovalRequestHandler = handler;
+  }
+
+  /**
+   * Create canUseTool callback for SDK
+   * This callback is called by SDK when a tool needs permission
+   * Returns a Promise that resolves when user approves/rejects via UI
+   */
+  private createCanUseToolCallback(): CanUseTool {
+    return async (
+      toolName: string,
+      toolInput: Record<string, unknown>,
+      options: { signal: AbortSignal; toolUseID: string }
+    ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }> => {
+      // Create a Promise that will be resolved when user approves/rejects
+      const approvalPromise = new Promise<ToolApprovalResult>((resolve) => {
+        this.pendingToolApproval = {
+          toolUseId: options.toolUseID,
+          toolName,
+          input: toolInput,
+          resolve,
+        };
+      });
+
+      // Notify UI about the pending approval via handler
+      if (this.toolApprovalRequestHandler) {
+        this.toolApprovalRequestHandler(options.toolUseID, toolName, toolInput);
+      }
+
+      // Wait for user decision or abort signal
+      const result = await Promise.race([
+        approvalPromise,
+        new Promise<ToolApprovalResult>((resolve) => {
+          options.signal.addEventListener('abort', () => {
+            resolve({ approved: false, message: 'Request aborted' });
+          });
+        }),
+      ]);
+
+      // Clear pending approval
+      this.pendingToolApproval = null;
+
+      if (result.approved) {
+        return {
+          behavior: 'allow',
+          updatedInput: result.updatedInput || toolInput,
+        };
+      } else {
+        return {
+          behavior: 'deny',
+          message: result.message || 'Tool execution denied by user',
+        };
+      }
+    };
+  }
+
+  /**
+   * Approve a pending tool call
+   * Called by IPC handler when user clicks approve in UI
+   */
+  approveToolCall(toolUseId: string, updatedInput?: Record<string, unknown>): boolean {
+    if (!this.pendingToolApproval || this.pendingToolApproval.toolUseId !== toolUseId) {
+      console.warn(`No pending approval for tool ${toolUseId}`);
+      return false;
+    }
+
+    this.pendingToolApproval.resolve({
+      approved: true,
+      updatedInput: updatedInput || this.pendingToolApproval.input,
+    });
+    return true;
+  }
+
+  /**
+   * Reject a pending tool call
+   * Called by IPC handler when user clicks reject in UI
+   */
+  rejectToolCall(toolUseId: string, message?: string): boolean {
+    if (!this.pendingToolApproval || this.pendingToolApproval.toolUseId !== toolUseId) {
+      console.warn(`No pending approval for tool ${toolUseId}`);
+      return false;
+    }
+
+    this.pendingToolApproval.resolve({
+      approved: false,
+      message: message || 'Tool execution rejected by user',
+    });
+    return true;
+  }
+
+  /**
+   * Check if there's a pending tool approval
+   */
+  hasPendingToolApproval(): boolean {
+    return this.pendingToolApproval !== null;
+  }
+
+  /**
+   * Get pending tool approval info
+   */
+  getPendingToolApproval(): { toolUseId: string; toolName: string; input: Record<string, unknown> } | null {
+    if (!this.pendingToolApproval) {
+      return null;
+    }
+    return {
+      toolUseId: this.pendingToolApproval.toolUseId,
+      toolName: this.pendingToolApproval.toolName,
+      input: this.pendingToolApproval.input,
+    };
+  }
+
+  /**
    * Process SDK messages and yield StreamEvents
    */
   private async *processQueryMessages(
@@ -184,7 +386,7 @@ export class ClaudeAgent {
     try {
       for await (const chunk of queryInstance) {
         if (this.isCancelled()) {
-          yield { type: 'error', error: 'Request cancelled by user' };
+          yield { type: 'cancelled', reason: 'Request cancelled by user' };
           break;
         }
 
@@ -424,11 +626,23 @@ export class ClaudeAgent {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      yield {
-        type: 'error',
-        error: errorMessage,
-        details: error instanceof Error ? error.stack : undefined,
-      };
+
+      // Check if this is a user-initiated cancellation (from SDK abort)
+      const isUserCancellation =
+        errorMessage.toLowerCase().includes('aborted by user') ||
+        errorMessage.toLowerCase().includes('cancelled by user') ||
+        errorMessage.toLowerCase().includes('canceled by user') ||
+        this.isCancelled();
+
+      if (isUserCancellation) {
+        yield { type: 'cancelled', reason: errorMessage };
+      } else {
+        yield {
+          type: 'error',
+          error: errorMessage,
+          details: error instanceof Error ? error.stack : undefined,
+        };
+      }
     } finally {
       yield { type: 'state', state: { thinking: false } };
       yield { type: 'done', usage: finalUsage };
@@ -481,6 +695,7 @@ export class ClaudeAgent {
 
   /**
    * Run agent with user input (using streaming input mode)
+   * @param input User message content
    */
   async *run(input: MessageContent): AsyncGenerator<StreamEvent, void, unknown> {
     this.abortController = new AbortController();
@@ -499,6 +714,11 @@ export class ClaudeAgent {
 
       // Build Options from config, excluding agent-specific metadata
       const { role, modelName, ...sdkOptions } = this.config;
+
+      const canUseToolCallback = this.toolApprovalRequestHandler
+        ? this.createCanUseToolCallback()
+        : undefined;
+
       const options: Options = {
         ...sdkOptions,
         model: modelName,
@@ -507,21 +727,28 @@ export class ClaudeAgent {
         abortController: this.abortController,
         maxTurns: 50,
         resume: this.claudeSessionId,
-        // includePartialMessages: true,  // Removed: requires --print flag which SDK doesn't pass
+        permissionMode: this.permissionMode, // Use instance variable (may be updated via setPermissionMode)
         pathToClaudeCodeExecutable: getClaudeCodeExecutablePath(),
         settingSources: sdkOptions.settingSources || ['local'],
+        canUseTool: canUseToolCallback,
+        // Empty hook to work around SDK bug: without hooks, SDK closes stdin before CLI can send
+        // can_use_tool requests, causing "Stream closed" error. This hook triggers the wait logic.
+        // See: sdk.mjs streamInput() - only waits for firstResultReceivedPromise when hasHooks is true
+        hooks: {
+          Notification: [{ hooks: [async () => ({})] }],
+        },
         stderr: (message: string) => {
           console.error('[Claude SDK stderr]', message);
         },
       };
 
       // Use streaming input mode with async generator
-      const queryInstance = query({
+      this.currentQuery = query({
         prompt: this.generateMessages(input),
         options,
       });
 
-      yield* this.processQueryMessages(queryInstance);
+      yield* this.processQueryMessages(this.currentQuery);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       yield { type: 'error', error: errorMessage };
@@ -530,6 +757,7 @@ export class ClaudeAgent {
     } finally {
       this.abortController = null;
       this.turnCancelled = false;
+      this.currentQuery = null;
     }
   }
 
@@ -548,13 +776,6 @@ export class ClaudeAgent {
    * SDK stores conversation history in transcript files, we read them directly for UI display
    */
   async getHistory(): Promise<HistoryMessage[]> {
-    // Read history from SDK transcript file if claudeSessionId is available
-    if (this.claudeSessionId) {
-      const { readTranscript } = await import('../sessions/transcript-reader.js');
-      return readTranscript(this.claudeSessionId, this.cwd);
-    }
-
-    // Fallback to in-memory history if no claudeSessionId yet
     return this.conversationHistory;
   }
 
