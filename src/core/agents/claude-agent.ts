@@ -22,6 +22,7 @@ import type {
   Options,
   PermissionMode,
   CanUseTool,
+  SettingSource,
 } from '@anthropic-ai/claude-agent-sdk';
 import { RoleType, getRoleDisplayName } from '../roles/role-enum.js';
 import { SessionManager } from '../sessions/session-manager.js';
@@ -36,18 +37,31 @@ import type { ContentBlock, MessageContent } from '../types/message-types.js';
 export type { ContentBlock, MessageContent };
 
 /**
- * Re-export PermissionMode type from SDK
+ * Re-export PermissionMode and SettingSource types from SDK
  */
-export type { PermissionMode };
+export type { PermissionMode, SettingSource };
+
+/**
+ * All available setting sources
+ */
+export const ALL_SETTING_SOURCES: SettingSource[] = ['user', 'project', 'local'];
 
 /**
  * Get the path to Claude Agent SDK's cli.js
  * This is needed because when running from compiled dist/, import.meta.url
- * points to the wrong location
+ * points to the wrong location.
+ * In Electron asar environment, the path needs to be adjusted to use unpacked version.
  */
 function getClaudeCodeExecutablePath(): string {
   const require = createRequire(import.meta.url);
-  const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+  let sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+
+  // In Electron asar environment, replace app.asar with app.asar.unpacked
+  // because the SDK contains native modules and CLI that can't run from inside asar
+  if (sdkPath.includes('app.asar')) {
+    sdkPath = sdkPath.replace('app.asar', 'app.asar.unpacked');
+  }
+
   return path.join(path.dirname(sdkPath), 'cli.js');
 }
 
@@ -178,8 +192,10 @@ export class ClaudeAgent {
   private cwd: string; // Session's working directory for transcript file lookup
   private currentQuery: Query | null = null; // Current query instance for runtime control
   private permissionMode: PermissionMode; // Current permission mode, persists across turns
+  private settingSources: SettingSource[]; // Current setting sources, persists across turns
   private pendingToolApproval: PendingToolApproval | null = null; // Current pending tool approval
   private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null; // Handler for notifying UI
+  private streamEndResolver: (() => void) | null = null; // Resolver to signal end of input stream
 
   constructor(
     config: ClaudeAgentConfig,
@@ -192,6 +208,7 @@ export class ClaudeAgent {
     this.cwd = cwd;
     this.claudeSessionId = claudeSessionId;
     this.permissionMode = config.permissionMode || 'default';
+    this.settingSources = config.settingSources || [...ALL_SETTING_SOURCES]; // Default to all sources
 
     // Load conversation history from transcript file if claudeSessionId exists
     if (claudeSessionId) {
@@ -204,6 +221,11 @@ export class ClaudeAgent {
    */
   cancel(): void {
     this.turnCancelled = true;
+    // Release the stream generator if it's waiting
+    if (this.streamEndResolver) {
+      this.streamEndResolver();
+      this.streamEndResolver = null;
+    }
     if (this.abortController) {
       this.abortController.abort();
     }
@@ -233,6 +255,22 @@ export class ClaudeAgent {
     if (this.currentQuery) {
       await this.currentQuery.setPermissionMode(mode);
     }
+  }
+
+  /**
+   * Get current setting sources
+   */
+  getSettingSources(): SettingSource[] {
+    return [...this.settingSources];
+  }
+
+  /**
+   * Set setting sources for future queries
+   * Note: settingSources cannot be changed during a running query,
+   * changes will take effect on the next query
+   */
+  setSettingSources(sources: SettingSource[]): void {
+    this.settingSources = [...sources];
   }
 
   /**
@@ -515,11 +553,31 @@ export class ClaudeAgent {
                 ? userMessage.tool_use_result
                 : JSON.stringify(userMessage.tool_use_result);
 
+              // Check message.content for tool_result blocks with is_error flag
+              // SDK sends tool results in message.content as well as tool_use_result
+              let isError = false;
+              let errorContent: string | undefined;
+              const messageContent = userMessage.message?.content;
+              if (Array.isArray(messageContent)) {
+                for (const block of messageContent) {
+                  if (block.type === 'tool_result' && 'is_error' in block && block.is_error) {
+                    isError = true;
+                    // Extract error content from the block
+                    const blockContent = (block as { content?: unknown }).content;
+                    errorContent = typeof blockContent === 'string'
+                      ? blockContent
+                      : JSON.stringify(blockContent || 'Tool execution failed');
+                    break;
+                  }
+                }
+              }
+
               yield {
                 type: 'tool_end',
                 toolName: 'unknown',
                 toolCallId: currentToolUseId,
-                output,
+                output: isError ? '' : output,
+                error: isError ? errorContent : undefined,
               };
               yield { type: 'state', state: { thinking: true } };
               currentToolUseId = undefined;
@@ -542,6 +600,13 @@ export class ClaudeAgent {
 
           case 'result': {
             const resultMessage = chunk as SDKResultMessage;
+
+            // Signal the input stream generator to end
+            // This allows SDK to properly close stdin after conversation ends
+            if (this.streamEndResolver) {
+              this.streamEndResolver();
+              this.streamEndResolver = null;
+            }
 
             // Update session checkpoint metadata on result
             if (resultMessage.session_id) {
@@ -691,6 +756,13 @@ export class ClaudeAgent {
       },
       parent_tool_use_id: null,
     } as SDKUserMessage;
+
+    // Keep the generator alive until the conversation ends
+    // This prevents SDK from closing stdin prematurely (which breaks tool approval requests)
+    // The streamEndResolver is called when we receive a 'result' message
+    await new Promise<void>((resolve) => {
+      this.streamEndResolver = resolve;
+    });
   }
 
   /**
@@ -729,12 +801,32 @@ export class ClaudeAgent {
         resume: this.claudeSessionId,
         permissionMode: this.permissionMode, // Use instance variable (may be updated via setPermissionMode)
         pathToClaudeCodeExecutable: getClaudeCodeExecutablePath(),
-        settingSources: sdkOptions.settingSources || ['local'],
+        settingSources: this.settingSources, // Use instance variable (may be updated via setSettingSources)
         canUseTool: canUseToolCallback,
-        // Empty hook to work around SDK bug: without hooks, SDK closes stdin before CLI can send
-        // can_use_tool requests, causing "Stream closed" error. This hook triggers the wait logic.
-        // See: sdk.mjs streamInput() - only waits for firstResultReceivedPromise when hasHooks is true
         hooks: {
+          // PreToolUse: Auto-inject workingDirectory for all tools if not specified
+          PreToolUse: [{
+            hooks: [async (input) => {
+              if (input.hook_event_name === 'PreToolUse') {
+                const toolInput = input.tool_input as Record<string, unknown> | undefined;
+                if (toolInput && !toolInput.workingDirectory) {
+                  return {
+                    hookSpecificOutput: {
+                      hookEventName: 'PreToolUse' as const,
+                      updatedInput: {
+                        ...toolInput,
+                        workingDirectory: input.cwd,
+                      },
+                    },
+                  };
+                }
+              }
+              return {};
+            }],
+          }],
+          // Empty hook to work around SDK bug: without hooks, SDK closes stdin before CLI can send
+          // can_use_tool requests, causing "Stream closed" error. This hook triggers the wait logic.
+          // See: sdk.mjs streamInput() - only waits for firstResultReceivedPromise when hasHooks is true
           Notification: [{ hooks: [async () => ({})] }],
         },
         stderr: (message: string) => {
