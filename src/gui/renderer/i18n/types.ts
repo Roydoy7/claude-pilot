@@ -137,6 +137,23 @@ export interface Translation {
         };
       };
     };
+    settingSources?: {
+      label: string;
+      sources: {
+        user: {
+          name: string;
+          description: string;
+        };
+        project: {
+          name: string;
+          description: string;
+        };
+        local: {
+          name: string;
+          description: string;
+        };
+      };
+    };
   };
 
   // Message

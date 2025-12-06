@@ -40,4 +40,21 @@ export const inputAreaZh = {
       },
     },
   },
+  settingSources: {
+    label: '设置来源',
+    sources: {
+      user: {
+        name: 'User',
+        description: '用户级别设置 (~/.claude/settings.json)',
+      },
+      project: {
+        name: 'Project',
+        description: '项目级别设置 (CLAUDE.md 文件)',
+      },
+      local: {
+        name: 'Local',
+        description: '本地设置 (.claude/settings.local.json)',
+      },
+    },
+  },
 };

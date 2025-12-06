@@ -40,4 +40,21 @@ export const inputAreaEn = {
       },
     },
   },
+  settingSources: {
+    label: 'Setting Sources',
+    sources: {
+      user: {
+        name: 'User',
+        description: 'User-level settings (~/.claude/settings.json)',
+      },
+      project: {
+        name: 'Project',
+        description: 'Project-level settings (CLAUDE.md files)',
+      },
+      local: {
+        name: 'Local',
+        description: 'Local settings (.claude/settings.local.json)',
+      },
+    },
+  },
 };
