@@ -8,6 +8,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Message } from './Message';
 import { ToolCallItem } from './ToolCallItem';
 import { StatusItem } from './StatusItem';
+import { ThinkingItem } from './ThinkingItem';
+import { CancelledItem } from './CancelledItem';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { MessageListItem } from '../../../preload/preload-types';
 
@@ -156,6 +158,20 @@ export function MessageList({
           } else if (item.type === 'status') {
             return (
               <StatusItem
+                key={item.id}
+                item={item}
+              />
+            );
+          } else if (item.type === 'thinking') {
+            return (
+              <ThinkingItem
+                key={item.id}
+                item={item}
+              />
+            );
+          } else if (item.type === 'cancelled') {
+            return (
+              <CancelledItem
                 key={item.id}
                 item={item}
               />
