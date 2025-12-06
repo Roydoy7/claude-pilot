@@ -339,6 +339,14 @@ export class ModelListManager {
 
     // Fetch models from API
     try {
+      const isOAuth = tokenStore.getTokenSource() === 'oauth';
+
+      // OAuth tokens don't have access to /v1/models endpoint
+      // Use fallback models for OAuth authentication
+      if (isOAuth) {
+        return FALLBACK_MODELS;
+      }
+
       const models = await fetchAnthropicModels(accessToken);
 
       // Save to cache
