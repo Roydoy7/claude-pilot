@@ -139,6 +139,9 @@ export interface MessageListItem {
 
   // Thinking type fields (extended thinking)
   thinking?: string;
+
+  // Compact summary flag (from /compact command)
+  isCompactSummary?: boolean;
 }
 
 /**
