@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import type { MessageListItem } from '../../../preload/preload-types';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface StatusItemProps {
   item: MessageListItem;
@@ -167,7 +168,48 @@ function ClockIcon() {
   );
 }
 
+/**
+ * SVG Terminal Icon for slash commands
+ */
+function TerminalIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="terminal-icon"
+    >
+      <rect
+        x="2"
+        y="4"
+        width="20"
+        height="16"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M6 9L10 12L6 15"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 15H18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function StatusItem({ item }: StatusItemProps) {
+  const { t } = useLanguage();
+
   // Validate item type
   if (item.type !== 'status' || !item.agentState) {
     return null;
@@ -178,10 +220,20 @@ export function StatusItem({ item }: StatusItemProps) {
   // Check if there's anything to display
   const hasThinking = state.thinking;
   const hasTool = state.tool !== undefined;
+  const hasCommand = state.command !== undefined && state.command.status === 'running';
 
-  if (!hasThinking && !hasTool) {
+  if (!hasThinking && !hasTool && !hasCommand) {
     return null; // Idle state - nothing to display
   }
+
+  // Get command display text from i18n or fallback
+  const getCommandText = (commandName: string): string => {
+    const commands = t.status.commands;
+    if (commands && commandName in commands) {
+      return commands[commandName as keyof typeof commands];
+    }
+    return `Running /${commandName}...`;
+  };
 
   return (
     <div
@@ -195,7 +247,23 @@ export function StatusItem({ item }: StatusItemProps) {
         color: 'var(--text-secondary)',
       }}
     >
-      {/* Tool state indicator - shown first */}
+      {/* Command state indicator - shown first (highest priority) */}
+      {hasCommand && state.command && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span className="status-icon-terminal">
+            <TerminalIcon />
+          </span>
+          <AnimatedText text={getCommandText(state.command.name)} />
+        </div>
+      )}
+
+      {/* Tool state indicator - shown second */}
       {hasTool && state.tool && (
         <div
           style={{
@@ -271,6 +339,24 @@ export function StatusItem({ item }: StatusItemProps) {
           justify-content: center;
           animation: tick 1s steps(12) infinite;
           color: var(--warning);
+        }
+
+        .status-icon-terminal {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          animation: terminalPulse 1.5s ease-in-out infinite;
+          color: var(--accent-secondary, #10b981);
+        }
+
+        /* Terminal pulse animation */
+        @keyframes terminalPulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.6;
+          }
         }
 
         /* Dot pulse animation for thinking bubble */
