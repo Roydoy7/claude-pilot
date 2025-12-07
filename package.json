@@ -24,6 +24,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.60",
     "@mohtasham/md-to-docx": "^2.4.0",
+    "@tanstack/react-virtual": "^3.13.12",
     "@types/adm-zip": "^0.5.7",
     "@types/diff": "^8.0.0",
     "@types/pdfkit": "^0.17.3",
@@ -39,6 +40,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
+    "react-virtualized-auto-sizer": "^1.0.26",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "xml2js": "^0.6.2",
@@ -48,6 +50,7 @@
     "@electron/rebuild": "^4.0.1",
     "@types/react": "^19.2.4",
     "@types/react-dom": "^19.2.3",
+    "@types/react-virtualized-auto-sizer": "^1.0.4",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/ui": "^3.2.4",
     "concurrently": "^9.2.1",
