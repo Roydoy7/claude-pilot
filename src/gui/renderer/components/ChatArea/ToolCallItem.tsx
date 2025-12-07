@@ -13,6 +13,106 @@ import type { ReactNode } from 'react';
 import type { MessageListItem, ToolResponse, ToolProgressEntry } from '../../../preload/preload-types';
 import { useLanguage } from '../../i18n/LanguageContext';
 
+/**
+ * Diff line type for edit tool display
+ */
+type DiffLineType = 'unchanged' | 'added' | 'removed';
+
+interface DiffLine {
+  type: DiffLineType;
+  content: string;
+}
+
+/**
+ * Simple LCS-based diff algorithm for computing line differences
+ */
+function computeDiff(oldStr: string, newStr: string): DiffLine[] {
+  const oldLines = oldStr.split('\n');
+  const newLines = newStr.split('\n');
+
+  // Build LCS table
+  const m = oldLines.length;
+  const n = newLines.length;
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (oldLines[i - 1] === newLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  // Backtrack to find diff
+  const result: DiffLine[] = [];
+  let i = m, j = n;
+
+  const tempResult: DiffLine[] = [];
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      tempResult.push({ type: 'unchanged', content: oldLines[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      tempResult.push({ type: 'added', content: newLines[j - 1] });
+      j--;
+    } else {
+      tempResult.push({ type: 'removed', content: oldLines[i - 1] });
+      i--;
+    }
+  }
+
+  // Reverse to get correct order
+  for (let k = tempResult.length - 1; k >= 0; k--) {
+    result.push(tempResult[k]);
+  }
+
+  return result;
+}
+
+/**
+ * Render diff lines with appropriate colors
+ */
+function renderDiffLines(diffLines: DiffLine[]): ReactNode {
+  return (
+    <pre style={{ margin: 0, padding: '0.5rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.5' }}>
+      {diffLines.map((line, idx) => {
+        let bgColor = 'transparent';
+        let textColor = 'inherit';
+        let prefix = ' ';
+
+        if (line.type === 'added') {
+          bgColor = 'rgba(16,185,129,0.2)';
+          textColor = '#059669';
+          prefix = '+';
+        } else if (line.type === 'removed') {
+          bgColor = 'rgba(239,68,68,0.2)';
+          textColor = '#dc2626';
+          prefix = '-';
+        }
+
+        return (
+          <div
+            key={idx}
+            style={{
+              backgroundColor: bgColor,
+              color: textColor,
+              padding: '0 0.25rem',
+              marginLeft: '-0.25rem',
+              marginRight: '-0.25rem',
+            }}
+          >
+            <span style={{ opacity: 0.6, marginRight: '0.5rem' }}>{prefix}</span>
+            {line.content}
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
+
 interface ToolCallItemProps {
   item: MessageListItem;
   onApprove?: (toolCallId: string) => void;
@@ -1090,20 +1190,9 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
                 <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontSize: '0.7rem' }}>(replace all)</span>
               )}
             </div>
-            {args.old_string && (
-              <div style={{ marginBottom: '0.25rem' }}>
-                <div style={{ color: '#ef4444', fontSize: '0.7rem', marginBottom: '0.125rem' }}>- Old:</div>
-                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {args.old_string}
-                </pre>
-              </div>
-            )}
-            {args.new_string && (
+            {(args.old_string !== undefined || args.new_string !== undefined) && (
               <div>
-                <div style={{ color: '#10b981', fontSize: '0.7rem', marginBottom: '0.125rem' }}>+ New:</div>
-                <pre style={{ margin: 0, padding: '0.25rem 0.5rem', backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: '2px', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {args.new_string}
-                </pre>
+                {renderDiffLines(computeDiff(args.old_string || '', args.new_string || ''))}
               </div>
             )}
           </div>
@@ -2341,17 +2430,9 @@ export function ToolCallItem({
   const hasDetails = toolConfig.hasDetails(toolCall.args, response);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: '0.75rem',
-        marginBottom: '0.5rem',
-        fontSize: '0.875rem',
-        color: 'var(--text-secondary)',
-      }}
-    >
+    <div className="chat-item chat-item-ai" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
       {/* AI Avatar */}
-      <div style={{ flexShrink: 0 }}>
+      <div className="chat-item-avatar">
         <div className="avatar-icon ai-avatar">
           {/* AI icon - bot/robot face */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2365,7 +2446,7 @@ export function ToolCallItem({
       </div>
 
       {/* Tool call content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="chat-item-content">
         {/* Tool call - first line: icon, name, inline text */}
         <div
           style={{
