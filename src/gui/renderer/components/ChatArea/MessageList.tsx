@@ -1,10 +1,13 @@
 /**
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
- * MessageList Component - Displays scrollable list of messages and tool calls
+ * MessageList Component - Virtualized scrollable list of messages and tool calls
+ * Uses @tanstack/react-virtual for efficient rendering of long message lists
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import type React from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Message } from './Message';
 import { ToolCallItem } from './ToolCallItem';
 import { StatusItem } from './StatusItem';
@@ -21,7 +24,56 @@ interface MessageListProps {
 }
 
 const SCROLL_THRESHOLD = 150; // Distance from bottom to consider "at bottom"
-const SMOOTH_SCROLL_THRESHOLD = 300; // Use smooth scroll if less than this distance
+const DEFAULT_ITEM_HEIGHT = 100; // Estimated height for items before measurement
+
+/**
+ * Check if an item should be rendered (not empty)
+ */
+function shouldRenderItem(item: MessageListItem): boolean {
+  if (item.type === 'message') {
+    // Skip empty assistant messages
+    if (item.role === 'assistant' && (!item.content || (typeof item.content === 'string' && item.content.trim() === ''))) {
+      return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+/**
+ * Renders a single item based on its type
+ */
+function renderItem(
+  item: MessageListItem,
+  onToolApprove?: (toolCallId: string) => void,
+  onToolReject?: (toolCallId: string) => void,
+): React.ReactNode {
+  if (item.type === 'message') {
+    if (item.isCompactSummary) {
+      return <CompactSummaryItem item={item} />;
+    }
+
+    return (
+      <Message
+        message={{
+          id: item.id,
+          role: item.role!,
+          content: item.content!,
+          usage: item.usage,
+        }}
+      />
+    );
+  } else if (item.type === 'tool_call') {
+    return <ToolCallItem item={item} onApprove={onToolApprove} onReject={onToolReject} />;
+  } else if (item.type === 'status') {
+    return <StatusItem item={item} />;
+  } else if (item.type === 'thinking') {
+    return <ThinkingItem item={item} />;
+  } else if (item.type === 'cancelled') {
+    return <CancelledItem item={item} />;
+  }
+  return null;
+}
 
 export function MessageList({
   items,
@@ -29,41 +81,47 @@ export function MessageList({
   onToolReject,
 }: MessageListProps) {
   const { t } = useLanguage();
-  const listRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const isAutoScrollEnabled = useRef(true);
   const lastItemCount = useRef(items.length);
 
+  // Filter out empty items before virtualization
+  const filteredItems = useMemo(() => items.filter(shouldRenderItem), [items]);
+
+  // TanStack Virtual virtualizer with dynamic measurement
+  const virtualizer = useVirtualizer({
+    count: filteredItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => DEFAULT_ITEM_HEIGHT,
+    overscan: 5,
+  });
+
   // Check if user is at bottom
   const checkIfAtBottom = useCallback(() => {
-    if (!listRef.current) return false;
+    if (!parentRef.current) return false;
 
-    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
     return distanceFromBottom < SCROLL_THRESHOLD;
   }, []);
 
-  // Scroll to bottom with smart behavior
-  const scrollToBottom = useCallback((smooth = false) => {
-    if (!listRef.current) return;
+  // Scroll to bottom
+  const scrollToBottom = useCallback((_smooth = false) => {
+    if (!parentRef.current || filteredItems.length === 0) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-
-    // Use smooth scroll only for short distances or when explicitly requested
-    const shouldSmooth = smooth || distanceFromBottom < SMOOTH_SCROLL_THRESHOLD;
-
-    listRef.current.scrollTo({
-      top: scrollHeight,
-      behavior: shouldSmooth ? 'smooth' : 'auto',
+    // Use virtualizer's scrollToIndex for accurate scrolling
+    virtualizer.scrollToIndex(filteredItems.length - 1, {
+      align: 'end',
+      behavior: 'auto',
     });
 
     // Re-enable auto-scroll and clear indicators
     isAutoScrollEnabled.current = true;
     setShowScrollButton(false);
     setHasNewMessages(false);
-  }, []);
+  }, [filteredItems.length, virtualizer]);
 
   // Handle user scroll events
   const handleScroll = useCallback(() => {
@@ -84,8 +142,8 @@ export function MessageList({
   // Auto-scroll on new items
   useEffect(() => {
     // Detect new items
-    const hasNewItem = items.length > lastItemCount.current;
-    lastItemCount.current = items.length;
+    const hasNewItem = filteredItems.length > lastItemCount.current;
+    lastItemCount.current = filteredItems.length;
 
     // If user is not at bottom and there's a new item, show indicator
     if (hasNewItem && !checkIfAtBottom()) {
@@ -93,20 +151,26 @@ export function MessageList({
     }
 
     // Auto-scroll if enabled
-    if (isAutoScrollEnabled.current) {
-      scrollToBottom(false); // Use instant scroll during streaming
+    if (isAutoScrollEnabled.current && hasNewItem) {
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+      });
     }
-  }, [items, checkIfAtBottom, scrollToBottom]);
+  }, [filteredItems.length, checkIfAtBottom, scrollToBottom]);
 
   // Scroll to bottom on mount
   useEffect(() => {
-    scrollToBottom(false);
-  }, [scrollToBottom]);
+    if (filteredItems.length > 0) {
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+      });
+    }
+  }, []); // Only on mount
 
-  if (items.length === 0) {
+  if (filteredItems.length === 0) {
     return (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <div className="message-list" ref={listRef}>
+        <div className="message-list" ref={parentRef}>
           <div
             style={{
               display: 'flex',
@@ -126,69 +190,42 @@ export function MessageList({
     );
   }
 
+  const virtualItems = virtualizer.getVirtualItems();
+
   return (
-    <div className="message-list" ref={listRef} onScroll={handleScroll} style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {items.map((item) => {
-          if (item.type === 'message') {
-            // Skip empty assistant messages (often appear before tool calls)
-            if (item.role === 'assistant' && (!item.content || (typeof item.content === 'string' && item.content.trim() === ''))) {
-              return null;
-            }
-
-            // Render compact summary messages with special component
-            if (item.isCompactSummary) {
-              return (
-                <CompactSummaryItem
-                  key={item.id}
-                  item={item}
-                />
-              );
-            }
-
-            return (
-              <Message
-                key={item.id}
-                message={{
-                  id: item.id,
-                  role: item.role!,
-                  content: item.content!,
-                  usage: item.usage,
-                }}
-              />
-            );
-          } else if (item.type === 'tool_call') {
-            return (
-              <ToolCallItem
-                key={item.id}
-                item={item}
-                onApprove={onToolApprove}
-                onReject={onToolReject}
-              />
-            );
-          } else if (item.type === 'status') {
-            return (
-              <StatusItem
-                key={item.id}
-                item={item}
-              />
-            );
-          } else if (item.type === 'thinking') {
-            return (
-              <ThinkingItem
-                key={item.id}
-                item={item}
-              />
-            );
-          } else if (item.type === 'cancelled') {
-            return (
-              <CancelledItem
-                key={item.id}
-                item={item}
-              />
-            );
-          }
-          return null;
+    <div
+      className="message-list"
+      ref={parentRef}
+      onScroll={handleScroll}
+    >
+      {/* Virtual list container - position:relative here so absolute children respect padding */}
+      <div
+        style={{
+          height: virtualizer.getTotalSize(),
+          position: 'relative',
+        }}
+      >
+        {/* Render only visible items */}
+        {virtualItems.map((virtualItem) => {
+          const item = filteredItems[virtualItem.index];
+          return (
+            <div
+              key={item.id}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <div style={{ paddingBottom: '1rem' }}>
+                {renderItem(item, onToolApprove, onToolReject)}
+              </div>
+            </div>
+          );
         })}
       </div>
 

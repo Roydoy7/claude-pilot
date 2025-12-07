@@ -562,12 +562,12 @@
 }
 
 .message-user {
-  align-self: flex-end;
+  margin-left: auto;
   flex-direction: row-reverse;
 }
 
 .message-ai {
-  align-self: flex-start;
+  margin-right: auto;
 }
 
 .message-avatar {
