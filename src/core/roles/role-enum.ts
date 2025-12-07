@@ -8,9 +8,6 @@ export enum RoleType {
   // Office productivity
   OFFICE_ASSISTANT = 'office-assistant',
 
-  // Translation services
-  TRANSLATOR = 'translator',
-
   // Claude code
   CLAUDE_CODE = 'claude-code',
 }
@@ -20,7 +17,6 @@ export enum RoleType {
  */
 export const ROLE_DISPLAY_NAMES: Record<RoleType, string> = {
   [RoleType.OFFICE_ASSISTANT]: 'Office Assistant',
-  [RoleType.TRANSLATOR]: 'Translator',
   [RoleType.CLAUDE_CODE]: 'Claude Code',
 };
 
