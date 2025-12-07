@@ -63,6 +63,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [settingSources, setSettingSources] = useState<SettingSource[]>(['user', 'project', 'local']);
+  const [slashCommands, setSlashCommands] = useState<string[]>(['/compact']);
 
   // Session configuration state (for new sessions)
   const [sessionConfig, setSessionConfig] = useState<{
@@ -86,7 +87,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     onRejectedToolsChange: setRejectedTools,
   });
 
-  // Load permission mode and setting sources on mount
+  // Load permission mode, setting sources, and slash commands on mount
   useEffect(() => {
     window.electronAPI.agent.getPermissionMode().then((result) => {
       if (result.success) {
@@ -195,6 +196,12 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     } catch (error) {
       console.error('Failed to set setting sources:', error);
     }
+  };
+
+  // Handle slash command selection - send as message
+  const handleSlashCommandSelect = async (command: string) => {
+    // Send the slash command as a message
+    await handleSendMessage(command);
   };
 
   // Helper function to extract text from MessageContent for titles
@@ -308,11 +315,12 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
       }
 
       // If this was the first message, update title
-      if (items.length === 0 && currentSessionId) {
+      const sessionIdToUse = currentSessionId || response.sessionId;
+      if (items.length === 0 && sessionIdToUse) {
         try {
           const textContent = extractTextFromMessage(message);
           const title = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
-          const result = await window.electronAPI.session.updateTitle(currentSessionId, title);
+          const result = await window.electronAPI.session.updateTitle(sessionIdToUse, title);
           if (result.success && result.session && onSessionUpdate) {
             onSessionUpdate(result.session);
           }
@@ -388,6 +396,8 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         settingSources={settingSources}
         onSettingSourcesChange={handleSettingSourcesChange}
         contextUsage={contextUsage}
+        slashCommands={slashCommands}
+        onSlashCommandSelect={handleSlashCommandSelect}
       />
     </div>
   );
