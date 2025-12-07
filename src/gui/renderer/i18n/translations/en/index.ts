@@ -39,6 +39,14 @@ export const enTranslations: Translation = {
     scrollToBottom: 'Scroll to bottom',
   },
 
+  // Compact Summary
+  compactSummary: {
+    title: 'Conversation Summary',
+    continuedFrom: 'Continued from previous context',
+    expand: 'Show full summary',
+    collapse: 'Show less',
+  },
+
   // Tool Call
   toolCall: {
     showCode: 'Show Code',
@@ -64,9 +72,21 @@ export const enTranslations: Translation = {
 
   // Status
   status: {
-    aiThinking: 'AI is thinking',
-    executingTool: (toolName: string) => `Executing ${toolName}`,
+    aiThinking: 'AI is thinking...',
+    executingTool: (toolName: string) => `Executing ${toolName}...`,
     waitingForApproval: 'Waiting for tool approval',
+    commands: {
+      compact: 'Compacting conversation...',
+      clear: 'Clearing conversation...',
+      help: 'Loading help...',
+      model: 'Switching model...',
+      config: 'Loading configuration...',
+      init: 'Initializing project...',
+      resume: 'Resuming session...',
+      memory: 'Managing memory...',
+      mcp: 'Managing MCP servers...',
+      permissions: 'Managing permissions...',
+    },
   },
 
   // Workspace Browser

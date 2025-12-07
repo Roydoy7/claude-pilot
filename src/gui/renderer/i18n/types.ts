@@ -154,6 +154,9 @@ export interface Translation {
         };
       };
     };
+    slashCommands?: {
+      label: string;
+    };
   };
 
   // Message
@@ -175,6 +178,14 @@ export interface Translation {
     noMessages: string;
     newMessages: string;
     scrollToBottom: string;
+  };
+
+  // Compact Summary
+  compactSummary?: {
+    title: string;
+    continuedFrom: string;
+    expand: string;
+    collapse: string;
   };
 
   // Tool Call
@@ -205,6 +216,19 @@ export interface Translation {
     aiThinking: string;
     executingTool: (toolName: string) => string;
     waitingForApproval: string;
+    // Slash command execution states
+    commands?: {
+      compact: string;
+      clear: string;
+      help: string;
+      model: string;
+      config: string;
+      init: string;
+      resume: string;
+      memory: string;
+      mcp: string;
+      permissions: string;
+    };
   };
 
   // Workspace Browser

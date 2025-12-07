@@ -57,4 +57,7 @@ export const inputAreaZh = {
       },
     },
   },
+  slashCommands: {
+    label: '命令',
+  },
 };

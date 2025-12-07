@@ -57,4 +57,7 @@ export const inputAreaEn = {
       },
     },
   },
+  slashCommands: {
+    label: 'Commands',
+  },
 };

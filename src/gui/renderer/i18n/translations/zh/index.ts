@@ -39,6 +39,14 @@ export const zhTranslations: Translation = {
     scrollToBottom: '滚动到底部',
   },
 
+  // Compact Summary
+  compactSummary: {
+    title: '对话摘要',
+    continuedFrom: '从上一轮上下文继续',
+    expand: '展开完整摘要',
+    collapse: '收起',
+  },
+
   // Tool Call
   toolCall: {
     showCode: '显示代码',
@@ -64,9 +72,21 @@ export const zhTranslations: Translation = {
 
   // Status
   status: {
-    aiThinking: 'AI 正在思考',
-    executingTool: (toolName: string) => `正在执行 ${toolName}`,
+    aiThinking: 'AI 正在思考...',
+    executingTool: (toolName: string) => `正在执行 ${toolName}...`,
     waitingForApproval: '等待工具审批',
+    commands: {
+      compact: '正在压缩对话...',
+      clear: '正在清除对话...',
+      help: '正在加载帮助...',
+      model: '正在切换模型...',
+      config: '正在加载配置...',
+      init: '正在初始化项目...',
+      resume: '正在恢复会话...',
+      memory: '正在管理记忆...',
+      mcp: '正在管理 MCP 服务器...',
+      permissions: '正在管理权限...',
+    },
   },
 
   // Workspace Browser

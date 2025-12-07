@@ -57,4 +57,7 @@ export const inputAreaJa = {
       },
     },
   },
+  slashCommands: {
+    label: 'コマンド',
+  },
 };

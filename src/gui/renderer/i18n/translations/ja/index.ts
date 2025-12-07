@@ -39,6 +39,14 @@ export const jaTranslations: Translation = {
     scrollToBottom: '最下部へスクロール',
   },
 
+  // Compact Summary
+  compactSummary: {
+    title: '会話サマリー',
+    continuedFrom: '前のコンテキストから継続',
+    expand: '全文を表示',
+    collapse: '折りたたむ',
+  },
+
   // Tool Call
   toolCall: {
     showCode: 'コードを表示',
@@ -64,9 +72,21 @@ export const jaTranslations: Translation = {
 
   // Status
   status: {
-    aiThinking: 'AIが考え中',
-    executingTool: (toolName: string) => `${toolName}を実行中`,
+    aiThinking: 'AIが考え中...',
+    executingTool: (toolName: string) => `${toolName}を実行中...`,
     waitingForApproval: 'ツールの承認待ち',
+    commands: {
+      compact: '会話を圧縮中...',
+      clear: '会話をクリア中...',
+      help: 'ヘルプを読み込み中...',
+      model: 'モデルを切り替え中...',
+      config: '設定を読み込み中...',
+      init: 'プロジェクトを初期化中...',
+      resume: 'セッションを再開中...',
+      memory: 'メモリを管理中...',
+      mcp: 'MCPサーバーを管理中...',
+      permissions: '権限を管理中...',
+    },
   },
 
   // Workspace Browser
