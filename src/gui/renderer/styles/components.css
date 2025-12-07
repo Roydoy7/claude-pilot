@@ -443,18 +443,111 @@
   overflow-x: hidden;
 }
 
+/* ========================================
+   Unified Chat Item Layout
+   All message types (text, tool calls) use this
+   ======================================== */
+
+:root {
+  --chat-item-max-width: 85%;
+  --chat-item-avatar-size: 2rem;
+  --chat-item-gap: 0.75rem;
+  --chat-item-content-max-width: 800px;
+}
+
+/* Base chat item - unified wrapper for all message types */
+.chat-item {
+  display: flex;
+  flex-direction: row;
+  max-width: var(--chat-item-max-width);
+  gap: var(--chat-item-gap);
+  animation: chat-item-fade-in 0.2s ease;
+  margin-bottom: 0.5rem;
+}
+
+.chat-item:last-child {
+  margin-bottom: 0;
+}
+
+/* User messages align right */
+.chat-item-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+/* AI/Tool messages align left */
+.chat-item-ai {
+  align-self: flex-start;
+}
+
+/* Avatar container - consistent for all chat items */
+.chat-item-avatar {
+  flex-shrink: 0;
+  width: var(--chat-item-avatar-size);
+  height: var(--chat-item-avatar-size);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.25rem;
+}
+
+/* Content container - flexible with max width */
+.chat-item-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* Enable text truncation */
+  max-width: var(--chat-item-content-max-width);
+}
+
+@keyframes chat-item-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  :root {
+    --chat-item-max-width: 95%;
+    --chat-item-content-max-width: none;
+  }
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --chat-item-max-width: 75%;
+    --chat-item-content-max-width: 900px;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --chat-item-max-width: 70%;
+    --chat-item-content-max-width: 1000px;
+  }
+}
+
+/* Legacy .message class - maps to chat-item for backwards compatibility */
 .message {
   display: flex;
   flex-direction: row;
-  max-width: 80%;
-  gap: 0.75rem;
-  animation: message-fade-in 0.2s ease;
+  max-width: var(--chat-item-max-width);
+  gap: var(--chat-item-gap);
+  animation: chat-item-fade-in 0.2s ease;
 }
 
 .message-content {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
+  max-width: var(--chat-item-content-max-width);
 }
 
 @keyframes message-fade-in {
