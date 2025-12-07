@@ -48,6 +48,40 @@ interface SDKTranscriptEntry {
   parentUuid?: string | null; // Parent message UUID for linking
   parent_tool_use_id?: string | null;
   toolUseResult?: SDKToolUseResult; // Structured tool result from SDK
+  isCompactSummary?: boolean; // Flag for compact summary messages (from /compact command)
+  subtype?: string; // System message subtype (e.g., 'compact_boundary')
+  isMeta?: boolean; // Flag for meta messages (e.g., "Caveat" warnings from /compact)
+}
+
+/**
+ * Check if a message content is a system/internal message that should be filtered
+ * These include:
+ * - Meta messages (isMeta: true) - e.g., "Caveat" warnings
+ * - Command messages containing <command-name> tags
+ * - Command output messages containing <local-command-stdout> or <local-command-stderr> tags
+ */
+function isSystemMessage(content: string | ContentBlock[], isMeta?: boolean): boolean {
+  // Filter meta messages
+  if (isMeta) {
+    return true;
+  }
+
+  // Only check string content for XML tags
+  if (typeof content !== 'string') {
+    return false;
+  }
+
+  // Filter command messages (e.g., /compact command)
+  if (content.includes('<command-name>') || content.includes('<command-message>')) {
+    return true;
+  }
+
+  // Filter command output messages
+  if (content.includes('<local-command-stdout>') || content.includes('<local-command-stderr>')) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -272,6 +306,11 @@ export function readTranscript(claudeSessionId: string, cwd: string): HistoryMes
         // Skip if no role or content
         if (!role || !content) continue;
 
+        // Skip system/internal messages (meta messages, command messages, command output)
+        if (isSystemMessage(content, entry.isMeta)) {
+          continue;
+        }
+
         // For assistant messages with same message ID, merge content blocks
         // This handles the case where thinking and text are streamed separately
         if (role === 'assistant' && messageId) {
@@ -328,6 +367,7 @@ export function readTranscript(claudeSessionId: string, cwd: string): HistoryMes
           content,
           timestamp: entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now(),
           usage: convertUsage(usage),
+          isCompactSummary: entry.isCompactSummary, // Preserve compact summary flag
         };
 
         if (role === 'assistant' && toolCalls.length > 0) {
