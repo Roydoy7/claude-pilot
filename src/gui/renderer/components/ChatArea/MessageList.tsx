@@ -10,6 +10,7 @@ import { ToolCallItem } from './ToolCallItem';
 import { StatusItem } from './StatusItem';
 import { ThinkingItem } from './ThinkingItem';
 import { CancelledItem } from './CancelledItem';
+import { CompactSummaryItem } from './CompactSummaryItem';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { MessageListItem } from '../../../preload/preload-types';
 
@@ -133,6 +134,16 @@ export function MessageList({
             // Skip empty assistant messages (often appear before tool calls)
             if (item.role === 'assistant' && (!item.content || (typeof item.content === 'string' && item.content.trim() === ''))) {
               return null;
+            }
+
+            // Render compact summary messages with special component
+            if (item.isCompactSummary) {
+              return (
+                <CompactSummaryItem
+                  key={item.id}
+                  item={item}
+                />
+              );
             }
 
             return (
