@@ -533,6 +533,7 @@ export class SessionAgent {
     usage?: UsageMetadata;
     tool_calls?: Array<{ id: string; name: string; args: Record<string, any> }>;
     tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
+    isCompactSummary?: boolean;
   }>) {
     try {
       const items: MessageListItem[] = [];
@@ -611,6 +612,7 @@ export class SessionAgent {
             role: msg.role as 'user' | 'assistant',
             content: displayContent,
             usage: msg.usage,
+            isCompactSummary: msg.isCompactSummary,
           };
 
           items.push(messageItem);
@@ -789,26 +791,70 @@ export class SessionAgent {
   }
 
   /**
+   * Check if content is a slash command (starts with /)
+   * Returns the command name if it is, null otherwise
+   */
+  private getSlashCommand(content: MessageContent): string | null {
+    let textContent = '';
+    if (typeof content === 'string') {
+      textContent = content.trim();
+    } else if (Array.isArray(content)) {
+      // Extract text from content blocks
+      const textBlocks = content.filter(
+        (block): block is { type: 'text'; text: string } => block.type === 'text'
+      );
+      textContent = textBlocks.map(b => b.text).join('').trim();
+    }
+
+    // Check if starts with / and extract command name
+    if (textContent.startsWith('/')) {
+      const match = textContent.match(/^\/(\w+)/);
+      return match ? match[1] : null;
+    }
+    return null;
+  }
+
+  /**
    * Add a user message to displayItems
    * Called when user sends a message, before backend processing
+   * Slash commands are not displayed as user messages, only status is shown
    */
   addUserMessage(userMessage: MessageListItem) {
-    // Add user message first
-    this.displayItems.push(userMessage);
+    // Check if this is a slash command
+    const commandName = userMessage.content ? this.getSlashCommand(userMessage.content) : null;
 
-    // Then add thinking status (updateStatusItem will recreate displayItems array,
-    // so we need to ensure user message is already in displayItems before calling it)
-    // Create status item manually to avoid array recreation issue
-    const statusItem: MessageListItem = {
-      type: 'status',
-      id: `status-${Date.now()}`,
-      timestamp: Date.now(),
-      agentState: { thinking: true },
-    };
+    if (commandName) {
+      // Slash command: don't show user message, only show command status
+      const statusItem: MessageListItem = {
+        type: 'status',
+        id: `status-${Date.now()}`,
+        timestamp: Date.now(),
+        agentState: {
+          thinking: false,
+          command: {
+            name: commandName,
+            status: 'running',
+          },
+        },
+      };
 
-    this.displayItems.push(statusItem);
+      this.displayItems.push(statusItem);
+    } else {
+      // Regular message: show user message + thinking status
+      this.displayItems.push(userMessage);
 
-    // Notify UI once with both user message and thinking status
+      // Create status item manually to avoid array recreation issue
+      const statusItem: MessageListItem = {
+        type: 'status',
+        id: `status-${Date.now()}`,
+        timestamp: Date.now(),
+        agentState: { thinking: true },
+      };
+
+      this.displayItems.push(statusItem);
+    }
+
+    // Notify UI
     this.notifyDisplayItemsChanged();
   }
 
