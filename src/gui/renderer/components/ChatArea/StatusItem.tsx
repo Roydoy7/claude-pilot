@@ -5,7 +5,7 @@
  * Two-layer state system: thinking state + tool state can coexist
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import type { MessageListItem } from '../../../preload/preload-types';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -207,7 +207,7 @@ function TerminalIcon() {
   );
 }
 
-export function StatusItem({ item }: StatusItemProps) {
+export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
   const { t } = useLanguage();
 
   // Validate item type
@@ -420,4 +420,4 @@ export function StatusItem({ item }: StatusItemProps) {
       `}</style>
     </div>
   );
-}
+});

@@ -5,6 +5,7 @@
  * Minimal, inline design similar to ThinkingItem
  */
 
+import { memo } from 'react';
 import type { MessageListItem } from '../../../preload/preload-types';
 
 interface CancelledItemProps {
@@ -38,7 +39,7 @@ function StopIcon() {
   );
 }
 
-export function CancelledItem({ item }: CancelledItemProps) {
+export const CancelledItem = memo(function CancelledItem({ item }: CancelledItemProps) {
   // Validate item type
   if (item.type !== 'cancelled') {
     return null;
@@ -71,4 +72,4 @@ export function CancelledItem({ item }: CancelledItemProps) {
       </div>
     </div>
   );
-}
+});

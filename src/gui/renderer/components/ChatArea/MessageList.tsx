@@ -96,6 +96,8 @@ export function MessageList({
     getScrollElement: () => parentRef.current,
     estimateSize: () => DEFAULT_ITEM_HEIGHT,
     overscan: 5,
+    // Use item ID as key for stable measurements
+    getItemKey: (index) => filteredItems[index]?.id ?? index,
   });
 
   // Check if user is at bottom
@@ -219,11 +221,11 @@ export function MessageList({
                 left: 0,
                 width: '100%',
                 transform: `translateY(${virtualItem.start}px)`,
+                boxSizing: 'border-box',
+                paddingBottom: '1rem',
               }}
             >
-              <div style={{ paddingBottom: '1rem' }}>
-                {renderItem(item, onToolApprove, onToolReject)}
-              </div>
+              {renderItem(item, onToolApprove, onToolReject)}
             </div>
           );
         })}

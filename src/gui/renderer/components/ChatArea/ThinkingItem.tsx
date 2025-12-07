@@ -5,7 +5,7 @@
  * Minimal, inline design that doesn't interrupt the conversation flow
  */
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import type { MessageListItem } from '../../../preload/preload-types';
 
 interface ThinkingItemProps {
@@ -43,7 +43,7 @@ function SparklesIcon() {
   );
 }
 
-export function ThinkingItem({ item }: ThinkingItemProps) {
+export const ThinkingItem = memo(function ThinkingItem({ item }: ThinkingItemProps) {
   const [expanded, setExpanded] = useState(false);
 
   // Validate item type
@@ -155,4 +155,4 @@ export function ThinkingItem({ item }: ThinkingItemProps) {
       </div>
     </div>
   );
-}
+});

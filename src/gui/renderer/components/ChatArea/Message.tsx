@@ -4,7 +4,7 @@
  * Message Component - Displays a single chat message with Markdown support
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -34,7 +34,7 @@ interface MessageProps {
   message: MessageData;
 }
 
-export function Message({ message }: MessageProps) {
+export const Message = memo(function Message({ message }: MessageProps) {
   const { t } = useLanguage();
   const isUser = message.role === 'user';
   const [isSaving, setIsSaving] = useState(false);
@@ -355,4 +355,4 @@ export function Message({ message }: MessageProps) {
       )}
     </div>
   );
-}
+});
