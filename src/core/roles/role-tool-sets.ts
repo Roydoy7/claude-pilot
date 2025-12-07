@@ -55,6 +55,11 @@ const DANGEROUS_TOOLS = ['Write', 'Edit', 'Bash', 'TodoWrite'] as const;
 const FILE_TOOLS = [...SAFE_READ_TOOLS, 'Write', 'Edit'] as const;
 
 /**
+ * Skill
+ */
+const SKILL = ['Skill'] as const;
+
+/**
  * Available tools for each role (what tools the agent CAN use)
  * Passed to SDK as 'tools' parameter
  */
@@ -62,10 +67,6 @@ export const ROLE_AVAILABLE_TOOLS: Record<RoleType, readonly string[]> = {
   [RoleType.OFFICE_ASSISTANT]: [
     ...FILE_TOOLS,
     ...SAFE_WEB_TOOLS,
-  ],
-
-  [RoleType.TRANSLATOR]: [
-    ...FILE_TOOLS,
   ],
 
   [RoleType.CLAUDE_CODE]: [
@@ -81,15 +82,13 @@ export const ROLE_AUTO_APPROVED_TOOLS: Record<RoleType, readonly string[]> = {
   [RoleType.OFFICE_ASSISTANT]: [
     ...SAFE_READ_TOOLS,
     ...SAFE_WEB_TOOLS,
-  ],
-
-  [RoleType.TRANSLATOR]: [
-    ...SAFE_READ_TOOLS,
+    ...SKILL,
   ],
 
   [RoleType.CLAUDE_CODE]: [
     ...SAFE_READ_TOOLS,
     ...SAFE_WEB_TOOLS,
+    ...SKILL,
   ],
 };
 
@@ -128,8 +127,6 @@ export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
   [RoleType.OFFICE_ASSISTANT]: {
     python: pythonMcpServer,
   },
-
-  [RoleType.TRANSLATOR]: {},
 
   [RoleType.CLAUDE_CODE]: {},
 };
