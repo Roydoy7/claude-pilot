@@ -97,6 +97,11 @@ export interface AgentState {
     type: 'executing' | 'waiting_approval';
     toolName?: string;
   };
+  // Slash command execution state
+  command?: {
+    name: string; // e.g., 'compact', 'help', 'clear'
+    status: 'running' | 'completed';
+  };
 }
 
 /**
@@ -122,6 +127,7 @@ export type StreamEvent =
   | { type: 'error'; error: string; details?: string }
   | { type: 'cancelled'; reason: string }
   | { type: 'checkpoint' }
+  | { type: 'slashCommands'; commands: string[] }
   | { type: 'done'; usage?: UsageMetadata };
 
 /**
@@ -134,6 +140,7 @@ export interface HistoryMessage {
   usage?: UsageMetadata;
   tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
   tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
+  isCompactSummary?: boolean; // Flag for compact summary messages (from /compact command)
 }
 
 /**
@@ -193,6 +200,7 @@ export class ClaudeAgent {
   private currentQuery: Query | null = null; // Current query instance for runtime control
   private permissionMode: PermissionMode; // Current permission mode, persists across turns
   private settingSources: SettingSource[]; // Current setting sources, persists across turns
+  private slashCommands: string[] = []; // Available slash commands from SDK
   private pendingToolApproval: PendingToolApproval | null = null; // Current pending tool approval
   private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null; // Handler for notifying UI
   private streamEndResolver: (() => void) | null = null; // Resolver to signal end of input stream
@@ -418,7 +426,6 @@ export class ClaudeAgent {
     yield { type: 'state', state: { thinking: true } };
 
     let accumulatedText = '';
-    let currentToolUseId: string | undefined;
     let finalUsage: UsageMetadata | undefined;
 
     try {
@@ -503,7 +510,6 @@ export class ClaudeAgent {
                       // Note: tool_start was already sent from stream_event with empty args
                       // Here we have the complete args, so update the tool call
                       const toolUseBlock = block as { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
-                      currentToolUseId = toolUseBlock.id;
                       // Yield tool_start with complete args (overwrites the earlier empty-args version)
                       yield {
                         type: 'tool_start',
@@ -548,39 +554,49 @@ export class ClaudeAgent {
 
           case 'user': {
             const userMessage = chunk as SDKUserMessage;
-            if (userMessage.tool_use_result !== undefined && currentToolUseId) {
-              const output = typeof userMessage.tool_use_result === 'string'
-                ? userMessage.tool_use_result
-                : JSON.stringify(userMessage.tool_use_result);
+            // Process tool_result blocks from message content
+            // Each tool_result has its own tool_use_id, allowing parallel tool results
+            const messageContent = userMessage.message?.content;
+            if (Array.isArray(messageContent)) {
+              for (const block of messageContent) {
+                if (block.type === 'tool_result' && 'tool_use_id' in block) {
+                  const toolResultBlock = block as {
+                    type: 'tool_result';
+                    tool_use_id: string;
+                    content?: unknown;
+                    is_error?: boolean;
+                  };
 
-              // Check message.content for tool_result blocks with is_error flag
-              // SDK sends tool results in message.content as well as tool_use_result
-              let isError = false;
-              let errorContent: string | undefined;
-              const messageContent = userMessage.message?.content;
-              if (Array.isArray(messageContent)) {
-                for (const block of messageContent) {
-                  if (block.type === 'tool_result' && 'is_error' in block && block.is_error) {
-                    isError = true;
-                    // Extract error content from the block
-                    const blockContent = (block as { content?: unknown }).content;
-                    errorContent = typeof blockContent === 'string'
+                  const toolUseId = toolResultBlock.tool_use_id;
+                  const isError = !!toolResultBlock.is_error;
+                  const blockContent = toolResultBlock.content;
+
+                  // Get output from tool_use_result if available, otherwise from block content
+                  let output: string;
+                  if (userMessage.tool_use_result !== undefined) {
+                    output = typeof userMessage.tool_use_result === 'string'
+                      ? userMessage.tool_use_result
+                      : JSON.stringify(userMessage.tool_use_result);
+                  } else {
+                    output = typeof blockContent === 'string'
                       ? blockContent
-                      : JSON.stringify(blockContent || 'Tool execution failed');
-                    break;
+                      : JSON.stringify(blockContent || '');
                   }
+
+                  const errorContent = isError
+                    ? (typeof blockContent === 'string' ? blockContent : JSON.stringify(blockContent || 'Tool execution failed'))
+                    : undefined;
+
+                  yield {
+                    type: 'tool_end',
+                    toolName: 'unknown',
+                    toolCallId: toolUseId,
+                    output: isError ? '' : output,
+                    error: errorContent,
+                  };
                 }
               }
-
-              yield {
-                type: 'tool_end',
-                toolName: 'unknown',
-                toolCallId: currentToolUseId,
-                output: isError ? '' : output,
-                error: isError ? errorContent : undefined,
-              };
               yield { type: 'state', state: { thinking: true } };
-              currentToolUseId = undefined;
             }
             break;
           }
@@ -658,6 +674,12 @@ export class ClaudeAgent {
               if (systemMessage.session_id) {
                 const sessionManager = SessionManager.getInstance();
                 sessionManager.updateClaudeSessionId(this.sessionId, systemMessage.session_id);
+              }
+
+              // Capture available slash commands
+              if (systemMessage.slash_commands) {
+                this.slashCommands = systemMessage.slash_commands;
+                yield { type: 'slashCommands', commands: this.slashCommands };
               }
             } else if (systemMessage.subtype === 'compact_boundary') {
               // Conversation compaction boundary - checkpoint event
@@ -797,7 +819,7 @@ export class ClaudeAgent {
         cwd: this.cwd, // Set current working directory from session
         additionalDirectories: session?.additionalDirectories, // Set additional directories from session
         abortController: this.abortController,
-        maxTurns: 50,
+        // No maxTurns limit - allow unlimited turns like Claude Code interactive mode
         resume: this.claudeSessionId,
         permissionMode: this.permissionMode, // Use instance variable (may be updated via setPermissionMode)
         pathToClaudeCodeExecutable: getClaudeCodeExecutablePath(),
