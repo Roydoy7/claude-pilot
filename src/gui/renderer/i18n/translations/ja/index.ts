@@ -24,11 +24,14 @@ export const jaTranslations: Translation = {
     saved: '保存しました！',
     attachment: (index: number) => `添付ファイル ${index + 1}`,
     tokens: {
-      input: '入力トークン',
+      input: '入力トークン（新規）',
       output: '出力トークン',
       total: '合計トークン',
       cacheHit: (count: number) => `キャッシュヒット: ${count}トークンをキャッシュから読み取り（コスト90%削減）`,
-      cacheWrite: (count: number) => `キャッシュ書き込み: ${count}トークンをキャッシュに書き込み（コスト25%増加、5分間有効）`,
+      cacheWrite: (count: number) => `キャッシュ書き込み: ${count}トークンをキャッシュに書き込み（コスト25%増加）`,
+      cache5min: '5分キャッシュ',
+      cache1hour: '1時間キャッシュ（Max契約）',
+      serviceTier: (tier: string) => `サービス層: ${tier}`,
     },
   },
 

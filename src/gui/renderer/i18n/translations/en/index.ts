@@ -24,11 +24,14 @@ export const enTranslations: Translation = {
     saved: 'Saved!',
     attachment: (index: number) => `Attachment ${index + 1}`,
     tokens: {
-      input: 'Input tokens',
+      input: 'Input tokens (new)',
       output: 'Output tokens',
       total: 'Total tokens',
-      cacheHit: (count: number) => `Cache hit: ${count} tokens read from cache (90% cost reduction)`,
-      cacheWrite: (count: number) => `Cache write: ${count} tokens written to cache (25% cost increase, valid for 5 min)`,
+      cacheHit: (count: number) => `Cache hit: ${count} tokens read from cache (90% cost savings)`,
+      cacheWrite: (count: number) => `Cache write: ${count} tokens written to cache (25% cost increase)`,
+      cache5min: '5-minute cache',
+      cache1hour: '1-hour cache (Max tier)',
+      serviceTier: (tier: string) => `Service tier: ${tier}`,
     },
   },
 

@@ -289,22 +289,22 @@ export function InputArea({
   }, [templateContent, onTemplateApplied]);
 
   const handleSend = () => {
-    const trimmed = message.trim();
-    if ((!trimmed && images.length === 0) || disabled) return;
+    // Only trim for empty check, preserve original message content including newlines
+    if ((!message.trim() && images.length === 0) || disabled) return;
 
     // Build message content
     let messageContent: MessageContent;
 
     if (images.length === 0) {
-      // Simple text message
-      messageContent = trimmed;
+      // Simple text message - preserve original content
+      messageContent = message;
     } else {
       // Multimodal message with images - use Anthropic native format
       const contentBlocks: MessageContent = [];
 
-      // Add text if present
-      if (trimmed) {
-        contentBlocks.push({ type: 'text', text: trimmed });
+      // Add text if present (preserve original)
+      if (message.trim()) {
+        contentBlocks.push({ type: 'text', text: message });
       }
 
       // Add images using Anthropic native format

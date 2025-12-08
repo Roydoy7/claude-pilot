@@ -8,17 +8,11 @@ import { useState, useEffect, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import type { MessageContent } from '../../../preload/preload-types';
+import type { MessageContent, UsageMetadata } from '../../../preload/preload-types';
 import { useLanguage } from '../../i18n/LanguageContext';
 
-export interface UsageMetadata {
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  // Anthropic prompt caching fields (optional)
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
-}
+// Re-export UsageMetadata for consumers that import from this file
+export type { UsageMetadata };
 
 /**
  * Message data structure (simplified - no tool_calls, they are separate ToolCallItems now)
@@ -85,7 +79,9 @@ export const Message = memo(function Message({ message }: MessageProps) {
     textContent = JSON.stringify(message.content);
   }
 
-  const contentString = textContent;
+  // For user messages, convert single newlines to Markdown hard breaks (two spaces + newline)
+  // This ensures newlines are preserved in the rendered output
+  const contentString = isUser ? textContent.replace(/\n/g, '  \n') : textContent;
 
   // Handle save as template
   const handleSaveAsTemplate = async () => {
@@ -243,27 +239,36 @@ export const Message = memo(function Message({ message }: MessageProps) {
         <div className="message-footer">
           {message.usage && !isUser && (
             <div className="message-usage">
-              <span title="Input tokens">{message.usage.input_tokens}↑</span>
-              <span title="Output tokens">{message.usage.output_tokens}↓</span>
-              <span title="Total tokens">{message.usage.total_tokens}Σ</span>
+              {/* Basic token counts */}
+              <span title={t.message.tokens.input}>{message.usage.input_tokens}↑</span>
+              <span title={t.message.tokens.output}>{message.usage.output_tokens}↓</span>
+              <span title={t.message.tokens.total}>{message.usage.total_tokens}Σ</span>
+
               {/* Prompt caching info - only show if cache was used or created */}
               {((message.usage.cache_read_input_tokens || 0) > 0 || (message.usage.cache_creation_input_tokens || 0) > 0) && (
                 <>
                   <span style={{ margin: '0 0.25rem', color: 'var(--text-tertiary)' }}>|</span>
                   {(message.usage.cache_read_input_tokens || 0) > 0 && (
                     <span
-                      title={`Cache hit: ${message.usage.cache_read_input_tokens} tokens read from cache (90% cost reduction)`}
+                      title={t.message.tokens.cacheHit(message.usage.cache_read_input_tokens || 0)}
                       style={{ color: '#10b981', fontWeight: '600' }}
                     >
-                      💾{message.usage.cache_read_input_tokens}
+                      ⚡{message.usage.cache_read_input_tokens}
                     </span>
                   )}
                   {(message.usage.cache_creation_input_tokens || 0) > 0 && (
                     <span
-                      title={`Cache write: ${message.usage.cache_creation_input_tokens} tokens written to cache (25% cost increase, valid for 5 min)`}
+                      title={t.message.tokens.cacheWrite(message.usage.cache_creation_input_tokens || 0)}
                       style={{ color: '#f59e0b' }}
                     >
                       📝{message.usage.cache_creation_input_tokens}
+                      {/* Show TTL breakdown if available */}
+                      {message.usage.cache_creation && (
+                        <span style={{ fontSize: '0.75em', opacity: 0.8 }}>
+                          {message.usage.cache_creation.ephemeral_5m_input_tokens ? ' (5m)' : ''}
+                          {message.usage.cache_creation.ephemeral_1h_input_tokens ? ' (1h)' : ''}
+                        </span>
+                      )}
                     </span>
                   )}
                 </>

@@ -170,6 +170,11 @@ export interface Translation {
       total: string;
       cacheHit: (count: number) => string;
       cacheWrite: (count: number) => string;
+      /** Cache TTL labels */
+      cache5min: string;
+      cache1hour: string;
+      /** Service tier label */
+      serviceTier: (tier: string) => string;
     };
   };
 

@@ -24,11 +24,14 @@ export const zhTranslations: Translation = {
     saved: '已保存！',
     attachment: (index: number) => `附件 ${index + 1}`,
     tokens: {
-      input: '输入 tokens',
+      input: '输入 tokens（新增）',
       output: '输出 tokens',
       total: '总 tokens',
-      cacheHit: (count: number) => `缓存命中：从缓存读取 ${count} tokens（成本降低 90%）`,
-      cacheWrite: (count: number) => `缓存写入：向缓存写入 ${count} tokens（成本增加 25%，有效期 5 分钟）`,
+      cacheHit: (count: number) => `缓存命中：从缓存读取 ${count} tokens（节省 90% 成本）`,
+      cacheWrite: (count: number) => `缓存写入：向缓存写入 ${count} tokens（增加 25% 成本）`,
+      cache5min: '5 分钟缓存',
+      cache1hour: '1 小时缓存（Max 订阅）',
+      serviceTier: (tier: string) => `服务层级：${tier}`,
     },
   },
 

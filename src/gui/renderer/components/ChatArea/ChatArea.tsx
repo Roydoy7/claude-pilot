@@ -40,9 +40,15 @@ function getMaxOutputTokens(modelName: string): number {
 
 /**
  * Calculate total tokens from usage
+ * Matches SDK's YRA() function: input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens
  */
 function calculateTotalTokens(usage: UsageMetadata): number {
-  return usage.input_tokens + usage.output_tokens;
+  return (
+    usage.input_tokens +
+    (usage.cache_creation_input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0) +
+    usage.output_tokens
+  );
 }
 
 interface ChatAreaProps {
