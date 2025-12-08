@@ -1276,9 +1276,8 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
     renderContent: (args, showResult, response) => {
       const elements: ReactNode[] = [];
       if (args.file_path) {
-        const contentPreview = args.content
-          ? (args.content.length > 300 ? args.content.substring(0, 300) + '...' : args.content)
-          : null;
+        // Show full content without truncation
+        const content = args.content || null;
         elements.push(
           <div
             key="details"
@@ -1293,14 +1292,14 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
               fontSize: '0.75rem',
             }}
           >
-            <div style={{ marginBottom: contentPreview ? '0.25rem' : 0 }}>
+            <div style={{ marginBottom: content ? '0.25rem' : 0 }}>
               <span style={{ color: 'var(--text-secondary)' }}>📝 Creating: </span>
               <span style={{ color: 'var(--text-primary)' }}>{args.file_path}</span>
             </div>
-            {contentPreview && (
+            {content && (
               <div style={{ marginTop: '0.5rem' }}>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-secondary)', fontSize: '0.7rem', fontFamily: 'monospace', maxHeight: '150px', overflow: 'auto' }}>
-                  {contentPreview}
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-secondary)', fontSize: '0.7rem', fontFamily: 'monospace', maxHeight: '400px', overflow: 'auto' }}>
+                  {content}
                 </pre>
               </div>
             )}
@@ -2393,8 +2392,6 @@ export function ToolCallItem({
   const [showDetails, setShowDetails] = useState(toolConfig.defaultExpanded ?? false);
   const [showResult, setShowResult] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
-  const [showRejectInput, setShowRejectInput] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedResult, setCopiedResult] = useState(false);
 
@@ -2893,130 +2890,41 @@ export function ToolCallItem({
           style={{
             marginBottom: '0.5rem',
             marginLeft: '1.5rem',
+            display: 'flex',
+            gap: '0.5rem',
           }}
         >
-          {/* Action buttons */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.5rem',
-              marginBottom: showRejectInput ? '0.5rem' : '0',
-            }}
-          >
-            {onReject && (
-              <button
-                onClick={() => setShowRejectInput(!showRejectInput)}
-                style={{
-                  padding: '0.25rem 0.75rem',
-                  border: showRejectInput ? '1px solid #ef4444' : '1px solid var(--border)',
-                  borderRadius: '4px',
-                  backgroundColor: showRejectInput ? '#ef4444' : 'var(--bg-tertiary)',
-                  color: showRejectInput ? '#ffffff' : 'var(--text-primary)',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                {showRejectInput ? 'Cancel' : 'Reject'}
-              </button>
-            )}
-            {onApprove && (
-              <button
-                onClick={() => onApprove(toolCall.id)}
-                style={{
-                  padding: '0.25rem 0.75rem',
-                  border: '1px solid #10b981',
-                  borderRadius: '4px',
-                  backgroundColor: '#10b981',
-                  color: '#ffffff',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Approve
-              </button>
-            )}
-          </div>
-
-          {/* Reject reason input (shown when Reject is clicked) */}
-          {showRejectInput && onReject && (
-            <div
+          {onReject && (
+            <button
+              onClick={() => onReject(toolCall.id)}
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-                padding: '0.75rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px',
+                padding: '0.25rem 0.75rem',
                 border: '1px solid var(--border)',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
               }}
             >
-              <label
-                htmlFor={`reject-reason-${toolCall.id}`}
-                style={{
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                Rejection Reason (optional but recommended):
-              </label>
-              <textarea
-                id={`reject-reason-${toolCall.id}`}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Explain why this tool execution is rejected. This helps the AI understand and find alternative solutions."
-                style={{
-                  width: '100%',
-                  minHeight: '60px',
-                  padding: '0.5rem',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.75rem',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                }}
-              />
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => {
-                    setShowRejectInput(false);
-                    setRejectReason('');
-                  }}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--bg-secondary)',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    onReject(toolCall.id, rejectReason || undefined);
-                    setShowRejectInput(false);
-                    setRejectReason('');
-                  }}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    border: '1px solid #ef4444',
-                    borderRadius: '4px',
-                    backgroundColor: '#ef4444',
-                    color: '#ffffff',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                  }}
-                >
-                  Confirm Rejection
-                </button>
-              </div>
-            </div>
+              Reject
+            </button>
+          )}
+          {onApprove && (
+            <button
+              onClick={() => onApprove(toolCall.id)}
+              style={{
+                padding: '0.25rem 0.75rem',
+                border: '1px solid #10b981',
+                borderRadius: '4px',
+                backgroundColor: '#10b981',
+                color: '#ffffff',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
+            >
+              Approve
+            </button>
           )}
         </div>
       )}
