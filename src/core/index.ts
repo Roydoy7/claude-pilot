@@ -53,7 +53,6 @@ export {
 
 export {
   getRoleSystemPrompt,
-  ROLE_SYSTEM_PROMPTS,
 } from './roles/role-system-prompts.js';
 
 export {
