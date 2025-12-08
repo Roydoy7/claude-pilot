@@ -211,12 +211,12 @@ export class SessionAgent {
             this.displayItems.push(newStreamingItem);
             this.streamingItemIndex = this.displayItems.length - 1;
           } else {
-            // Update existing streaming item with latest text
-            // Keep existing usage (already set when item was created)
+            // Update existing streaming item with latest text and usage
             const existingItem = this.displayItems[this.streamingItemIndex];
             this.displayItems[this.streamingItemIndex] = {
               ...existingItem,
               content: this.streamingText,
+              usage: this.streamingUsage ?? existingItem.usage,
             };
           }
 
@@ -392,6 +392,25 @@ export class SessionAgent {
         // No need to notify UI - item is already in displayItems
         break;
 
+      case 'message': {
+        // Complete message event (e.g., compact summary)
+        // Create a new message item and add to displayItems
+        const messageItem: MessageListItem = {
+          type: 'message',
+          id: `message-${this.sessionId}-${event.timestamp}`,
+          timestamp: event.timestamp,
+          role: 'assistant',
+          content: event.content,
+          isCompactSummary: event.isCompactSummary,
+        };
+
+        this.displayItems.push(messageItem);
+
+        // Notify UI
+        this.notifyDisplayItemsChanged();
+        break;
+      }
+
       case 'error':
         // Error occurred during execution - add error message to displayItems
         const errorMessageItem: MessageListItem = {
@@ -434,9 +453,18 @@ export class SessionAgent {
         // These often appear when LLM decides to call tools without text
         this.displayItems = this.displayItems.filter(item => {
           if (item.type === 'message' && item.role === 'assistant') {
-            const content = typeof item.content === 'string' ? item.content.trim() : '';
-            // Keep message if it has non-empty content
-            return content.length > 0;
+            // Handle both string and ContentBlock[] content formats
+            if (typeof item.content === 'string') {
+              return item.content.trim().length > 0;
+            }
+            // For ContentBlock[], check if any text block has content
+            if (Array.isArray(item.content)) {
+              return item.content.some(block =>
+                block.type === 'text' && 'text' in block && (block.text as string)?.trim().length > 0
+              );
+            }
+            // Keep message if content exists in unknown format
+            return !!item.content;
           }
           // Keep all non-assistant messages and tool calls
           return true;
