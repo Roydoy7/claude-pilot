@@ -302,58 +302,51 @@ async function executePythonCode(
 
   try {
     // Wrap user code for reliable output capture
+    // Key improvements:
+    // 1. Unbuffered output (-u flag equivalent via PYTHONUNBUFFERED)
+    // 2. Immediate flush after each print
+    // 3. Real-time output even if script hangs/crashes
     const wrappedCode = `# -*- coding: ${encoding} -*-
 import sys
+import os
 import io
 import base64
 import json
 import traceback
 
-# Force UTF-8 for internal processing
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+# Force unbuffered output for real-time capture
+os.environ['PYTHONUNBUFFERED'] = '1'
 
-# Capture all output
-_output_lines = []
-_error_lines = []
+# Force UTF-8 for internal processing with line buffering
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+
+# Custom print that flushes immediately
 _original_print = print
 
 def print(*args, **kwargs):
-    """Capture print output"""
-    import io
-    str_io = io.StringIO()
-    _original_print(*args, file=str_io, **kwargs)
-    output = str_io.getvalue()
-    _output_lines.append(output)
+    """Print with immediate flush for real-time output"""
+    kwargs.setdefault('flush', True)
     _original_print(*args, **kwargs)
 
 # Execute user code
 _exit_code = 0
+_error_output = ''
 try:
 ${code.split('\n').map((line) => '    ' + line).join('\n')}
 except SystemExit as e:
-    _exit_code = e.code if e.code else 0
+    _exit_code = e.code if isinstance(e.code, int) else (1 if e.code else 0)
 except Exception as e:
-    _error_lines.append(traceback.format_exc())
+    _error_output = traceback.format_exc()
+    _original_print(_error_output, file=sys.stderr, flush=True)
     _exit_code = 1
 
-# Restore original print
-print = _original_print
-
-# Combine output
-_final_output = ''.join(_output_lines)
-_final_errors = ''.join(_error_lines)
-
-# Output result with special markers
-result_data = {
-    "stdout": _final_output,
-    "stderr": _final_errors,
-    "exit_code": _exit_code
-}
-
-json_str = json.dumps(result_data, ensure_ascii=False)
+# Output result marker (exit code for parsing)
+# This marker appears ONLY if script completes normally (not killed by timeout)
+result_data = {"exit_code": _exit_code}
+json_str = json.dumps(result_data)
 encoded = base64.b64encode(json_str.encode('utf-8')).decode('ascii')
-print(f"__PYTHON_RESULT_BASE64__{encoded}__END__")
+_original_print(f"__PYTHON_RESULT_BASE64__{encoded}__END__", flush=True)
 
 sys.exit(_exit_code)`;
 
@@ -365,10 +358,12 @@ sys.exit(_exit_code)`;
       timestamp: Date.now(),
     });
 
-    // Execute Python code
+    // Execute Python code with manual timeout for better error reporting
     const result = await new Promise<PythonExecutionResult>((resolve) => {
       let stdout = '';
       let stderr = '';
+      let isTimedOut = false;
+      let timeoutHandle: NodeJS.Timeout | undefined;
 
       const pythonDir = path.dirname(pythonPath);
       const sitePackagesDir = path.join(pythonDir, 'Lib', 'site-packages');
@@ -377,15 +372,29 @@ sys.exit(_exit_code)`;
         ? `${sitePackagesDir}${path.delimiter}${existingPythonPath}`
         : sitePackagesDir;
 
-      const pythonProcess = spawn(pythonPath, [tempFilePath], {
+      // Don't use spawn's timeout - handle manually to preserve output on timeout
+      // Use -u flag for unbuffered output to ensure real-time capture
+      const pythonProcess = spawn(pythonPath, ['-u', tempFilePath], {
         cwd: workingDir,
         env: {
           ...process.env,
           PYTHONIOENCODING: encoding,
           PYTHONPATH: pythonPathValue,
+          PYTHONUNBUFFERED: '1', // Force unbuffered stdout/stderr
         },
-        timeout,
       });
+
+      // Manual timeout handler
+      timeoutHandle = setTimeout(() => {
+        isTimedOut = true;
+        pythonProcess.kill('SIGTERM');
+        // Force kill after 3 seconds if SIGTERM didn't work
+        setTimeout(() => {
+          if (!pythonProcess.killed) {
+            pythonProcess.kill('SIGKILL');
+          }
+        }, 3000);
+      }, timeout);
 
       pythonProcess.stdout.on('data', (data) => {
         const message = data.toString(encoding);
@@ -411,32 +420,34 @@ sys.exit(_exit_code)`;
         });
       });
 
-      pythonProcess.on('close', (processExitCode) => {
+      pythonProcess.on('close', (processExitCode, signal) => {
+        // Clear timeout
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+
         const executionTime = Date.now() - startTime;
 
         const base64Match = stdout.match(/__PYTHON_RESULT_BASE64__([A-Za-z0-9+/=]+)__END__/);
 
-        let actualStdout = stdout.trim();
+        // Remove the result marker from stdout to get clean output
+        let actualStdout = stdout.replace(/__PYTHON_RESULT_BASE64__[A-Za-z0-9+/=]+__END__/g, '').trim();
         let actualStderr = stderr.trim();
         let actualExitCode = processExitCode;
 
+        // Parse result marker if present (indicates script completed normally)
         if (base64Match) {
           try {
             const base64Data = base64Match[1];
             const jsonStr = Buffer.from(base64Data, 'base64').toString('utf-8');
             const resultData = JSON.parse(jsonStr);
-
-            actualStdout = resultData.stdout || '';
-            actualStderr = resultData.stderr || '';
             actualExitCode = resultData.exit_code;
-
-            actualStdout = stdout.replace(/__PYTHON_RESULT_BASE64__[A-Za-z0-9+/=]+__END__/g, '').trim();
           } catch (decodeError) {
             console.error('[Python Tool] Failed to decode Base64 result:', decodeError);
           }
         }
 
-        const success = actualExitCode === 0;
+        const success = actualExitCode === 0 && !isTimedOut;
 
         if (success) {
           recordProgress({
@@ -455,11 +466,17 @@ sys.exit(_exit_code)`;
             progressHistory,
           });
         } else {
+          // Build error message based on failure type
           let errorMessage: string;
-          if (actualExitCode === null && processExitCode === null) {
-            errorMessage = 'Python process was terminated abnormally (possible timeout or system kill)';
+          if (isTimedOut) {
+            const timeoutSec = Math.round(timeout / 1000);
+            errorMessage = `Execution timed out after ${timeoutSec}s`;
+          } else if (signal) {
+            errorMessage = `Process terminated by signal: ${signal}`;
+          } else if (actualExitCode === null && processExitCode === null) {
+            errorMessage = 'Process terminated abnormally';
           } else {
-            errorMessage = `Python script exited with error code ${actualExitCode}`;
+            errorMessage = `Exited with code ${actualExitCode}`;
           }
 
           recordProgress({
@@ -482,6 +499,11 @@ sys.exit(_exit_code)`;
       });
 
       pythonProcess.on('error', (error) => {
+        // Clear timeout
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+
         const executionTime = Date.now() - startTime;
 
         recordProgress({
@@ -492,6 +514,8 @@ sys.exit(_exit_code)`;
 
         resolve({
           success: false,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
           error: `Failed to execute Python: ${error.message}`,
           executionTime,
           encoding,
@@ -543,41 +567,71 @@ function stripAnsiCodes(text: string): string {
 
 /**
  * Format execution result for LLM
+ * Always includes collected output even on failure/timeout
+ * Provides comprehensive feedback so LLM understands what happened
  */
 function formatResultForLLM(result: PythonExecutionResult): string {
   const lines: string[] = [];
+  const execTimeSec = (result.executionTime / 1000).toFixed(1);
 
   if (result.success) {
-    if (result.stdout) {
+    // Success case - show output with execution metadata
+    lines.push(`[Python Execution Completed Successfully]`);
+    lines.push(`Execution Time: ${execTimeSec}s`);
+    lines.push(`Exit Code: ${result.exitCode ?? 0}`);
+    lines.push('');
+
+    if (result.stdout && result.stdout.trim().length > 0) {
+      lines.push('Output:');
       lines.push(stripAnsiCodes(result.stdout));
     } else {
-      lines.push('Script executed successfully (no output)');
+      lines.push('(No output produced)');
     }
+
+    // Include stderr even on success (warnings, etc.)
+    if (result.stderr && result.stderr.trim().length > 0) {
+      lines.push('');
+      lines.push('Warnings/Stderr:');
+      lines.push(stripAnsiCodes(result.stderr));
+    }
+
     return lines.join('\n');
   }
 
-  lines.push('Python Execution Failed\n');
+  // Failure case - detailed error information
+  lines.push('[Python Execution Failed]');
+  lines.push(`Execution Time: ${execTimeSec}s`);
 
   if (result.exitCode !== undefined && result.exitCode !== null) {
     lines.push(`Exit Code: ${result.exitCode}`);
   }
 
+  if (result.error) {
+    lines.push(`Error: ${result.error}`);
+  }
+
+  // Always show stdout if any was collected (important for timeout cases)
   if (result.stdout && result.stdout.trim().length > 0) {
-    lines.push('\nOutput:');
+    lines.push('');
+    lines.push('Output collected before failure:');
     lines.push('```');
     lines.push(stripAnsiCodes(result.stdout));
     lines.push('```');
   }
 
-  if (result.stderr) {
-    lines.push('\nError Details:');
+  if (result.stderr && result.stderr.trim().length > 0) {
+    lines.push('');
+    lines.push('Stderr:');
     lines.push('```');
     lines.push(stripAnsiCodes(result.stderr));
     lines.push('```');
   }
 
-  if (result.error) {
-    lines.push(`\n${result.error}`);
+  // If no output at all, indicate this explicitly
+  if ((!result.stdout || result.stdout.trim().length === 0) &&
+      (!result.stderr || result.stderr.trim().length === 0)) {
+    lines.push('');
+    lines.push('(No output was captured before failure)');
   }
 
   return lines.join('\n');
