@@ -25,6 +25,21 @@ interface SDKToolUseResult {
 }
 
 /**
+ * SDK usage structure from transcript files
+ */
+interface SDKUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number;
+    ephemeral_1h_input_tokens?: number;
+  };
+  service_tier?: string | null;
+}
+
+/**
  * SDK transcript entry structure
  * Matches the format from cli.js transcript files
  */
@@ -36,12 +51,7 @@ interface SDKTranscriptEntry {
     role?: 'user' | 'assistant';
     content: string | ContentBlock[];
     model?: string;
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
+    usage?: SDKUsage;
   };
   timestamp?: string;
   uuid?: string;
@@ -147,19 +157,19 @@ function getTranscriptPath(claudeSessionId: string, sessionCwd?: string): string
 
 /**
  * Convert SDK usage to our UsageMetadata format
+ * Includes cache tokens for accurate context usage calculation
  */
-function convertUsage(sdkUsage?: {
-  input_tokens: number;
-  output_tokens: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
-}): UsageMetadata | undefined {
+function convertUsage(sdkUsage?: SDKUsage): UsageMetadata | undefined {
   if (!sdkUsage) return undefined;
 
   return {
     input_tokens: sdkUsage.input_tokens || 0,
     output_tokens: sdkUsage.output_tokens || 0,
     total_tokens: (sdkUsage.input_tokens || 0) + (sdkUsage.output_tokens || 0),
+    cache_read_input_tokens: sdkUsage.cache_read_input_tokens,
+    cache_creation_input_tokens: sdkUsage.cache_creation_input_tokens,
+    cache_creation: sdkUsage.cache_creation,
+    service_tier: sdkUsage.service_tier,
   };
 }
 

@@ -42,12 +42,34 @@ export interface ServiceInitResponse {
 }
 
 /**
+ * Cache creation breakdown by TTL
+ */
+export interface CacheCreationBreakdown {
+  /** Tokens written to 5-minute ephemeral cache (default) */
+  ephemeral_5m_input_tokens?: number;
+  /** Tokens written to 1-hour extended cache (requires Max subscription) */
+  ephemeral_1h_input_tokens?: number;
+}
+
+/**
  * Token usage metadata
+ * Matches SDK's usage structure for accurate context usage calculation
  */
 export interface UsageMetadata {
+  /** Input tokens (excluding cache reads) */
   input_tokens: number;
+  /** Output tokens generated */
   output_tokens: number;
+  /** Total tokens (input + output) */
   total_tokens: number;
+  /** Tokens read from cache (90% cost savings) */
+  cache_read_input_tokens?: number;
+  /** Total tokens written to cache (25% cost increase) */
+  cache_creation_input_tokens?: number;
+  /** Breakdown of cache creation by TTL */
+  cache_creation?: CacheCreationBreakdown;
+  /** Service tier (standard, max, etc.) */
+  service_tier?: string | null;
 }
 
 /**
