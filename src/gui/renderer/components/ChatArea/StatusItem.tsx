@@ -277,14 +277,14 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
               <span className="status-icon-gear">
                 <GearIcon />
               </span>
-              <AnimatedText text={`Executing ${state.tool.toolName || ''}`} />
+              <AnimatedText text={t.status.executingTool(state.tool.toolName || '')} />
             </>
           ) : (
             <>
               <span className="status-icon-clock">
                 <ClockIcon />
               </span>
-              <AnimatedText text="Waiting for tool approval" />
+              <AnimatedText text={t.status.waitingForApproval} />
             </>
           )}
         </div>
@@ -302,7 +302,7 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
           <span className="status-icon-thinking">
             <ThinkingIcon />
           </span>
-          <AnimatedText text="AI is thinking" />
+          <AnimatedText text={t.status.aiThinking} />
         </div>
       )}
 
