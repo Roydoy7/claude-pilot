@@ -608,14 +608,27 @@
   word-wrap: break-word;
 }
 
+.message-user .message-content {
+  align-items: flex-end;
+}
+
 .message-user .message-bubble {
   background-color: var(--user-bubble);
   color: var(--user-bubble-text);
+  text-align: left;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.message-ai .message-content {
+  align-items: flex-start;
 }
 
 .message-ai .message-bubble {
   background-color: var(--ai-bubble);
   color: var(--ai-bubble-text);
+  width: fit-content;
+  max-width: 100%;
 }
 
 .message-footer {

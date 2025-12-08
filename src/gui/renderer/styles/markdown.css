@@ -4,8 +4,63 @@
  * Markdown and Code Highlighting Styles
  */
 
-/* Import highlight.js themes - both imported, controlled by data-theme */
+/* Import highlight.js theme */
 @import 'highlight.js/styles/atom-one-light.css';
+
+/* Dark theme overrides for highlight.js */
+:root[data-theme='dark'] .hljs {
+  color: #abb2bf;
+  background: transparent !important;
+}
+
+/* Light theme - also make hljs background transparent */
+:root[data-theme='light'] .hljs {
+  background: transparent !important;
+}
+
+:root[data-theme='dark'] .hljs-comment,
+:root[data-theme='dark'] .hljs-quote {
+  color: #5c6370;
+}
+
+:root[data-theme='dark'] .hljs-keyword,
+:root[data-theme='dark'] .hljs-selector-tag,
+:root[data-theme='dark'] .hljs-literal,
+:root[data-theme='dark'] .hljs-type {
+  color: #c678dd;
+}
+
+:root[data-theme='dark'] .hljs-string,
+:root[data-theme='dark'] .hljs-title,
+:root[data-theme='dark'] .hljs-name,
+:root[data-theme='dark'] .hljs-section {
+  color: #98c379;
+}
+
+:root[data-theme='dark'] .hljs-number,
+:root[data-theme='dark'] .hljs-symbol,
+:root[data-theme='dark'] .hljs-bullet {
+  color: #d19a66;
+}
+
+:root[data-theme='dark'] .hljs-attr,
+:root[data-theme='dark'] .hljs-variable,
+:root[data-theme='dark'] .hljs-template-variable {
+  color: #e06c75;
+}
+
+:root[data-theme='dark'] .hljs-built_in,
+:root[data-theme='dark'] .hljs-builtin-name {
+  color: #e6c07b;
+}
+
+/* Ensure all text in message bubbles inherits correct color */
+.message-ai .message-bubble,
+.message-ai .message-bubble p,
+.message-ai .message-bubble li,
+.message-ai .message-bubble span:not(.hljs-keyword):not(.hljs-string):not(.hljs-comment):not(.hljs-number):not(.hljs-built_in):not(.hljs-attr):not(.hljs-literal):not(.hljs-type):not(.hljs-name):not(.hljs-section):not(.hljs-symbol):not(.hljs-bullet):not(.hljs-variable):not(.hljs-template-variable):not(.hljs-quote):not(.hljs-selector-tag):not(.hljs-title):not(.hljs-builtin-name) {
+  color: var(--ai-bubble-text);
+}
 
 /* Override highlight.js background for message bubbles */
 .message-bubble pre {
@@ -60,6 +115,7 @@
   margin: 1em 0 0.5em 0;
   font-weight: 600;
   line-height: 1.3;
+  color: var(--text-primary);
 }
 
 .message-bubble h1 { font-size: 1.2em; }
