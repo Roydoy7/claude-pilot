@@ -5,6 +5,7 @@
  * Provides streaming execution with tool support via MCP
  */
 
+import { promises as fs } from 'node:fs';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type {
   Query,
@@ -66,15 +67,34 @@ function getClaudeCodeExecutablePath(): string {
 }
 
 /**
+ * Cache creation breakdown by TTL
+ */
+export interface CacheCreationBreakdown {
+  /** Tokens written to 5-minute ephemeral cache (default) */
+  ephemeral_5m_input_tokens?: number;
+  /** Tokens written to 1-hour extended cache (requires Max subscription) */
+  ephemeral_1h_input_tokens?: number;
+}
+
+/**
  * Token usage metadata - matches SDK's usage structure
  */
 export interface UsageMetadata {
+  /** Input tokens (excluding cache reads) */
   input_tokens: number;
+  /** Output tokens generated */
   output_tokens: number;
+  /** Total tokens (input + output) */
   total_tokens: number;
+  /** Tokens read from cache (90% cost savings) */
   cache_read_input_tokens?: number;
+  /** Total tokens written to cache (25% cost increase) */
   cache_creation_input_tokens?: number;
+  /** Breakdown of cache creation by TTL */
+  cache_creation?: CacheCreationBreakdown;
+  /** Total cost in USD (if available) */
   total_cost_usd?: number;
+  /** Service tier (standard, max, etc.) */
   service_tier?: string | null;
 }
 
@@ -128,6 +148,7 @@ export type StreamEvent =
   | { type: 'cancelled'; reason: string }
   | { type: 'checkpoint' }
   | { type: 'slashCommands'; commands: string[] }
+  | { type: 'message'; content: string; timestamp: number; isCompactSummary?: boolean }
   | { type: 'done'; usage?: UsageMetadata };
 
 /**
@@ -467,6 +488,24 @@ export class ClaudeAgent {
               sessionManager.updateSessionCheckpoint(this.sessionId, assistantMessage.session_id);
             }
 
+            // Extract usage from assistant message - this is the real-time per-message usage
+            // NOTE: result.usage is cumulative (sum of all API calls in turn), but message.usage
+            // is the actual usage for this specific API call, which is what we want to display
+            const msgUsage = assistantMessage.message?.usage;
+            let currentUsage: UsageMetadata | undefined;
+            if (msgUsage) {
+              currentUsage = {
+                input_tokens: msgUsage.input_tokens || 0,
+                output_tokens: msgUsage.output_tokens || 0,
+                total_tokens: (msgUsage.input_tokens || 0) + (msgUsage.output_tokens || 0),
+                cache_read_input_tokens: msgUsage.cache_read_input_tokens,
+                cache_creation_input_tokens: msgUsage.cache_creation_input_tokens,
+                cache_creation: msgUsage.cache_creation,
+                service_tier: msgUsage.service_tier,
+              };
+              finalUsage = currentUsage;
+            }
+
             // Extract and yield message content from assistant message
             if (assistantMessage.message?.content) {
               const content = assistantMessage.message.content;
@@ -500,7 +539,7 @@ export class ClaudeAgent {
                           return;
                         }
                         accumulatedText += block.text;
-                        yield { type: 'text_delta', text: block.text };
+                        yield { type: 'text_delta', text: block.text, usage: currentUsage };
                       }
                       break;
                     }
@@ -554,6 +593,31 @@ export class ClaudeAgent {
 
           case 'user': {
             const userMessage = chunk as SDKUserMessage;
+
+            // Check if this is a compact summary message (SDK includes this flag but not in type definition)
+            const isCompactSummary = (userMessage as SDKUserMessage & { isCompactSummary?: boolean }).isCompactSummary;
+            if (isCompactSummary) {
+              // Extract summary text from message content
+              const summaryContent = userMessage.message?.content;
+              if (typeof summaryContent === 'string') {
+                // Yield the compact summary as an assistant message for display
+                yield {
+                  type: 'message',
+                  content: summaryContent,
+                  timestamp: Date.now(),
+                  isCompactSummary: true,
+                };
+                // Also store in conversation history
+                this.conversationHistory.push({
+                  role: 'assistant',
+                  content: summaryContent,
+                  timestamp: Date.now(),
+                  isCompactSummary: true,
+                });
+              }
+              break;
+            }
+
             // Process tool_result blocks from message content
             // Each tool_result has its own tool_use_id, allowing parallel tool results
             const messageContent = userMessage.message?.content;
@@ -630,16 +694,9 @@ export class ClaudeAgent {
               sessionManager.updateSessionCheckpoint(this.sessionId, resultMessage.session_id);
             }
 
-            // Build comprehensive usage from result (authoritative totals)
-            const usage: UsageMetadata = {
-              input_tokens: resultMessage.usage.input_tokens,
-              output_tokens: resultMessage.usage.output_tokens,
-              total_tokens: resultMessage.usage.input_tokens + resultMessage.usage.output_tokens,
-              cache_read_input_tokens: resultMessage.usage.cache_read_input_tokens,
-              cache_creation_input_tokens: resultMessage.usage.cache_creation_input_tokens,
-              total_cost_usd: resultMessage.total_cost_usd,
-              service_tier: resultMessage.usage.service_tier,
-            };
+            // NOTE: result.usage is cumulative (sum of all API calls in this turn)
+            // We use finalUsage from the last assistant message instead, which has
+            // the actual per-message usage that matches what's stored in transcripts
 
             if (resultMessage.subtype === 'success') {
               if (accumulatedText) {
@@ -647,11 +704,10 @@ export class ClaudeAgent {
                   role: 'assistant',
                   content: accumulatedText,
                   timestamp: Date.now(),
-                  usage,
+                  usage: finalUsage, // Use usage from last assistant message
                 });
               }
-              // Store usage for done event
-              finalUsage = usage;
+              // finalUsage is already set from the last assistant message
             } else {
               const errors = 'errors' in resultMessage ? resultMessage.errors : [];
               yield {
@@ -685,10 +741,26 @@ export class ClaudeAgent {
               // Conversation compaction boundary - checkpoint event
               yield { type: 'checkpoint' };
             } else if (systemMessage.subtype === 'status') {
-              // Status update (e.g., 'compacting')
+              // Status update (e.g., 'compacting', null)
               const statusMsg = systemMessage as SDKStatusMessage;
               if (statusMsg.status === 'compacting') {
-                yield { type: 'state', state: { thinking: true } };
+                // Compacting started - show command running state
+                yield {
+                  type: 'state',
+                  state: {
+                    thinking: true,
+                    command: { name: 'compact', status: 'running' },
+                  },
+                };
+              } else if (statusMsg.status === null) {
+                // Status cleared (e.g., compacting finished) - clear command state
+                yield {
+                  type: 'state',
+                  state: {
+                    thinking: false,
+                    command: { name: 'compact', status: 'completed' },
+                  },
+                };
               }
             }
             // hook_response: Hook responses are internal, no need to yield to frontend
@@ -826,11 +898,35 @@ export class ClaudeAgent {
         settingSources: this.settingSources, // Use instance variable (may be updated via setSettingSources)
         canUseTool: canUseToolCallback,
         hooks: {
-          // PreToolUse: Auto-inject workingDirectory for all tools if not specified
+          // PreToolUse: Auto-inject workingDirectory and check file size for Read tool
           PreToolUse: [{
             hooks: [async (input) => {
               if (input.hook_event_name === 'PreToolUse') {
                 const toolInput = input.tool_input as Record<string, unknown> | undefined;
+                const toolName = input.tool_name;
+
+                // Check file size for Read tool to prevent large files from entering conversation history
+                if (toolName === 'Read' && toolInput?.file_path) {
+                  const filePath = toolInput.file_path as string;
+                  try {
+                    const stats = await fs.stat(filePath);
+                    const MAX_FILE_SIZE = 500 * 1024; // 500KB (~125000 tokens)
+                    if (stats.size > MAX_FILE_SIZE) {
+                      const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+                      return {
+                        hookSpecificOutput: {
+                          hookEventName: 'PreToolUse' as const,
+                          permissionDecision: 'deny' as const,
+                          permissionDecisionReason: `File too large (${sizeMB}MB). Maximum allowed size is 500KB. Use offset/limit parameters to read specific portions, or use Grep to search for specific content.`,
+                        },
+                      };
+                    }
+                  } catch {
+                    // File doesn't exist or can't be accessed - let the tool handle the error
+                  }
+                }
+
+                // Auto-inject workingDirectory for all tools if not specified
                 if (toolInput && !toolInput.workingDirectory) {
                   return {
                     hookSpecificOutput: {
