@@ -85,14 +85,13 @@ export function getAgentCacheStats(): {
 
 /**
  * Build combined system prompt for a role
+ * Includes role-specific prompt and system reminders
+ * Note: Skills are automatically discovered by Claude Agent SDK from {cwd}/.claude/skills/
  */
-function buildSystemPrompt(
-  role: RoleType
-): string {
+function buildSystemPrompt(role: RoleType): string {
   const rolePrompt = getRoleSystemPrompt(role);
   const reminders = getSystemReminders();
-  return `${rolePrompt}
-${reminders}`;
+  return [rolePrompt, reminders].join('\n');
 }
 
 /**

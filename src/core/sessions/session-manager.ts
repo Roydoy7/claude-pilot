@@ -231,6 +231,19 @@ export class SessionManager {
   }
 
   /**
+   * Touch session - update timestamp to mark as recently used
+   */
+  touchSession(sessionId: string): void {
+    const session = this.loadSession(sessionId);
+    if (!session) {
+      return; // Silently ignore if session not found
+    }
+
+    session.updatedAt = Date.now();
+    this.saveSession(session);
+  }
+
+  /**
    * Get current session
    */
   getCurrentSession(): Session | null {
