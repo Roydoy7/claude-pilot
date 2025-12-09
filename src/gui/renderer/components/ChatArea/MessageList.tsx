@@ -60,6 +60,7 @@ function renderItem(
           role: item.role!,
           content: item.content!,
           usage: item.usage,
+          timestamp: item.timestamp,
         }}
       />
     );

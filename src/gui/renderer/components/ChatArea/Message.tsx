@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -22,6 +23,15 @@ export interface MessageData {
   role: 'user' | 'assistant';
   content: MessageContent; // Supports both text and multimodal content
   usage?: UsageMetadata;
+  timestamp?: number;
+}
+
+/**
+ * Format timestamp for display (HH:MM format)
+ */
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 interface MessageProps {
@@ -237,6 +247,12 @@ export const Message = memo(function Message({ message }: MessageProps) {
         )}
 
         <div className="message-footer">
+          {/* Timestamp */}
+          {message.timestamp && (
+            <span className="message-timestamp">
+              {formatTime(message.timestamp)}
+            </span>
+          )}
           {message.usage && !isUser && (
             <div className="message-usage">
               {/* Basic token counts */}
@@ -327,8 +343,8 @@ export const Message = memo(function Message({ message }: MessageProps) {
         </div>
       </div>
 
-      {/* Image modal overlay */}
-      {viewingImage && (
+      {/* Image modal overlay - rendered via Portal to escape overflow constraints */}
+      {viewingImage && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -356,7 +372,8 @@ export const Message = memo(function Message({ message }: MessageProps) {
             }}
             onClick={(e) => e.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
