@@ -7,6 +7,11 @@
 export const headerJa = {
   hideRightPanel: '右パネルを非表示',
   showRightPanel: '右パネルを表示',
+  sessionInfo: {
+    role: 'ロール',
+    model: 'モデル',
+    workspace: 'ワークスペース',
+  },
   roles: {
     officeAssistant: 'オフィスアシスタント',
     translator: '翻訳者',

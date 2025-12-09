@@ -8,6 +8,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { LanguageToggle } from './LanguageToggle';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { Session } from '../../../../core/sessions/session-manager';
+import { getRoleDisplayName, RoleType } from '../../../../core/roles/role-enum.js';
 
 interface HeaderProps {
   onTogglePanel?: () => void;
@@ -18,16 +19,12 @@ interface HeaderProps {
 export function Header({ onTogglePanel, isPanelVisible = true, currentSession }: HeaderProps) {
   const { t } = useLanguage();
 
-  // Format role display name
-  const getRoleDisplayName = (role: string) => {
-    switch (role) {
-      case 'office-assistant':
-        return t.header.roles.officeAssistant;
-      case 'translator':
-        return t.header.roles.translator;
-      default:
-        return role;
-    }
+  // Get short directory name from full path
+  const getShortDirName = (fullPath: string) => {
+    if (!fullPath) return '';
+    // Handle both Windows and Unix paths
+    const parts = fullPath.split(/[/\\]/);
+    return parts[parts.length - 1] || parts[parts.length - 2] || fullPath;
   };
 
   // Format model display name
@@ -48,23 +45,38 @@ export function Header({ onTogglePanel, isPanelVisible = true, currentSession }:
   return (
     <header className="header">
       <div className="header-logo">
-        <span className="header-logo-icon">🤖</span>
+        <span className="header-logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="8" width="18" height="12" rx="2" />
+            <circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none" />
+            <circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none" />
+            <path d="M12 2v4" />
+            <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
         <span>Claude Pilot</span>
       </div>
 
       {currentSession && (
         <div className="header-session-info">
-          <span className="session-role" title={`Role: ${getRoleDisplayName(currentSession.role)}`}>
-            {getRoleDisplayName(currentSession.role)}
+          <span className="session-role" title={`${t.header.sessionInfo.role}: ${getRoleDisplayName(currentSession.role as RoleType)}`}>
+            <span className="session-label">{t.header.sessionInfo.role}</span>
+            {getRoleDisplayName(currentSession.role as RoleType)}
           </span>
           <span className="session-separator">•</span>
-          <span className="session-provider" title="Provider: Anthropic Claude">
-            {t.header.providers.anthropic}
-          </span>
-          <span className="session-separator">•</span>
-          <span className="session-model" title={`Model: ${currentSession.modelName}`}>
+          <span className="session-model" title={`${t.header.sessionInfo.model}: ${currentSession.modelName}`}>
+            <span className="session-label">{t.header.sessionInfo.model}</span>
             {getModelDisplayName(currentSession.modelName)}
           </span>
+          {currentSession.cwd && (
+            <>
+              <span className="session-separator">•</span>
+              <span className="session-cwd" title={currentSession.cwd}>
+                <span className="session-label">{t.header.sessionInfo.workspace}</span>
+                {getShortDirName(currentSession.cwd)}
+              </span>
+            </>
+          )}
         </div>
       )}
 

@@ -7,6 +7,11 @@
 export const headerEn = {
   hideRightPanel: 'Hide Right Panel',
   showRightPanel: 'Show Right Panel',
+  sessionInfo: {
+    role: 'Role',
+    model: 'Model',
+    workspace: 'Workspace',
+  },
   roles: {
     officeAssistant: 'Office Assistant',
     translator: 'Translator',
