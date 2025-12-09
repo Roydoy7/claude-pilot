@@ -61,6 +61,8 @@ interface SDKTranscriptEntry {
   isCompactSummary?: boolean; // Flag for compact summary messages (from /compact command)
   subtype?: string; // System message subtype (e.g., 'compact_boundary')
   isMeta?: boolean; // Flag for meta messages (e.g., "Caveat" warnings from /compact)
+  error?: string; // Error type (e.g., 'rate_limit')
+  isApiErrorMessage?: boolean; // Flag for API error messages (usage limit, etc.)
 }
 
 /**
@@ -378,6 +380,7 @@ export function readTranscript(claudeSessionId: string, cwd: string): HistoryMes
           timestamp: entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now(),
           usage: convertUsage(usage),
           isCompactSummary: entry.isCompactSummary, // Preserve compact summary flag
+          isUsageLimitError: entry.isApiErrorMessage && entry.error === 'rate_limit', // Flag for usage limit errors
         };
 
         if (role === 'assistant' && toolCalls.length > 0) {

@@ -40,6 +40,7 @@ export const jaTranslations: Translation = {
     noMessages: 'まだメッセージがありません。会話を始めましょう！',
     newMessages: '新着メッセージ',
     scrollToBottom: '最下部へスクロール',
+    usageLimitReached: '使用制限に達しました',
   },
 
   // Compact Summary

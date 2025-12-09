@@ -137,10 +137,10 @@ export interface FileTreeNode {
 }
 
 /**
- * Message list item - unified type for messages, tool calls, status indicators, thinking, and cancelled
+ * Message list item - unified type for messages, tool calls, status indicators, thinking, cancelled, and usage_limit
  */
 export interface MessageListItem {
-  type: 'message' | 'tool_call' | 'status' | 'thinking' | 'cancelled';
+  type: 'message' | 'tool_call' | 'status' | 'thinking' | 'cancelled' | 'usage_limit';
   id: string;
   timestamp: number;
 
@@ -164,6 +164,9 @@ export interface MessageListItem {
 
   // Compact summary flag (from /compact command)
   isCompactSummary?: boolean;
+
+  // Usage limit type fields
+  usageLimitMessage?: string;
 }
 
 /**
@@ -301,6 +304,7 @@ export interface ElectronAPI {
       usage?: UsageMetadata;
       tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
       tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
+      isUsageLimitError?: boolean;
     }>>;
     create: (request: SessionCreateRequest) => Promise<{ success: boolean; session?: Session; error?: string }>;
     switch: (request: SessionSwitchRequest) => Promise<{ success: boolean; error?: string }>;

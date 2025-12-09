@@ -40,6 +40,7 @@ export const zhTranslations: Translation = {
     noMessages: '还没有消息。开始对话吧！',
     newMessages: '新消息',
     scrollToBottom: '滚动到底部',
+    usageLimitReached: '已达到使用限额',
   },
 
   // Compact Summary

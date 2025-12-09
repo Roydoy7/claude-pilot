@@ -145,6 +145,7 @@ export type StreamEvent =
   | { type: 'tool_progress'; toolName: string; toolCallId?: string; progressType: string; message: string; timestamp: number }
   | { type: 'interrupt'; interruptId: string; toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> }
   | { type: 'error'; error: string; details?: string }
+  | { type: 'usage_limit'; message: string }
   | { type: 'cancelled'; reason: string }
   | { type: 'checkpoint' }
   | { type: 'slashCommands'; commands: string[] }
@@ -162,6 +163,7 @@ export interface HistoryMessage {
   tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
   tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
   isCompactSummary?: boolean; // Flag for compact summary messages (from /compact command)
+  isUsageLimitError?: boolean; // Flag for usage limit error messages (rate_limit)
 }
 
 /**
@@ -793,8 +795,17 @@ export class ClaudeAgent {
         errorMessage.toLowerCase().includes('canceled by user') ||
         this.isCancelled();
 
+      // Check if this is a usage limit error
+      const isUsageLimitError =
+        errorMessage.toLowerCase().includes('limit reached') ||
+        errorMessage.toLowerCase().includes('resets') ||
+        errorMessage.toLowerCase().includes('rate limit') ||
+        errorMessage.toLowerCase().includes('usage limit');
+
       if (isUserCancellation) {
         yield { type: 'cancelled', reason: errorMessage };
+      } else if (isUsageLimitError) {
+        yield { type: 'usage_limit', message: errorMessage };
       } else {
         yield {
           type: 'error',

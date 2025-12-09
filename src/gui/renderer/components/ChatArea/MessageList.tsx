@@ -13,6 +13,7 @@ import { ToolCallItem } from './ToolCallItem';
 import { StatusItem } from './StatusItem';
 import { ThinkingItem } from './ThinkingItem';
 import { CancelledItem } from './CancelledItem';
+import { UsageLimitItem } from './UsageLimitItem';
 import { CompactSummaryItem } from './CompactSummaryItem';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { MessageListItem } from '../../../preload/preload-types';
@@ -72,6 +73,8 @@ function renderItem(
     return <ThinkingItem item={item} />;
   } else if (item.type === 'cancelled') {
     return <CancelledItem item={item} />;
+  } else if (item.type === 'usage_limit') {
+    return <UsageLimitItem item={item} />;
   }
   return null;
 }

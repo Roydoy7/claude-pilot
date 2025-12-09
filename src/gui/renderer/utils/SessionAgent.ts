@@ -447,6 +447,25 @@ export class SessionAgent {
         this.notifyDisplayItemsChanged();
         break;
 
+      case 'usage_limit': {
+        // Usage limit reached - show as inline usage limit indicator
+        const usageLimitItem: MessageListItem = {
+          type: 'usage_limit',
+          id: `usage-limit-${Date.now()}`,
+          timestamp: Date.now(),
+          usageLimitMessage: event.message,
+        };
+
+        this.displayItems.push(usageLimitItem);
+
+        // Clear status item (set to idle)
+        this.updateStatusItem({ thinking: false });
+
+        // Notify UI
+        this.notifyDisplayItemsChanged();
+        break;
+      }
+
       case 'done': {
         // Stream completed - clear streaming state
         // Remove empty assistant messages (messages with no content or only whitespace)
@@ -562,6 +581,7 @@ export class SessionAgent {
     tool_calls?: Array<{ id: string; name: string; args: Record<string, any> }>;
     tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
     isCompactSummary?: boolean;
+    isUsageLimitError?: boolean;
   }>) {
     try {
       const items: MessageListItem[] = [];
@@ -634,18 +654,45 @@ export class SessionAgent {
 
         // Create message item only if content is not empty (skip empty assistant messages)
         if (!isEmpty) {
-          const messageItem: MessageListItem = {
-            type: 'message',
-            id: `${this.sessionId}-msg-${msgIndex}`,
-            timestamp: msg.timestamp || Date.now(),
-            role: msg.role as 'user' | 'assistant',
-            content: displayContent,
-            usage: msg.usage,
-            isCompactSummary: msg.isCompactSummary,
-          };
+          // Check if this is a usage limit error message
+          if (msg.isUsageLimitError) {
+            // Extract text from content (can be string or ContentBlock[])
+            let limitMessage: string | undefined;
+            if (typeof displayContent === 'string') {
+              limitMessage = displayContent;
+            } else if (Array.isArray(displayContent)) {
+              // Extract text from ContentBlock array
+              const textParts: string[] = [];
+              for (const block of displayContent) {
+                if (block.type === 'text' && 'text' in block) {
+                  textParts.push(block.text);
+                }
+              }
+              limitMessage = textParts.join('');
+            }
 
-          items.push(messageItem);
-          itemIndex++;
+            const usageLimitItem: MessageListItem = {
+              type: 'usage_limit',
+              id: `${this.sessionId}-usage-limit-${msgIndex}`,
+              timestamp: msg.timestamp || Date.now(),
+              usageLimitMessage: limitMessage,
+            };
+            items.push(usageLimitItem);
+            itemIndex++;
+          } else {
+            const messageItem: MessageListItem = {
+              type: 'message',
+              id: `${this.sessionId}-msg-${msgIndex}`,
+              timestamp: msg.timestamp || Date.now(),
+              role: msg.role as 'user' | 'assistant',
+              content: displayContent,
+              usage: msg.usage,
+              isCompactSummary: msg.isCompactSummary,
+            };
+
+            items.push(messageItem);
+            itemIndex++;
+          }
         }
 
         // Create separate tool call items if present

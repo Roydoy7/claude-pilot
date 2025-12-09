@@ -40,6 +40,7 @@ export const enTranslations: Translation = {
     noMessages: 'No messages yet. Start a conversation!',
     newMessages: 'New messages',
     scrollToBottom: 'Scroll to bottom',
+    usageLimitReached: 'Usage limit reached',
   },
 
   // Compact Summary
