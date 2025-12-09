@@ -50,6 +50,11 @@ export interface Translation {
   header: {
     hideRightPanel: string;
     showRightPanel: string;
+    sessionInfo: {
+      role: string;
+      model: string;
+      workspace: string;
+    };
     roles: {
       officeAssistant: string;
       translator: string;
@@ -260,6 +265,7 @@ export interface Translation {
     sessions: string;
     workspace: string;
     prompts: string;
+    skills: string;
     closePanel: string;
 
     // Sessions Tab
@@ -310,6 +316,23 @@ export interface Translation {
       directoryLabel: (index: number) => string;
       removeDirectory: string;
       accessNote: string;
+    };
+
+    // Skills Tab
+    skillsTab: {
+      title: string;
+      enableSkills: string;
+      installed: string;
+      marketplace: string;
+      noSkillsInstalled: string;
+      browseMarketplace: string;
+      selectSession: string;
+      refreshMarketplace: string;
+      loading: string;
+      clickRefresh: string;
+      install: string;
+      installing: string;
+      uninstall: string;
     };
   };
 

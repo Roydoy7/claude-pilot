@@ -9,6 +9,7 @@ export const rightPanelJa = {
   sessions: 'セッション',
   workspace: 'ワークスペース',
   prompts: 'プロンプト',
+  skills: 'スキル',
   closePanel: 'パネルを閉じる',
 
   // Sessions Tab
@@ -61,5 +62,22 @@ export const rightPanelJa = {
     directoryLabel: (index: number) => `ディレクトリ ${index}`,
     removeDirectory: 'ディレクトリを削除',
     accessNote: 'AIは作業ディレクトリとすべての追加ディレクトリ内のファイルにアクセスできます。',
+  },
+
+  // Skills Tab
+  skillsTab: {
+    title: 'スキル',
+    enableSkills: 'スキルを有効化',
+    installed: 'インストール済み',
+    marketplace: 'マーケットプレイス',
+    noSkillsInstalled: 'まだスキルがインストールされていません。',
+    browseMarketplace: 'マーケットプレイスでスキルを探す。',
+    selectSession: 'スキルを管理するにはセッションを選択してください。',
+    refreshMarketplace: 'マーケットプレイスを更新',
+    loading: '読み込み中...',
+    clickRefresh: '更新をクリックして利用可能なスキルを表示します。',
+    install: 'インストール',
+    installing: 'インストール中...',
+    uninstall: 'アンインストール',
   },
 };

@@ -9,6 +9,7 @@ export const rightPanelEn = {
   sessions: 'Sessions',
   workspace: 'Workspace',
   prompts: 'Prompts',
+  skills: 'Skills',
   closePanel: 'Close Panel',
 
   // Sessions Tab
@@ -61,5 +62,22 @@ export const rightPanelEn = {
     directoryLabel: (index: number) => `Directory ${index}`,
     removeDirectory: 'Remove directory',
     accessNote: 'The AI can access files in the working directory and all additional directories.',
+  },
+
+  // Skills Tab
+  skillsTab: {
+    title: 'Skills',
+    enableSkills: 'Enable Skills',
+    installed: 'Installed',
+    marketplace: 'Marketplace',
+    noSkillsInstalled: 'No skills installed yet.',
+    browseMarketplace: 'Browse the marketplace to find skills.',
+    selectSession: 'Select a session to manage skills.',
+    refreshMarketplace: 'Refresh Marketplace',
+    loading: 'Loading...',
+    clickRefresh: 'Click refresh to browse available skills.',
+    install: 'Install',
+    installing: 'Installing...',
+    uninstall: 'Uninstall',
   },
 };

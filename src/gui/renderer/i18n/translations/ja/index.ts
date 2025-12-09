@@ -100,10 +100,12 @@ export const jaTranslations: Translation = {
     sessions: rightPanelJa.sessions,
     workspace: rightPanelJa.workspace,
     prompts: rightPanelJa.prompts,
+    skills: rightPanelJa.skills,
     closePanel: rightPanelJa.closePanel,
     sessionsTab: rightPanelJa.sessionsTab,
     promptsTab: rightPanelJa.promptsTab,
     workspaceTab: rightPanelJa.workspaceTab,
+    skillsTab: rightPanelJa.skillsTab,
   },
 
   // Template Editor

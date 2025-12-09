@@ -9,6 +9,7 @@ export const rightPanelZh = {
   sessions: '会话',
   workspace: '工作区',
   prompts: '提示词',
+  skills: '技能',
   closePanel: '关闭面板',
 
   // Sessions Tab
@@ -61,5 +62,22 @@ export const rightPanelZh = {
     directoryLabel: (index: number) => `目录 ${index}`,
     removeDirectory: '移除目录',
     accessNote: 'AI 可以访问工作目录和所有额外目录中的文件。',
+  },
+
+  // Skills Tab
+  skillsTab: {
+    title: '技能',
+    enableSkills: '启用技能',
+    installed: '已安装',
+    marketplace: '市场',
+    noSkillsInstalled: '尚未安装技能。',
+    browseMarketplace: '浏览市场以查找技能。',
+    selectSession: '选择会话以管理技能。',
+    refreshMarketplace: '刷新市场',
+    loading: '加载中...',
+    clickRefresh: '点击刷新以浏览可用技能。',
+    install: '安装',
+    installing: '安装中...',
+    uninstall: '卸载',
   },
 };

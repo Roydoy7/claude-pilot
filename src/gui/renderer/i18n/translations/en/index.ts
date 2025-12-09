@@ -100,10 +100,12 @@ export const enTranslations: Translation = {
     sessions: rightPanelEn.sessions,
     workspace: rightPanelEn.workspace,
     prompts: rightPanelEn.prompts,
+    skills: rightPanelEn.skills,
     closePanel: rightPanelEn.closePanel,
     sessionsTab: rightPanelEn.sessionsTab,
     promptsTab: rightPanelEn.promptsTab,
     workspaceTab: rightPanelEn.workspaceTab,
+    skillsTab: rightPanelEn.skillsTab,
   },
 
   // Template Editor

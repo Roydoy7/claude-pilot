@@ -100,10 +100,12 @@ export const zhTranslations: Translation = {
     sessions: rightPanelZh.sessions,
     workspace: rightPanelZh.workspace,
     prompts: rightPanelZh.prompts,
+    skills: rightPanelZh.skills,
     closePanel: rightPanelZh.closePanel,
     sessionsTab: rightPanelZh.sessionsTab,
     promptsTab: rightPanelZh.promptsTab,
     workspaceTab: rightPanelZh.workspaceTab,
+    skillsTab: rightPanelZh.skillsTab,
   },
 
   // Template Editor
