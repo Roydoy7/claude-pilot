@@ -965,7 +965,8 @@ async function mergePDFs(sources: string[], output: string): Promise<PDFExecutio
 }
 
 /**
- * Split PDF
+ * Split PDF - Extract specified pages into a single output file
+ * When pages parameter specifies a range (e.g., "61-76"), all pages are combined into one file
  */
 async function splitPDF(
   file: string,
@@ -981,50 +982,53 @@ async function splitPDF(
     const totalPages = pdfDoc.getPageCount();
     const pageNumbers = parsePageNumbers(pages, totalPages);
 
-    let baseDir: string;
-    let baseName: string;
+    // Create a single output document with all specified pages
+    const newDoc = await PDFLibDocument.create();
+    const copiedPages = await newDoc.copyPages(
+      pdfDoc,
+      pageNumbers.map((p) => p - 1)
+    );
+    copiedPages.forEach((page) => newDoc.addPage(page));
 
+    // Determine output file path
+    let outputFile: string;
     if (output) {
       if (output.endsWith('.pdf')) {
-        if (pageNumbers.length === 1) {
-          baseDir = path.dirname(output);
-          baseName = path.basename(output, '.pdf');
-        } else {
-          baseDir = path.dirname(output);
-          baseName = path.basename(file, path.extname(file));
-        }
-      } else {
-        baseDir = output;
-        baseName = path.basename(file, path.extname(file));
-      }
-    } else {
-      baseDir = path.dirname(file);
-      baseName = path.basename(file, path.extname(file));
-    }
-
-    const outputFiles: string[] = [];
-
-    for (const pageNum of pageNumbers) {
-      const newDoc = await PDFLibDocument.create();
-      const [copiedPage] = await newDoc.copyPages(pdfDoc, [pageNum - 1]);
-      newDoc.addPage(copiedPage);
-
-      let outputFile: string;
-      if (output?.endsWith('.pdf') && pageNumbers.length === 1) {
         outputFile = output;
       } else {
-        outputFile = path.join(baseDir, `${baseName}_page_${pageNum}.pdf`);
+        // output is a directory
+        const baseName = path.basename(file, path.extname(file));
+        if (pageNumbers.length === 1) {
+          outputFile = path.join(output, `${baseName}_page_${pageNumbers[0]}.pdf`);
+        } else {
+          const firstPage = pageNumbers[0];
+          const lastPage = pageNumbers[pageNumbers.length - 1];
+          outputFile = path.join(output, `${baseName}_pages_${firstPage}-${lastPage}.pdf`);
+        }
       }
-
-      await fs.writeFile(outputFile, await newDoc.save());
-      outputFiles.push(outputFile);
+    } else {
+      const baseDir = path.dirname(file);
+      const baseName = path.basename(file, path.extname(file));
+      if (pageNumbers.length === 1) {
+        outputFile = path.join(baseDir, `${baseName}_page_${pageNumbers[0]}.pdf`);
+      } else {
+        const firstPage = pageNumbers[0];
+        const lastPage = pageNumbers[pageNumbers.length - 1];
+        outputFile = path.join(baseDir, `${baseName}_pages_${firstPage}-${lastPage}.pdf`);
+      }
     }
+
+    await fs.writeFile(outputFile, await newDoc.save());
+    const stats = await fs.stat(outputFile);
 
     return {
       success: true,
       operation: 'split',
       file,
-      outputFiles,
+      outputFile,
+      outputFiles: [outputFile],
+      pageCount: pageNumbers.length,
+      fileSize: stats.size,
       executionTime: Date.now() - startTime,
     };
   } catch (error) {

@@ -61,7 +61,7 @@ function getDefaultPythonPath(): string {
   const embeddedPython = path.join(
     process.cwd(),
     'packages',
-    'python-3.13.9-embed-amd64',
+    'python-3.13.11-embed-amd64',
     'python.exe'
   );
 
