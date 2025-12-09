@@ -6,12 +6,93 @@
  * Features: No avatar, left indentation
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import type { ReactNode } from 'react';
 import type { MessageListItem, ToolResponse, ToolProgressEntry } from '../../../preload/preload-types';
 import { useLanguage } from '../../i18n/LanguageContext';
+
+/**
+ * Approval waiting icon - clock indicating waiting for user action
+ */
+function ApprovalWaitingIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="approval-waiting-icon"
+    >
+      {/* Clock icon */}
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </svg>
+  );
+}
+
+/**
+ * Animated text component for approval - bouncing characters like AI thinking
+ */
+function AnimatedApprovalText({ text }: { text: string }) {
+  const [bouncingIndices, setBouncingIndices] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const chars = text.split('');
+    const nonSpaceIndices = chars
+      .map((char, index) => (char !== ' ' ? index : -1))
+      .filter((index) => index !== -1);
+
+    if (nonSpaceIndices.length === 0) return;
+
+    let position = 0;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const interval = setInterval(() => {
+      const currentCharIndex = nonSpaceIndices[position];
+
+      // 50% chance to bounce
+      if (Math.random() > 0.5) {
+        setBouncingIndices((prev) => new Set(prev).add(currentCharIndex));
+
+        const timeout = setTimeout(() => {
+          setBouncingIndices((prev) => {
+            const next = new Set(prev);
+            next.delete(currentCharIndex);
+            return next;
+          });
+        }, 500);
+
+        timeouts.push(timeout);
+      }
+
+      position = (position + 1) % nonSpaceIndices.length;
+    }, 200);
+
+    return () => {
+      clearInterval(interval);
+      timeouts.forEach((timeout) => clearTimeout(timeout));
+    };
+  }, [text]);
+
+  return (
+    <span className="tool-approval-text">
+      {text.split('').map((char, index) => (
+        <span
+          key={index}
+          className={`char ${bouncingIndices.has(index) ? 'bounce' : ''}`}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 /**
  * Diff line type for edit tool display
@@ -113,10 +194,181 @@ function renderDiffLines(diffLines: DiffLine[]): ReactNode {
   );
 }
 
+/**
+ * Side-by-side diff view component
+ */
+function SideBySideDiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
+  const diffLines = computeDiff(oldStr, newStr);
+
+  // Build aligned lines for side-by-side view
+  const leftLines: Array<{ content: string; type: 'unchanged' | 'removed' | 'empty' }> = [];
+  const rightLines: Array<{ content: string; type: 'unchanged' | 'added' | 'empty' }> = [];
+
+  for (const line of diffLines) {
+    if (line.type === 'unchanged') {
+      leftLines.push({ content: line.content, type: 'unchanged' });
+      rightLines.push({ content: line.content, type: 'unchanged' });
+    } else if (line.type === 'removed') {
+      leftLines.push({ content: line.content, type: 'removed' });
+      rightLines.push({ content: '', type: 'empty' });
+    } else if (line.type === 'added') {
+      leftLines.push({ content: '', type: 'empty' });
+      rightLines.push({ content: line.content, type: 'added' });
+    }
+  }
+
+  const lineStyle: React.CSSProperties = {
+    padding: '0 0.25rem',
+    minHeight: '1.2em',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.7rem', lineHeight: '1.5' }}>
+      {/* Left panel - Original */}
+      <div style={{ flex: 1, backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', padding: '0.5rem', border: '1px solid var(--border)', overflow: 'auto' }}>
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginBottom: '0.25rem', fontWeight: 500 }}>Original</div>
+        <pre style={{ margin: 0 }}>
+          {leftLines.map((line, idx) => {
+            let bgColor = 'transparent';
+            let textColor = 'inherit';
+            if (line.type === 'removed') {
+              bgColor = 'rgba(239,68,68,0.2)';
+              textColor = '#dc2626';
+            } else if (line.type === 'empty') {
+              bgColor = 'rgba(128,128,128,0.1)';
+            }
+            return (
+              <div key={idx} style={{ ...lineStyle, backgroundColor: bgColor, color: textColor }}>
+                {line.content || '\u00A0'}
+              </div>
+            );
+          })}
+        </pre>
+      </div>
+      {/* Right panel - Modified */}
+      <div style={{ flex: 1, backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', padding: '0.5rem', border: '1px solid var(--border)', overflow: 'auto' }}>
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginBottom: '0.25rem', fontWeight: 500 }}>Modified</div>
+        <pre style={{ margin: 0 }}>
+          {rightLines.map((line, idx) => {
+            let bgColor = 'transparent';
+            let textColor = 'inherit';
+            if (line.type === 'added') {
+              bgColor = 'rgba(16,185,129,0.2)';
+              textColor = '#059669';
+            } else if (line.type === 'empty') {
+              bgColor = 'rgba(128,128,128,0.1)';
+            }
+            return (
+              <div key={idx} style={{ ...lineStyle, backgroundColor: bgColor, color: textColor }}>
+                {line.content || '\u00A0'}
+              </div>
+            );
+          })}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+const DIFF_VIEW_MODE_KEY = 'claude-pilot-diff-view-mode';
+
+/**
+ * Edit diff view component with toggle between unified and side-by-side views
+ */
+function EditDiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
+  const [viewMode, setViewMode] = useState<'unified' | 'sideBySide'>(() => {
+    const saved = localStorage.getItem(DIFF_VIEW_MODE_KEY);
+    return saved === 'sideBySide' ? 'sideBySide' : 'unified';
+  });
+
+  const handleViewModeChange = (mode: 'unified' | 'sideBySide') => {
+    setViewMode(mode);
+    localStorage.setItem(DIFF_VIEW_MODE_KEY, mode);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
+        <button
+          onClick={() => handleViewModeChange('unified')}
+          style={{
+            padding: '0.125rem 0.5rem',
+            border: '1px solid var(--border)',
+            borderRadius: '3px',
+            backgroundColor: viewMode === 'unified' ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: viewMode === 'unified' ? '#ffffff' : 'var(--text-secondary)',
+            fontSize: '0.65rem',
+            cursor: 'pointer',
+          }}
+        >
+          Unified
+        </button>
+        <button
+          onClick={() => handleViewModeChange('sideBySide')}
+          style={{
+            padding: '0.125rem 0.5rem',
+            border: '1px solid var(--border)',
+            borderRadius: '3px',
+            backgroundColor: viewMode === 'sideBySide' ? 'var(--accent)' : 'var(--bg-secondary)',
+            color: viewMode === 'sideBySide' ? '#ffffff' : 'var(--text-secondary)',
+            fontSize: '0.65rem',
+            cursor: 'pointer',
+          }}
+        >
+          Side by Side
+        </button>
+      </div>
+      {viewMode === 'unified' ? (
+        renderDiffLines(computeDiff(oldStr, newStr))
+      ) : (
+        <SideBySideDiffView oldStr={oldStr} newStr={newStr} />
+      )}
+    </div>
+  );
+}
+
 interface ToolCallItemProps {
   item: MessageListItem;
   onApprove?: (toolCallId: string) => void;
   onReject?: (toolCallId: string, reason?: string) => void;
+}
+
+/**
+ * Check if MCP tool response indicates an error
+ * MCP tools may return error info in the output text rather than response.error
+ */
+function isMcpToolError(response: ToolResponse | undefined): boolean {
+  if (!response) return false;
+  if (response.error) return true;
+
+  // Check output content for error markers
+  if (response.output) {
+    try {
+      const parsed = JSON.parse(response.output);
+      if (Array.isArray(parsed)) {
+        const text = parsed
+          .filter((item: { type?: string }) => item.type === 'text')
+          .map((item: { text?: string }) => item.text || '')
+          .join('\n');
+        // Check for Python/TypeScript execution failure markers
+        if (text.includes('[Python Execution Failed]') ||
+            text.includes('[TypeScript Execution Failed]') ||
+            text.includes('**Status**: Failed')) {
+          return true;
+        }
+      }
+    } catch {
+      // Not JSON, check raw output
+      if (response.output.includes('[Python Execution Failed]') ||
+          response.output.includes('[TypeScript Execution Failed]') ||
+          response.output.includes('**Status**: Failed')) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -427,7 +679,158 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
       if (!response) return null;
 
       let displayOutput = '';
-      const isError = !!response.error;
+      const isError = isMcpToolError(response);
+
+      if (response.error) {
+        displayOutput = response.error;
+      } else if (response.output) {
+        // MCP tool returns JSON array like [{"type":"text","text":"..."}]
+        try {
+          const parsed = JSON.parse(response.output);
+          if (Array.isArray(parsed)) {
+            // Extract text from MCP content array
+            displayOutput = parsed
+              .filter((item: { type?: string }) => item.type === 'text')
+              .map((item: { text?: string }) => item.text || '')
+              .join('\n');
+          } else if (typeof parsed === 'object' && parsed !== null) {
+            // Handle other object formats
+            if (parsed.text) {
+              displayOutput = parsed.text;
+            } else if (parsed.stdout !== undefined) {
+              displayOutput = parsed.stdout || '(no output)';
+            } else {
+              displayOutput = JSON.stringify(parsed, null, 2);
+            }
+          } else {
+            displayOutput = response.output;
+          }
+        } catch {
+          // Not JSON, use as-is
+          displayOutput = response.output;
+        }
+      }
+
+      if (!displayOutput) {
+        displayOutput = '(no output)';
+      }
+
+      return (
+        <div
+          style={{
+            marginLeft: '1.5rem',
+            marginBottom: '0.5rem',
+            marginTop: '0.5rem',
+            padding: '0.5rem 0.75rem',
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: '4px',
+            border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
+            fontSize: '0.75rem',
+            maxHeight: '300px',
+            overflow: 'auto',
+          }}
+        >
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: isError ? '#ef4444' : 'var(--text-primary)', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
+            {displayOutput}
+          </pre>
+        </div>
+      );
+    },
+  },
+  typescript: {
+    icon: '🔷',
+    getInlineText: (args) => {
+      const parts: string[] = [];
+
+      if (args.code) {
+        // Show first line of code as preview
+        const firstLine = args.code.split('\n')[0].trim();
+        const codePreview = firstLine.length > 40 ? `${firstLine.substring(0, 40)}...` : firstLine;
+        parts.push(codePreview);
+      }
+
+      return parts.join(' • ');
+    },
+    hasDetails: (args, response) => !!args.code || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasCode = !!args.code;
+      const hasResponse = !!response;
+
+      if (!hasCode && !hasResponse) return null;
+
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasCode && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetails(!showDetails);
+              }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide Code' : 'Show Code'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowResult(!showResult);
+              }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide Result' : 'Show Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      // When showResult is false, show code; when showResult is true, show result
+      if (!showResult) {
+        // Show code block
+        if (!args.code) return null;
+        return (
+          <div
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#3178c6', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
+              {args.code}
+            </pre>
+          </div>
+        );
+      }
+
+      // Show result
+      if (!response) return null;
+
+      let displayOutput = '';
+      const isError = isMcpToolError(response);
 
       if (response.error) {
         displayOutput = response.error;
@@ -623,6 +1026,41 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
 
       // Show result if requested
       if (showResult && response) {
+        // Parse MCP tool output format
+        let displayOutput = '';
+        const isError = isMcpToolError(response);
+
+        if (response.error) {
+          displayOutput = response.error;
+        } else if (response.output) {
+          // MCP tool returns JSON array like [{"type":"text","text":"..."}]
+          try {
+            const parsed = JSON.parse(response.output);
+            if (Array.isArray(parsed)) {
+              // Extract text from MCP content array
+              displayOutput = parsed
+                .filter((item: { type?: string }) => item.type === 'text')
+                .map((item: { text?: string }) => item.text || '')
+                .join('\n');
+            } else if (typeof parsed === 'object' && parsed !== null) {
+              if (parsed.text) {
+                displayOutput = parsed.text;
+              } else {
+                displayOutput = JSON.stringify(parsed, null, 2);
+              }
+            } else {
+              displayOutput = response.output;
+            }
+          } catch {
+            // Not JSON, use as-is
+            displayOutput = response.output;
+          }
+        }
+
+        if (!displayOutput) {
+          displayOutput = '(no output)';
+        }
+
         elements.push(
           <div
             key="result"
@@ -630,28 +1068,224 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
               marginLeft: '1.5rem',
               marginBottom: '0.5rem',
               marginTop: '0.5rem',
-              padding: '0.75rem',
+              padding: '0.75rem 1rem',
               backgroundColor: 'var(--bg-tertiary)',
               borderRadius: '4px',
-              border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+              border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
               fontSize: '0.75rem',
               maxHeight: '300px',
               overflow: 'auto',
             }}
           >
-            {response.error ? (
+            {isError ? (
               <div style={{ color: '#ef4444' }}>
-                <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>❌ Error:</div>
+                <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Error:</div>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {response.error}
+                  {displayOutput}
                 </pre>
               </div>
             ) : (
               <div style={{ color: 'var(--text-primary)' }}>
-                <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#10b981' }}>✅ Result:</div>
+                <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+                  {displayOutput}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return elements.length > 0 ? <>{elements}</> : null;
+    },
+  },
+  convert: {
+    icon: '🔄',
+    getInlineText: (args) => {
+      const op = args.operation || '';
+      const file = args.file || '';
+      const fileName = file.split(/[/\\]/).pop() || file;
+      const to = args.to || '';
+      const from = args.from || '';
+
+      if (op === 'list-formats') {
+        return '📋 List supported formats';
+      }
+
+      if (op === 'convert') {
+        if (from && to) {
+          return `${fileName} (${from} → ${to})`;
+        }
+        if (to) {
+          return `${fileName} → ${to}`;
+        }
+        return fileName;
+      }
+
+      return op || fileName || '';
+    },
+    hasDetails: (args, response) => !!args.operation || !!response,
+    renderButton: (args, showDetails, setShowDetails, response, showResult, setShowResult) => {
+      const hasArgs = !!args.operation && args.operation !== 'list-formats';
+      const hasResponse = !!response;
+
+      if (!hasArgs && !hasResponse) return null;
+
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {hasArgs && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetails(!showDetails);
+              }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showDetails ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showDetails ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showDetails ? 'Hide Details' : 'Show Details'}
+            </button>
+          )}
+          {hasResponse && setShowResult && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowResult(!showResult);
+              }}
+              style={{
+                padding: '0.125rem 0.5rem',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: showResult ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+              }}
+            >
+              {showResult ? 'Hide Result' : 'Show Result'}
+            </button>
+          )}
+        </div>
+      );
+    },
+    renderContent: (args, showResult, response) => {
+      const elements: ReactNode[] = [];
+
+      // Show args details for convert operation
+      if (args.operation === 'convert') {
+        const detailItems: Array<{ label: string; value: string; icon: string }> = [];
+
+        if (args.file) {
+          detailItems.push({ label: 'Input', value: args.file, icon: '📁' });
+        }
+        if (args.output) {
+          detailItems.push({ label: 'Output', value: args.output, icon: '💾' });
+        }
+        if (args.from) {
+          detailItems.push({ label: 'From', value: args.from, icon: '📥' });
+        }
+        if (args.to) {
+          detailItems.push({ label: 'To', value: args.to, icon: '📤' });
+        }
+        if (args.toc) {
+          detailItems.push({ label: 'TOC', value: 'Yes', icon: '📑' });
+        }
+        if (args.standalone === false) {
+          detailItems.push({ label: 'Standalone', value: 'No', icon: '📄' });
+        }
+
+        if (detailItems.length > 0) {
+          elements.push(
+            <div
+              key="details"
+              style={{
+                marginLeft: '1.5rem',
+                marginBottom: '0.5rem',
+                marginTop: '0.5rem',
+                padding: '0.5rem 0.75rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '4px',
+                border: '1px solid var(--border)',
+                fontSize: '0.75rem',
+              }}
+            >
+              {detailItems.map((item, idx) => (
+                <div key={idx} style={{ marginBottom: idx < detailItems.length - 1 ? '0.25rem' : 0 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{item.icon} {item.label}: </span>
+                  <span style={{ color: 'var(--text-primary)' }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+      }
+
+      // Show result if requested
+      if (showResult && response) {
+        let displayOutput = '';
+        const isError = isMcpToolError(response);
+
+        if (response.error) {
+          displayOutput = response.error;
+        } else if (response.output) {
+          try {
+            const parsed = JSON.parse(response.output);
+            if (Array.isArray(parsed)) {
+              displayOutput = parsed
+                .filter((item: { type?: string }) => item.type === 'text')
+                .map((item: { text?: string }) => item.text || '')
+                .join('\n');
+            } else if (typeof parsed === 'object' && parsed !== null) {
+              if (parsed.text) {
+                displayOutput = parsed.text;
+              } else {
+                displayOutput = JSON.stringify(parsed, null, 2);
+              }
+            } else {
+              displayOutput = response.output;
+            }
+          } catch {
+            displayOutput = response.output;
+          }
+        }
+
+        if (!displayOutput) {
+          displayOutput = '(no output)';
+        }
+
+        elements.push(
+          <div
+            key="result"
+            style={{
+              marginLeft: '1.5rem',
+              marginBottom: '0.5rem',
+              marginTop: '0.5rem',
+              padding: '0.75rem 1rem',
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: '4px',
+              border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
+              fontSize: '0.75rem',
+              maxHeight: '300px',
+              overflow: 'auto',
+            }}
+          >
+            {isError ? (
+              <div style={{ color: '#ef4444' }}>
+                <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Error:</div>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {response.output}
+                  {displayOutput}
                 </pre>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-primary)' }}>
+                <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+                  {displayOutput}
+                </ReactMarkdown>
               </div>
             )}
           </div>
@@ -1192,7 +1826,7 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
             </div>
             {(args.old_string !== undefined || args.new_string !== undefined) && (
               <div>
-                {renderDiffLines(computeDiff(args.old_string || '', args.new_string || ''))}
+                <EditDiffView oldStr={args.old_string || ''} newStr={args.new_string || ''} />
               </div>
             )}
           </div>
@@ -1370,7 +2004,7 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
         let hasStderr = false;
         let stderrContent = '';
         let wasInterrupted = false;
-        const isError = !!response.error;
+        const isError = isMcpToolError(response);
 
         if (!response.error && response.output) {
           try {
@@ -2335,6 +2969,9 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
  */
 const TOOL_ALIASES: Record<string, string> = {
   'mcp__python__run': 'python',
+  'mcp__pdf__process': 'pdf',
+  'mcp__convert__convert': 'convert',
+  'mcp__typescript__execute': 'typescript',
 };
 
 /**
@@ -2492,20 +3129,23 @@ export function ToolCallItem({
                 REJECTED
               </span>
             )}
-            {response && (
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: '600',
-                  color: response.error ? '#ef4444' : '#10b981',
-                  padding: '0.125rem 0.375rem',
-                  backgroundColor: response.error ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                  borderRadius: '3px',
-                }}
-              >
-                {response.error ? 'FAIL' : 'SUCCESS'}
-              </span>
-            )}
+            {response && ((): React.ReactNode => {
+              const isError = isMcpToolError(response);
+              return (
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: '600',
+                    color: isError ? '#ef4444' : '#10b981',
+                    padding: '0.125rem 0.375rem',
+                    backgroundColor: isError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                    borderRadius: '3px',
+                  }}
+                >
+                  {isError ? 'FAIL' : 'SUCCESS'}
+                </span>
+              );
+            })()}
             {/* Tool-specific action buttons */}
             {hasDetails && toolConfig.renderButton(toolCall.args, showDetails, setShowDetails, response, showResult, setShowResult)}
           </div>
@@ -2775,7 +3415,7 @@ export function ToolCallItem({
           {showResult && response && ((): React.ReactNode => {
             // Parse MCP tool output format: [{"type":"text","text":"..."}]
             let displayOutput = '';
-            const isError = !!response.error;
+            const isError = isMcpToolError(response);
 
             if (response.error) {
               displayOutput = response.error;
@@ -2884,46 +3524,28 @@ export function ToolCallItem({
         hasDetails && (showDetails || showResult) && toolConfig.renderContent(toolCall.args, showResult, response)
       )}
 
-      {/* Approval buttons (if needed) - inline */}
+      {/* Approval buttons (if needed) - with animated text */}
       {needsApproval && !response && (onApprove || onReject) && (
         <div
-          style={{
-            marginBottom: '0.5rem',
-            marginLeft: '1.5rem',
-            display: 'flex',
-            gap: '0.5rem',
-          }}
+          className="tool-approval-container"
+          style={{ marginBottom: '0.5rem', marginLeft: '1.5rem' }}
         >
+          <ApprovalWaitingIcon />
+          <AnimatedApprovalText text={t.status.waitingForApproval} />
           {onReject && (
             <button
+              className="tool-approval-btn-reject"
               onClick={() => onReject(toolCall.id)}
-              style={{
-                padding: '0.25rem 0.75rem',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                backgroundColor: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-              }}
             >
-              Reject
+              {t.common.buttons.reject}
             </button>
           )}
           {onApprove && (
             <button
+              className="tool-approval-btn-approve"
               onClick={() => onApprove(toolCall.id)}
-              style={{
-                padding: '0.25rem 0.75rem',
-                border: '1px solid #10b981',
-                borderRadius: '4px',
-                backgroundColor: '#10b981',
-                color: '#ffffff',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-              }}
             >
-              Approve
+              {t.common.buttons.approve}
             </button>
           )}
         </div>
