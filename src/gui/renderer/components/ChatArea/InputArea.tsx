@@ -177,6 +177,13 @@ export function InputArea({
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
   const [showSettingSourcesMenu, setShowSettingSourcesMenu] = useState(false);
   const [showSlashCommandMenu, setShowSlashCommandMenu] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Max heights for normal and expanded modes
+  const maxHeightNormal = 200;
+  const maxHeightExpanded = 500;
+  const currentMaxHeight = isExpanded ? maxHeightExpanded : maxHeightNormal;
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const permissionMenuRef = useRef<HTMLDivElement>(null);
@@ -278,7 +285,7 @@ export function InputArea({
       // Auto-expand textarea to fit content
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
-        const newHeight = Math.min(textareaRef.current.scrollHeight, 200);
+        const newHeight = Math.min(textareaRef.current.scrollHeight, currentMaxHeight);
         textareaRef.current.style.height = `${newHeight}px`;
       }
       // Notify parent that template was applied
@@ -286,7 +293,7 @@ export function InputArea({
         onTemplateApplied();
       }
     }
-  }, [templateContent, onTemplateApplied]);
+  }, [templateContent, onTemplateApplied, currentMaxHeight]);
 
   const handleSend = () => {
     // Only trim for empty check, preserve original message content including newlines
@@ -346,9 +353,29 @@ export function InputArea({
     // Auto-expand textarea
     const textarea = e.target;
     textarea.style.height = 'auto';
-    const newHeight = Math.min(textarea.scrollHeight, 200);
+    const newHeight = Math.min(textarea.scrollHeight, currentMaxHeight);
     textarea.style.height = `${newHeight}px`;
   };
+
+  // Toggle expanded mode
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
+  // Recalculate textarea height when expanded state changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
+
+      if (isExpanded) {
+        // Expanding: set to expanded minHeight, content will auto-expand from there
+        textarea.style.height = '200px';
+      } else {
+        // Collapsing: force reset to collapsed minHeight
+        textarea.style.height = '60px';
+      }
+    }
+  }, [isExpanded]);
 
   // Format actions
   const insertFormatting = (before: string, after: string = before) => {
@@ -513,7 +540,7 @@ export function InputArea({
 
       // Auto-expand textarea
       textarea.style.height = 'auto';
-      const newHeight = Math.min(textarea.scrollHeight, 200);
+      const newHeight = Math.min(textarea.scrollHeight, currentMaxHeight);
       textarea.style.height = `${newHeight}px`;
     }, 0);
   };
@@ -543,16 +570,6 @@ export function InputArea({
         <div className="toolbar-left">
           <button
             className="toolbar-btn"
-            onClick={() => setShowWorkspaceBrowser(true)}
-            title="Browse Workspace Files"
-            disabled={disabled || !sessionId}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-          </button>
-          <button
-            className="toolbar-btn"
             onClick={() => insertFormatting('**')}
             title="Bold"
             disabled={disabled}
@@ -574,6 +591,21 @@ export function InputArea({
             disabled={disabled}
           >
             {'</>'}
+          </button>
+          {/* Separator */}
+          <span style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-color, #dee2e6)', margin: '0 4px' }}></span>
+          {/* Insert file path button - @ symbol indicates "mention/reference" */}
+          <button
+            className="toolbar-btn"
+            onClick={() => setShowWorkspaceBrowser(true)}
+            title="Insert File Path (@)"
+            disabled={disabled || !sessionId}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* @ symbol - commonly used for mentions/references */}
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+            </svg>
           </button>
         </div>
         <button
@@ -611,10 +643,12 @@ export function InputArea({
             onPaste={handlePaste}
             placeholder={placeholder}
             disabled={disabled}
-            rows={3}
+            rows={isExpanded ? 10 : 3}
             style={{
-              minHeight: '60px',
+              minHeight: isExpanded ? '200px' : '60px',
+              maxHeight: `${currentMaxHeight}px`,
               resize: 'none',
+              transition: 'min-height 0.2s ease',
             }}
           />
         </div>
@@ -963,8 +997,33 @@ export function InputArea({
             )}
           </div>
 
-          {/* Right side - Upload and Send buttons */}
+          {/* Right side - Expand, Upload and Send buttons */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="toolbar-btn"
+              onClick={toggleExpanded}
+              title={isExpanded ? 'Collapse input' : 'Expand input'}
+              disabled={disabled}
+              style={{
+                color: isExpanded ? 'var(--primary, #6366f1)' : undefined,
+              }}
+            >
+              {isExpanded ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 14 10 14 10 20"></polyline>
+                  <polyline points="20 10 14 10 14 4"></polyline>
+                  <line x1="14" y1="10" x2="21" y2="3"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <polyline points="9 21 3 21 3 15"></polyline>
+                  <line x1="21" y1="3" x2="14" y2="10"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+              )}
+            </button>
             <button
               className="toolbar-btn"
               onClick={() => fileInputRef.current?.click()}
