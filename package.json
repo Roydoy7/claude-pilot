@@ -13,8 +13,9 @@
     "preview": "vite preview",
     "electron:dev": "vite",
     "electron:build": "vite build && electron-builder",
-    "postinstall": "patch-package && node scripts/setup-python-env.js && node scripts/beautify-cli.js",
+    "postinstall": "patch-package && node scripts/setup-python-env.js && node scripts/setup-pandoc.js && node scripts/beautify-cli.js",
     "setup:python": "node scripts/setup-python-env.js",
+    "setup:pandoc": "node scripts/setup-pandoc.js",
     "beautify:cli": "node scripts/beautify-cli.js",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -32,6 +33,7 @@
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
     "markitdown-ts": "^0.0.7",
+    "officegen": "^0.6.5",
     "open": "^10.2.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
@@ -59,6 +61,7 @@
     "electron": "^37.7.6",
     "electron-builder": "^26.0.12",
     "patch-package": "^8.0.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
     "vite-plugin-electron": "^0.29.0",
@@ -83,8 +86,22 @@
     ],
     "extraResources": [
       {
-        "from": "packages/python-3.13.9-embed-amd64",
-        "to": "python-3.13.9-embed-amd64",
+        "from": "packages/python-3.13.11-embed-amd64",
+        "to": "python-3.13.11-embed-amd64",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "packages/pandoc-3.8.3",
+        "to": "pandoc-3.8.3",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "packages/wkhtmltopdf-0.12.6-1",
+        "to": "wkhtmltopdf-0.12.6-1",
         "filter": [
           "**/*"
         ]
