@@ -28,6 +28,9 @@ import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/type
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Generic invoke for extensibility
+  invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
+
   // Utility
   ping: () => ipcRenderer.invoke('ping'),
 

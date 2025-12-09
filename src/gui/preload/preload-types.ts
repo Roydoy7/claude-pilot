@@ -267,6 +267,9 @@ export interface TemplateUpdateRequest {
  * Electron API exposed to renderer process
  */
 export interface ElectronAPI {
+  // Generic invoke for extensibility (skills, etc.)
+  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+
   // Service initialization
   service: {
     initialize: (request?: ServiceInitRequest) => Promise<ServiceInitResponse>;

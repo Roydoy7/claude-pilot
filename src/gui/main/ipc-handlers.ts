@@ -14,6 +14,7 @@ import { modelListManager } from '../../core/providers/model-list-manager.js';
 import { templateManager } from '../../core/templates/template-manager.js';
 import { authManager } from '../../core/auth/auth-manager.js';
 import type { OAuthLoginOptions } from '../../core/auth/auth-manager.js';
+import { getSkillManager } from '../../core/skills/skill-manager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -626,5 +627,84 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    */
   ipcMain.handle('ping', async () => {
     return 'pong';
+  });
+
+  /**
+   * Skills Management
+   * Note: Skills are installed to {cwd}/.claude/skills/{skill-name}/
+   * Claude Agent SDK automatically discovers and loads these skills
+   */
+
+  /**
+   * Get skills data for a session (marketplaces, installed skills, enabled state)
+   */
+  ipcMain.handle('skills:getData', async (_event, sessionId: string) => {
+    const skillManager = getSkillManager();
+    await skillManager.initialize();
+
+    // Get cwd from session to find installed skills
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.loadSession(sessionId);
+    const cwd = session?.cwd;
+
+    return {
+      marketplaces: skillManager.getMarketplaces(),
+      installedSkills: cwd ? await skillManager.getInstalledSkills(cwd) : [],
+      enabled: skillManager.isGlobalEnabled(),
+    };
+  });
+
+  /**
+   * Fetch available skills from a marketplace
+   */
+  ipcMain.handle('skills:fetchMarketplace', async (_event, marketplaceId: string, sessionId: string) => {
+    const skillManager = getSkillManager();
+
+    // Get cwd from session to check which skills are installed
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.loadSession(sessionId);
+    const cwd = session?.cwd;
+
+    return await skillManager.fetchMarketplaceSkills(marketplaceId, cwd);
+  });
+
+  /**
+   * Install a skill from a marketplace to session's cwd
+   */
+  ipcMain.handle('skills:install', async (_event, marketplaceId: string, skillPath: string, sessionId: string) => {
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.loadSession(sessionId);
+
+    if (!session?.cwd) {
+      throw new Error('Session not found or has no working directory');
+    }
+
+    const skillManager = getSkillManager();
+    return await skillManager.installSkill(marketplaceId, skillPath, session.cwd);
+  });
+
+  /**
+   * Uninstall a skill from session's cwd
+   */
+  ipcMain.handle('skills:uninstall', async (_event, skillName: string, sessionId: string) => {
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.loadSession(sessionId);
+
+    if (!session?.cwd) {
+      throw new Error('Session not found or has no working directory');
+    }
+
+    const skillManager = getSkillManager();
+    await skillManager.uninstallSkill(session.cwd, skillName);
+    return { success: true };
+  });
+
+  /**
+   * Set global skills enabled/disabled
+   */
+  ipcMain.handle('skills:setGlobalEnabled', async (_event, enabled: boolean) => {
+    const skillManager = getSkillManager();
+    await skillManager.setGlobalEnabled(enabled);
+    return { success: true };
   });
 }
