@@ -8,19 +8,21 @@ import { useState, useEffect } from 'react';
 import { SessionsTab } from './SessionsTab';
 import { WorkspaceTab } from './WorkspaceTab';
 import { PromptsTab } from './PromptsTab';
+import { SkillsTab } from './SkillsTab';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { Session } from '../../../../core/sessions/session-manager';
 
-type TabType = 'sessions' | 'workspace' | 'prompts';
+type TabType = 'sessions' | 'workspace' | 'prompts' | 'skills';
 
 interface RightPanelProps {
   sessionId?: string;
   onClose?: () => void;
   onSessionSelect?: (session: Session) => void;
   onApplyTemplate?: (content: string) => void;
+  width?: number;
 }
 
-export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplate }: RightPanelProps) {
+export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplate, width }: RightPanelProps) {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>('sessions');
 
@@ -35,7 +37,7 @@ export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplat
   }, []);
 
   return (
-    <div className="right-panel">
+    <div className="right-panel" style={width ? { width: `${width}px` } : undefined}>
       {/* Tab Bar */}
       <div className="tab-bar">
         <button
@@ -72,6 +74,15 @@ export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplat
           <span>{t.rightPanel.prompts}</span>
         </button>
         <button
+          className="tab-button"
+          data-active={activeTab === 'skills'}
+          onClick={() => setActiveTab('skills')}
+          title={t.rightPanel.skills}
+        >
+          <span>🧩</span>
+          <span>{t.rightPanel.skills}</span>
+        </button>
+        <button
           className="tab-button close-button"
           onClick={onClose}
           title={t.rightPanel.closePanel}
@@ -90,6 +101,9 @@ export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplat
         </div>
         <div style={{ display: activeTab === 'prompts' ? 'block' : 'none' }}>
           <PromptsTab onApplyTemplate={onApplyTemplate || (() => {})} />
+        </div>
+        <div style={{ display: activeTab === 'skills' ? 'block' : 'none' }}>
+          <SkillsTab sessionId={sessionId ?? null} />
         </div>
       </div>
     </div>

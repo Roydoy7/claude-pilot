@@ -4,7 +4,7 @@
  * Main React application component
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { Header } from './components/Header';
@@ -14,11 +14,22 @@ import { RoleType } from '../../core/roles/role-enum.js';
 import { ClaudeModel } from '../../core/providers/model-list-manager.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 
+const PANEL_WIDTH_KEY = 'rightPanelWidth';
+const DEFAULT_PANEL_WIDTH = 380;
+const MIN_PANEL_WIDTH = 280;
+const MAX_PANEL_WIDTH = 800;
+
 function App() {
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPanelVisible, setIsPanelVisible] = useState(true);
   const [templateContent, setTemplateContent] = useState<string | undefined>(undefined);
+  const [panelWidth, setPanelWidth] = useState(() => {
+    const saved = localStorage.getItem(PANEL_WIDTH_KEY);
+    return saved ? parseInt(saved, 10) : DEFAULT_PANEL_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Initialize service and load sessions
   useEffect(() => {
@@ -60,6 +71,41 @@ function App() {
   const handleTemplateApplied = () => {
     setTemplateContent(undefined);
   };
+
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeRef.current = { startX: e.clientX, startWidth: panelWidth };
+  }, [panelWidth]);
+
+  // Handle resize move
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      // Calculate new width (dragging left increases width, right decreases)
+      const delta = resizeRef.current.startX - e.clientX;
+      const newWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, resizeRef.current.startWidth + delta));
+      setPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      // Save to localStorage
+      localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.toString());
+      resizeRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, panelWidth]);
 
   if (isLoading) {
     return (
@@ -103,12 +149,20 @@ function App() {
               onTemplateApplied={handleTemplateApplied}
             />
             {isPanelVisible && (
-              <RightPanel
-                sessionId={currentSession?.id}
-                onClose={togglePanel}
-                onSessionSelect={handleSessionSelect}
-                onApplyTemplate={handleApplyTemplate}
-              />
+              <>
+                {/* Resizer handle */}
+                <div
+                  className={`panel-resizer ${isResizing ? 'resizing' : ''}`}
+                  onMouseDown={handleResizeStart}
+                />
+                <RightPanel
+                  sessionId={currentSession?.id}
+                  onClose={togglePanel}
+                  onSessionSelect={handleSessionSelect}
+                  onApplyTemplate={handleApplyTemplate}
+                  width={panelWidth}
+                />
+              </>
             )}
           </div>
         </div>

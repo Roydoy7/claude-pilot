@@ -84,6 +84,27 @@
   font-size: 0.8125rem;
 }
 
+.session-cwd {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-family: monospace;
+  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+}
+
+.session-cwd:hover {
+  color: var(--primary, #6366f1);
+}
+
+.session-label {
+  color: var(--text-tertiary);
+  font-weight: 400;
+  font-size: 0.75rem;
+  margin-right: 4px;
+}
+
 .header-controls {
   display: flex;
   align-items: center;
@@ -645,16 +666,28 @@
   color: var(--text-secondary);
 }
 
+.message-timestamp {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-family: inherit;
+  padding: 0.125rem 0.25rem;
+  background-color: var(--bg-secondary);
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .message-user .message-footer {
   justify-content: flex-end;
 }
 
 .message-usage {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   font-size: 0.7rem;
   color: var(--text-tertiary);
-  font-family: monospace;
+  font-family: inherit;
 }
 
 .message-usage span {
@@ -781,17 +814,57 @@
 }
 
 /* ========================================
+   Panel Resizer
+   ======================================== */
+
+.panel-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 100%;
+  background-color: var(--border);
+  transition: background-color 0.15s ease, width 0.15s ease;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer.resizing::after {
+  width: 4px;
+  background-color: var(--primary, #6366f1);
+}
+
+.panel-resizer.resizing {
+  cursor: col-resize;
+}
+
+/* Prevent text selection while resizing */
+body.resizing-panel {
+  user-select: none;
+  cursor: col-resize !important;
+}
+
+/* ========================================
    Right Panel (Tabs)
    ======================================== */
 
 .right-panel {
   width: 380px;
   background-color: var(--bg-secondary);
-  border-left: 1px solid var(--border);
+  border-left: none;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: width 0.2s ease;
 }
 
 .right-panel[data-collapsed='true'] {
@@ -1577,5 +1650,91 @@
 .workspace-browser-btn.secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ========================================
+   Tool Approval Animation
+   ======================================== */
+
+/* Character bounce animation - same as AI thinking */
+@keyframes approvalCharBounce {
+  0% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  40% {
+    transform: translateY(-8px);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  55% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  70% {
+    transform: translateY(2px);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  85% {
+    transform: translateY(-1px);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.tool-approval-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-waiting-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.tool-approval-text {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  display: inline-flex;
+}
+
+.tool-approval-text .char {
+  display: inline-block;
+}
+
+.tool-approval-text .char.bounce {
+  animation: approvalCharBounce 0.5s linear;
+}
+
+.tool-approval-btn-approve {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid #10b981;
+  border-radius: 3px;
+  background-color: #10b981;
+  color: #ffffff;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.tool-approval-btn-approve:hover {
+  background-color: #059669;
+}
+
+.tool-approval-btn-reject {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid #ef4444;
+  border-radius: 3px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.tool-approval-btn-reject:hover {
+  background-color: #dc2626;
 }
 

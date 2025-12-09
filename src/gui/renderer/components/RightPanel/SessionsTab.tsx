@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '../../../../core/sessions/session-manager';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { getRoleDisplayName, RoleType } from '../../../../core/roles/role-enum.js';
 
 interface SessionsTabProps {
   currentSessionId?: string;
@@ -289,7 +290,7 @@ export function SessionsTab({ currentSessionId, onSessionSelect }: SessionsTabPr
                 </button>
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                {session.role} · Claude · {session.modelName}
+                {getRoleDisplayName(session.role as RoleType)} · {session.modelName}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
                 {formatDate(session.createdAt)}
