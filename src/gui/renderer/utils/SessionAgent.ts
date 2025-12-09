@@ -584,10 +584,10 @@ export class SessionAgent {
             thinkingContent = thinkingBlocks.map(b => b.thinking || '').join('\n');
           }
 
-          // Filter to only text blocks for display content
-          const textBlocks = blocks.filter(block => block.type === 'text');
-          if (textBlocks.length > 0) {
-            displayContent = textBlocks as MessageContent;
+          // Filter to text and image blocks for display content (exclude thinking blocks)
+          const displayBlocks = blocks.filter(block => block.type === 'text' || block.type === 'image');
+          if (displayBlocks.length > 0) {
+            displayContent = displayBlocks as MessageContent;
           } else {
             displayContent = [];
           }
@@ -624,11 +624,12 @@ export class SessionAgent {
           const trimmed = displayContent.trim();
           isEmpty = trimmed === '[]' || trimmed === '{}' || trimmed === '';
         } else if (Array.isArray(displayContent)) {
-          // Check if array has any text content
-          const hasTextContent = displayContent.some(
-            (block: { type: string; text?: string }) => block.type === 'text' && block.text?.trim()
+          // Check if array has any text or image content
+          const hasContent = displayContent.some(
+            (block: { type: string; text?: string }) =>
+              (block.type === 'text' && block.text?.trim()) || block.type === 'image'
           );
-          isEmpty = !hasTextContent;
+          isEmpty = !hasContent;
         }
 
         // Create message item only if content is not empty (skip empty assistant messages)

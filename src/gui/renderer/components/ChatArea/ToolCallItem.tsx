@@ -387,7 +387,7 @@ interface ToolConfig {
     showResult?: boolean,
     setShowResult?: (show: boolean) => void
   ) => ReactNode;
-  renderContent: (args: Record<string, any>, showResult?: boolean, response?: ToolResponse) => ReactNode;
+  renderContent: (args: Record<string, any>, showResult?: boolean, response?: ToolResponse, showDetails?: boolean) => ReactNode;
 }
 
 /**
@@ -1967,59 +1967,40 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
 
   Bash: {
     icon: '⚡',
-    getInlineText: (args) => {
+    getInlineText: () => '',  // No inline text, show everything in details
+    hasDetails: () => true,   // Always has details
+    defaultExpanded: true,    // Always expanded by default
+    renderButton: () => null, // No buttons needed
+    renderContent: (args, _showResult, response) => {
       const cmd = args.command || '';
-      return `$ ${cmd}`;
-    },
-    hasDetails: (_args, response) => !!response,
-    renderButton: (_args, _showDetails, _setShowDetails, response, showResult, setShowResult) => {
-      const hasResponse = !!response;
-      if (!hasResponse) return null;
-      return (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {hasResponse && setShowResult && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowResult(!showResult); }}
-              style={{
-                padding: '0.125rem 0.5rem',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                backgroundColor: showResult ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: showResult ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-              }}
-            >
-              {showResult ? 'Hide' : 'Output'}
-            </button>
-          )}
-        </div>
-      );
-    },
-    renderContent: (_args, showResult, response) => {
-      const elements: ReactNode[] = [];
-      if (showResult && response) {
-        // Parse SDK Bash result: { stdout, stderr, interrupted, isImage }
-        let displayOutput = response.error || response.output;
-        let hasStderr = false;
-        let stderrContent = '';
-        let wasInterrupted = false;
-        const isError = isMcpToolError(response);
+      // Format command: split at && for better readability
+      const formattedCmd = cmd
+        .replace(/ && /g, ' \\\n  && ')
+        .replace(/ \|\| /g, ' \\\n  || ')
+        .replace(/ \| /g, ' \\\n  | ');
+
+      // Parse response
+      let displayOutput = '';
+      let hasStderr = false;
+      let stderrContent = '';
+      let wasInterrupted = false;
+      let isError = false;
+
+      if (response) {
+        displayOutput = response.error || response.output || '';
+        isError = isMcpToolError(response);
 
         if (!response.error && response.output) {
           try {
             const parsed = JSON.parse(response.output);
             if (typeof parsed === 'object' && parsed !== null) {
-              // Extract stdout
               if (parsed.stdout !== undefined) {
-                displayOutput = parsed.stdout || '(no output)';
+                displayOutput = parsed.stdout || '';
               }
-              // Extract stderr
               if (parsed.stderr && parsed.stderr.trim()) {
                 hasStderr = true;
                 stderrContent = parsed.stderr;
               }
-              // Check if interrupted
               if (parsed.interrupted) {
                 wasInterrupted = true;
               }
@@ -2028,43 +2009,53 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
             // Not JSON, use as-is
           }
         }
-
-        elements.push(
-          <div
-            key="result"
-            style={{
-              marginLeft: '1.5rem',
-              marginBottom: '0.5rem',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              border: isError ? '1px solid #ef4444' : wasInterrupted ? '1px solid #f59e0b' : '1px solid var(--border)',
-              fontSize: '0.75rem',
-              maxHeight: '300px',
-              overflow: 'auto',
-            }}
-          >
-            {wasInterrupted && (
-              <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.5rem' }}>
-                ⚠️ Command was interrupted
-              </div>
-            )}
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: isError ? '#ef4444' : 'var(--text-primary)', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4' }}>
-              {displayOutput}
-            </pre>
-            {hasStderr && (
-              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
-                <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>stderr:</div>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f59e0b', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.4', opacity: 0.8 }}>
-                  {stderrContent}
-                </pre>
-              </div>
-            )}
-          </div>
-        );
       }
-      return elements.length > 0 ? <>{elements}</> : null;
+
+      return (
+        <div
+          style={{
+            marginLeft: '1.5rem',
+            marginTop: '0.5rem',
+            padding: '0.5rem 0.75rem',
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: '4px',
+            border: isError ? '1px solid #ef4444' : wasInterrupted ? '1px solid #f59e0b' : '1px solid var(--border)',
+            maxHeight: '400px',
+            overflow: 'auto',
+          }}
+        >
+          {/* Command */}
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-primary)', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.5' }}>
+            <span style={{ color: '#10b981' }}>$</span> {formattedCmd}
+          </pre>
+
+          {/* Output */}
+          {(displayOutput || wasInterrupted) && (
+            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
+              {wasInterrupted && (
+                <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>
+                  ⚠️ Command was interrupted
+                </div>
+              )}
+              {displayOutput && (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: isError ? '#ef4444' : 'var(--text-secondary)', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.5' }}>
+                  {displayOutput}
+                </pre>
+              )}
+            </div>
+          )}
+
+          {/* Stderr */}
+          {hasStderr && (
+            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
+              <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>stderr:</div>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f59e0b', fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace", fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.8 }}>
+                {stderrContent}
+              </pre>
+            </div>
+          )}
+        </div>
+      );
     },
   },
 
@@ -3081,7 +3072,7 @@ export function ToolCallItem({
 
       {/* Tool call content */}
       <div className="chat-item-content">
-        {/* Tool call - first line: icon, name, inline text */}
+        {/* Tool call - first line: icon, name, inline text, and status for Bash */}
         <div
           style={{
             display: 'flex',
@@ -3101,10 +3092,42 @@ export function ToolCallItem({
               {inlineText}
             </span>
           )}
+          {/* Bash status on the same line */}
+          {canonicalToolName === 'Bash' && response && ((): React.ReactNode => {
+            const isError = isMcpToolError(response);
+            return (
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: '600',
+                  color: isError ? '#ef4444' : '#10b981',
+                  padding: '0.125rem 0.375rem',
+                  backgroundColor: isError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '3px',
+                }}
+              >
+                {isError ? 'FAIL' : 'SUCCESS'}
+              </span>
+            );
+          })()}
+          {canonicalToolName === 'Bash' && wasRejected && !response && (
+            <span
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: '600',
+                color: '#f59e0b',
+                padding: '0.125rem 0.375rem',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                borderRadius: '3px',
+              }}
+            >
+              REJECTED
+            </span>
+          )}
         </div>
 
-        {/* Second line: status + action buttons */}
-        {(response || wasRejected || hasDetails) && (
+        {/* Second line: status + action buttons (skip for Bash - status shown after content) */}
+        {canonicalToolName !== 'Bash' && (response || wasRejected || hasDetails) && (
           <div
             style={{
               display: 'flex',
@@ -3516,12 +3539,12 @@ export function ToolCallItem({
       ) : (toolCall.name === 'pdf' || toolCall.name === 'markitdown' || toolCall.name === 'python') ? (
         // Specialized rendering for pdf, markitdown, and python tools - separate details and result
         <>
-          {showDetails && toolConfig.renderContent(toolCall.args, false, undefined)}
-          {showResult && response && toolConfig.renderContent(toolCall.args, true, response)}
+          {showDetails && toolConfig.renderContent(toolCall.args, false, undefined, showDetails)}
+          {showResult && response && toolConfig.renderContent(toolCall.args, true, response, showDetails)}
         </>
       ) : (
         // Default rendering for other tools
-        hasDetails && (showDetails || showResult) && toolConfig.renderContent(toolCall.args, showResult, response)
+        hasDetails && (showDetails || showResult) && toolConfig.renderContent(toolCall.args, showResult, response, showDetails)
       )}
 
       {/* Approval buttons (if needed) - with animated text */}
