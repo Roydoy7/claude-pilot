@@ -25,6 +25,9 @@ pywin32>=311  # Required by xlwings for Windows COM interface
 # Document conversion (PDF, Word, PowerPoint, Excel to Markdown)
 markitdown[pdf,docx,pptx,xlsx]>=0.1.3
 
+# PDF to DOCX conversion
+pdf2docx>=0.5.8
+
 # Add more packages as needed
 # matplotlib>=3.7.0
 # pillow>=10.0.0

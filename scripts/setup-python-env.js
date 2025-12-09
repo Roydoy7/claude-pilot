@@ -1,12 +1,16 @@
 /**
  * Setup Python environment script
- * Automatically installs Python packages from python-requirements.txt
+ * Downloads Python embedded version and installs packages from python-requirements.txt
  * Runs during npm install (postinstall hook)
  */
 
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const fs = require('fs');
+const https = require('https');
 const path = require('path');
+const { promisify } = require('util');
+
+const execAsync = promisify(exec);
 
 // ANSI color codes
 const colors = {
@@ -22,20 +26,21 @@ function log(message, color = colors.reset) {
   console.log(`${color}${message}${colors.reset}`);
 }
 
+// Configuration
+const PYTHON_VERSION = '3.13.11';
+const PYTHON_URL = `https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`;
+const PACKAGES_DIR = path.join(__dirname, '..', 'packages');
+const PYTHON_DIR = path.join(PACKAGES_DIR, `python-${PYTHON_VERSION}-embed-amd64`);
+const PYTHON_EXE = path.join(PYTHON_DIR, 'python.exe');
+const TEMP_ZIP = path.join(PACKAGES_DIR, 'python-temp.zip');
+const GET_PIP_URL = 'https://bootstrap.pypa.io/get-pip.py';
+const GET_PIP_PATH = path.join(PACKAGES_DIR, 'get-pip.py');
+
 function getPythonPath() {
-  const pythonDir = path.join(
-    __dirname,
-    '..',
-    'packages',
-    'python-3.13.9-embed-amd64'
-  );
-
-  const pythonExe = path.join(pythonDir, 'python.exe');
-
   return {
-    pythonDir,
-    pythonExe,
-    exists: fs.existsSync(pythonExe),
+    pythonDir: PYTHON_DIR,
+    pythonExe: PYTHON_EXE,
+    exists: fs.existsSync(PYTHON_EXE),
   };
 }
 
@@ -43,13 +48,152 @@ function getRequirementsPath() {
   return path.join(__dirname, '..', 'python-requirements.txt');
 }
 
+/**
+ * Download file from URL
+ */
+function downloadFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    log(`   Downloading from: ${url}`, colors.cyan);
+
+    const file = fs.createWriteStream(destPath);
+    let downloadedBytes = 0;
+    let totalBytes = 0;
+
+    const request = (currentUrl) => {
+      const protocol = currentUrl.startsWith('https') ? https : require('http');
+
+      protocol
+        .get(currentUrl, (response) => {
+          // Handle redirects
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            log(`   Following redirect...`, colors.cyan);
+            request(response.headers.location);
+            return;
+          }
+
+          if (response.statusCode !== 200) {
+            reject(new Error(`Failed to download: HTTP ${response.statusCode}`));
+            return;
+          }
+
+          totalBytes = parseInt(response.headers['content-length'], 10) || 0;
+
+          response.pipe(file);
+
+          response.on('data', (chunk) => {
+            downloadedBytes += chunk.length;
+            if (totalBytes > 0) {
+              const percent = ((downloadedBytes / totalBytes) * 100).toFixed(1);
+              const mb = (downloadedBytes / (1024 * 1024)).toFixed(1);
+              process.stdout.write(`\r   Downloaded: ${mb} MB (${percent}%)   `);
+            }
+          });
+
+          file.on('finish', () => {
+            file.close();
+            console.log(''); // New line after progress
+            resolve();
+          });
+        })
+        .on('error', (err) => {
+          fs.unlink(destPath, () => {}); // Delete partial file
+          reject(err);
+        });
+    };
+
+    request(url);
+  });
+}
+
+/**
+ * Extract ZIP file using PowerShell (Windows built-in)
+ */
+async function extractZip(zipPath, destDir) {
+  log(`   Extracting to: ${destDir}`, colors.cyan);
+
+  // Ensure destination directory exists
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+
+  // Use PowerShell to extract (available on all Windows versions)
+  const psCommand = `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`;
+
+  try {
+    await execAsync(`powershell -Command "${psCommand}"`);
+    log('   Extraction complete', colors.green);
+  } catch (error) {
+    throw new Error(`Failed to extract ZIP: ${error.message}`);
+  }
+}
+
+/**
+ * Download and setup Python
+ */
+async function downloadPython() {
+  log('\n📥 Downloading Python...', colors.blue);
+
+  // Ensure packages directory exists
+  if (!fs.existsSync(PACKAGES_DIR)) {
+    fs.mkdirSync(PACKAGES_DIR, { recursive: true });
+  }
+
+  try {
+    // Download Python ZIP
+    await downloadFile(PYTHON_URL, TEMP_ZIP);
+    log('✅ Python download complete', colors.green);
+
+    // Extract ZIP
+    log('\n📦 Extracting Python...', colors.blue);
+    await extractZip(TEMP_ZIP, PYTHON_DIR);
+
+    // Verify installation
+    if (fs.existsSync(PYTHON_EXE)) {
+      log('✅ Python extracted successfully!', colors.green);
+      log(`   Location: ${PYTHON_EXE}`, colors.cyan);
+      return true;
+    } else {
+      throw new Error('python.exe not found after extraction');
+    }
+  } catch (error) {
+    log(`\n❌ Failed to download Python: ${error.message}`, colors.red);
+    log('   You can manually download from:', colors.yellow);
+    log(`   ${PYTHON_URL}`, colors.yellow);
+    return false;
+  } finally {
+    // Clean up temp ZIP
+    if (fs.existsSync(TEMP_ZIP)) {
+      fs.unlinkSync(TEMP_ZIP);
+    }
+  }
+}
+
+/**
+ * Download get-pip.py if not exists
+ */
+async function downloadGetPip() {
+  if (fs.existsSync(GET_PIP_PATH)) {
+    log('✅ get-pip.py already exists', colors.green);
+    return true;
+  }
+
+  log('\n📥 Downloading get-pip.py...', colors.blue);
+
+  try {
+    await downloadFile(GET_PIP_URL, GET_PIP_PATH);
+    log('✅ get-pip.py downloaded', colors.green);
+    return true;
+  } catch (error) {
+    log(`❌ Failed to download get-pip.py: ${error.message}`, colors.red);
+    return false;
+  }
+}
+
 async function checkPythonAvailable() {
   const { pythonExe, exists } = getPythonPath();
 
   if (!exists) {
-    log('❌ Embedded Python not found!', colors.red);
-    log(`Expected location: ${pythonExe}`, colors.yellow);
-    log('Please download Python embedded version first.', colors.yellow);
+    log('⚠️  Embedded Python not found, will download...', colors.yellow);
     return false;
   }
 
@@ -59,29 +203,28 @@ async function checkPythonAvailable() {
 
 async function installPip() {
   const { pythonExe, pythonDir } = getPythonPath();
-  const getPipPath = path.join(__dirname, '..', 'packages', 'get-pip.py');
 
-  if (!fs.existsSync(getPipPath)) {
-    log('❌ get-pip.py not found!', colors.red);
-    log(`   Expected location: ${getPipPath}`, colors.yellow);
+  // Download get-pip.py if needed
+  const getPipAvailable = await downloadGetPip();
+  if (!getPipAvailable) {
     return false;
   }
 
   log('\n📦 Installing pip...', colors.blue);
-  log(`   Using: ${getPipPath}`, colors.cyan);
+  log(`   Using: ${GET_PIP_PATH}`, colors.cyan);
 
   return new Promise((resolve) => {
-    const process = spawn(pythonExe, [getPipPath]);
+    const proc = spawn(pythonExe, [GET_PIP_PATH]);
 
-    process.stdout.on('data', (data) => {
+    proc.stdout.on('data', (data) => {
       process.stdout.write(data);
     });
 
-    process.stderr.on('data', (data) => {
+    proc.stderr.on('data', (data) => {
       process.stderr.write(data);
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         log('✅ pip installed successfully', colors.green);
         resolve(true);
@@ -92,7 +235,7 @@ async function installPip() {
       }
     });
 
-    process.on('error', (error) => {
+    proc.on('error', (error) => {
       log('❌ Error installing pip', colors.red);
       log(`   ${error.message}`, colors.yellow);
       resolve(false);
@@ -104,19 +247,19 @@ async function checkPipAvailable() {
   const { pythonExe } = getPythonPath();
 
   return new Promise((resolve) => {
-    const process = spawn(pythonExe, ['-m', 'pip', '--version']);
+    const proc = spawn(pythonExe, ['-m', 'pip', '--version']);
 
     let output = '';
 
-    process.stdout.on('data', (data) => {
+    proc.stdout.on('data', (data) => {
       output += data.toString();
     });
 
-    process.stderr.on('data', (data) => {
+    proc.stderr.on('data', (data) => {
       output += data.toString();
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         log('✅ pip is available', colors.green);
         log(`   ${output.trim()}`, colors.cyan);
@@ -127,7 +270,7 @@ async function checkPipAvailable() {
       }
     });
 
-    process.on('error', () => {
+    proc.on('error', () => {
       resolve(false);
     });
   });
@@ -158,12 +301,12 @@ async function installPywin32() {
 
     log(`   Command: python ${args.join(' ')}`, colors.cyan);
 
-    const process = spawn(pythonExe, args, {
+    const proc = spawn(pythonExe, args, {
       cwd: pythonDir,
       stdio: 'inherit',
     });
 
-    process.on('close', async (code) => {
+    proc.on('close', async (code) => {
       if (code === 0) {
         log('✅ pywin32 installed successfully', colors.green);
         log('   pywin32 is ready for xlwings use', colors.cyan);
@@ -179,7 +322,7 @@ async function installPywin32() {
       }
     });
 
-    process.on('error', (error) => {
+    proc.on('error', (error) => {
       log('❌ Error installing pywin32', colors.red);
       log(`   ${error.message}`, colors.yellow);
       resolve(false);
@@ -224,12 +367,12 @@ async function installRequirements() {
 
     log(`   Command: python ${args.join(' ')}`, colors.cyan);
 
-    const process = spawn(pythonExe, args, {
+    const proc = spawn(pythonExe, args, {
       cwd: pythonDir,
       stdio: 'inherit', // Show pip output in real-time
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         log('\n✅ Python packages installed successfully', colors.green);
         resolve(true);
@@ -240,7 +383,7 @@ async function installRequirements() {
       }
     });
 
-    process.on('error', (error) => {
+    proc.on('error', (error) => {
       log('\n❌ Error installing Python packages', colors.red);
       log(`   ${error.message}`, colors.yellow);
       resolve(false);
@@ -252,17 +395,17 @@ async function listInstalledPackages() {
   const { pythonExe, pythonDir } = getPythonPath();
 
   return new Promise((resolve) => {
-    const process = spawn(pythonExe, ['-m', 'pip', 'list', '--format=json'], {
+    const proc = spawn(pythonExe, ['-m', 'pip', 'list', '--format=json'], {
       cwd: pythonDir,
     });
 
     let output = '';
 
-    process.stdout.on('data', (data) => {
+    proc.stdout.on('data', (data) => {
       output += data.toString();
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         try {
           const packages = JSON.parse(output);
@@ -279,7 +422,7 @@ async function listInstalledPackages() {
       }
     });
 
-    process.on('error', () => {
+    proc.on('error', () => {
       resolve(false);
     });
   });
@@ -295,28 +438,33 @@ async function ensureSitePackagesInPath() {
   }
 
   try {
-    let content = fs.readFileSync(pthFile, 'utf8');
+    const content = fs.readFileSync(pthFile, 'utf8');
 
-    // Check if site-packages is already in the path
-    if (content.includes('site-packages')) {
-      log('✅ site-packages already configured in python313._pth', colors.green);
-      return true;
+    // Check if site module is enabled and Lib/site-packages is configured
+    // Enabling 'import site' is crucial for:
+    // 1. pip to work correctly
+    // 2. .pth files to be processed (e.g., pywin32.pth adds win32 paths)
+    const hasSiteImport = content.includes('import site') && !content.match(/^#\s*import site/m);
+    const hasSitePackages = content.includes('Lib/site-packages') || content.includes('Lib\\site-packages');
+
+    if (!hasSiteImport || !hasSitePackages) {
+      // Rewrite with correct configuration
+      const newContent = [
+        'python313.zip',
+        '.',
+        'Lib/site-packages',
+        '',
+        '# Enable site module for pip and pywin32 to work',
+        'import site',
+        '',
+      ].join('\n');
+      fs.writeFileSync(pthFile, newContent, 'utf8');
+      log('✅ Configured python313._pth with site module enabled', colors.green);
+      log('   This allows pip and pywin32 to work correctly', colors.cyan);
+    } else {
+      log('✅ python313._pth already configured correctly', colors.green);
     }
 
-    // Add site-packages to the path
-    const lines = content.split('\n');
-    const newLines = [];
-
-    for (const line of lines) {
-      newLines.push(line);
-      // Add site-packages after the current directory (.)
-      if (line.trim() === '.') {
-        newLines.push('site-packages');
-      }
-    }
-
-    fs.writeFileSync(pthFile, newLines.join('\n'), 'utf8');
-    log('✅ Added site-packages to python313._pth', colors.green);
     return true;
   } catch (error) {
     log('❌ Failed to modify python313._pth', colors.red);
@@ -329,19 +477,19 @@ async function main() {
   log('\n🐍 Setting up Python environment...', colors.blue);
   log('='.repeat(50), colors.blue);
 
-  // Check if Python exists
-  const pythonAvailable = await checkPythonAvailable();
+  // Check if Python exists, download if not
+  let pythonAvailable = await checkPythonAvailable();
   if (!pythonAvailable) {
-    log('\n⚠️  Skipping Python setup (Python not found)', colors.yellow);
-    log(
-      '   This is normal if you haven\'t set up Python yet.',
-      colors.yellow
-    );
-    log(
-      '   The application will still work without Python tools.',
-      colors.yellow
-    );
-    return;
+    const downloaded = await downloadPython();
+    if (!downloaded) {
+      log('\n⚠️  Skipping Python setup (download failed)', colors.yellow);
+      log(
+        '   The application will still work without Python tools.',
+        colors.yellow
+      );
+      return;
+    }
+    pythonAvailable = true;
   }
 
   // Ensure site-packages is in Python path

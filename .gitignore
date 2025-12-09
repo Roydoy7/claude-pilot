@@ -34,18 +34,14 @@ yarn-error.log*
 # Keep only: embedded runtime (.pyd, .dll, .exe, .zip) and get-pip.py
 # All packages are installed to site-packages/ directory
 
-# Ignore site-packages (all installed packages)
-packages/python-3.13.9-embed-amd64/site-packages/
-
-# Ignore pip-created directories
-packages/python-3.13.9-embed-amd64/Scripts/
-packages/python-3.13.9-embed-amd64/Lib/
-packages/python-3.13.9-embed-amd64/bin/
-
-# Python cache
-packages/python-3.13.9-embed-amd64/__pycache__/
-packages/python-3.13.9-embed-amd64/**/__pycache__/
-packages/python-3.13.9-embed-amd64/**/*.pyc
+# Ignore python
+packages/python-3.13.11-embed-amd64/
+# Ignore pandoc
+packages/pandoc-3.8.3/
+# Ignore 7za
+packages/7za/
+# Ignore wkhtmltopdf
+packages/wkhtmltopdf-0.12.6-1/
 
 # User data and runtime files (should not be committed)
 # Session data with SQLite checkpoints
@@ -72,3 +68,4 @@ coverage/
 *.tmp
 *.temp
 .cache/
+.ts-exec-temp/
