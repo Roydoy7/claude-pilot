@@ -15,6 +15,8 @@
 import { RoleType } from './role-enum.js';
 import { pythonMcpServer } from '../tools/python-mcp-server.js';
 import { pdfMcpServer } from '../tools/pdf-mcp-server.js';
+import { convertMcpServer } from '../tools/convert-mcp-server.js';
+import { typescriptMcpServer } from '../tools/typescript-mcp-server.js';
 
 /**
  * All available Claude SDK built-in tools
@@ -127,6 +129,8 @@ export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
   [RoleType.OFFICE_ASSISTANT]: {
     python: pythonMcpServer,
     pdf: pdfMcpServer,
+    convert: convertMcpServer,
+    typescript: typescriptMcpServer,
   },
 
   [RoleType.CLAUDE_CODE]: {},
