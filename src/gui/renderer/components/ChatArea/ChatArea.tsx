@@ -23,31 +23,16 @@ function getContextWindowSize(modelName: string): number {
 }
 
 /**
- * Get max output tokens based on model name
- * Based on SDK's zB0() function logic
+ * Calculate input tokens from usage (for context usage calculation)
+ * This represents how much of the context window is being used for input
+ * Formula: input_tokens + cache_creation_input_tokens + cache_read_input_tokens
+ * Note: output_tokens are NOT included because they don't consume the context window
  */
-function getMaxOutputTokens(modelName: string): number {
-  const model = modelName.toLowerCase();
-  if (model.includes('3-5')) return 8192;
-  if (model.includes('claude-3-opus')) return 4096;
-  if (model.includes('claude-3-sonnet')) return 8192;
-  if (model.includes('claude-3-haiku')) return 4096;
-  if (model.includes('opus-4-5')) return 64000;
-  if (model.includes('opus-4')) return 32000;
-  if (model.includes('sonnet-4') || model.includes('haiku-4')) return 64000;
-  return 32000;
-}
-
-/**
- * Calculate total tokens from usage
- * Matches SDK's YRA() function: input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens
- */
-function calculateTotalTokens(usage: UsageMetadata): number {
+function calculateInputTokens(usage: UsageMetadata): number {
   return (
     usage.input_tokens +
     (usage.cache_creation_input_tokens ?? 0) +
-    (usage.cache_read_input_tokens ?? 0) +
-    usage.output_tokens
+    (usage.cache_read_input_tokens ?? 0)
   );
 }
 
@@ -69,7 +54,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [settingSources, setSettingSources] = useState<SettingSource[]>(['user', 'project', 'local']);
-  const [slashCommands, setSlashCommands] = useState<string[]>(['/compact']);
+  const [slashCommands, setSlashCommands] = useState<string[]>(['/compact','/init']);
 
   // Session configuration state (for new sessions)
   const [sessionConfig, setSessionConfig] = useState<{
@@ -360,14 +345,14 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
       if (item.type === 'message' && item.role === 'assistant' && item.usage) {
         const modelName = sessionConfig.modelName;
         const contextWindowSize = getContextWindowSize(modelName);
-        const maxOutputTokens = getMaxOutputTokens(modelName);
-        const availableInputTokens = contextWindowSize - maxOutputTokens;
-        const usedTokens = calculateTotalTokens(item.usage);
-        const percentUsed = Math.min(100, Math.round((usedTokens / availableInputTokens) * 100));
+        // Calculate input tokens used (excluding output tokens)
+        // This represents actual context window consumption
+        const usedInputTokens = calculateInputTokens(item.usage);
+        const percentUsed = Math.min(100, Math.round((usedInputTokens / contextWindowSize) * 100));
 
         return {
-          usedTokens,
-          totalTokens: availableInputTokens,
+          usedTokens: usedInputTokens,
+          totalTokens: contextWindowSize,
           percentUsed,
         };
       }
