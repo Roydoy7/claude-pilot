@@ -69,3 +69,10 @@ coverage/
 *.temp
 .cache/
 .ts-exec-temp/
+
+# Dotnet Debug files
+autocad-plugin/obj/
+autocad-plugin/bin/
+
+# Visual Studio files
+.vs/

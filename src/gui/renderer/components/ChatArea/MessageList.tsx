@@ -7,7 +7,7 @@
 
 import type React from 'react';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import { Message } from './Message';
 import { ToolCallItem } from './ToolCallItem';
 import { StatusItem } from './StatusItem';
@@ -101,7 +101,7 @@ export function MessageList({
     estimateSize: () => DEFAULT_ITEM_HEIGHT,
     overscan: 5,
     // Use item ID as key for stable measurements
-    getItemKey: (index) => filteredItems[index]?.id ?? index,
+    getItemKey: (index: number) => filteredItems[index]?.id ?? index,
   });
 
   // Check if user is at bottom
@@ -212,7 +212,7 @@ export function MessageList({
         }}
       >
         {/* Render only visible items */}
-        {virtualItems.map((virtualItem) => {
+        {virtualItems.map((virtualItem: VirtualItem) => {
           const item = filteredItems[virtualItem.index];
           return (
             <div

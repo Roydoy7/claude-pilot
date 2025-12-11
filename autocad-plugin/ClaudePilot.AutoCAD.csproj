@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net47</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputType>Library</OutputType>
+    <AssemblyName>ClaudePilot.AutoCAD</AssemblyName>
+    <RootNamespace>ClaudePilot.AutoCAD</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Framework references -->
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- NuGet packages -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="AutoCAD.NET" Version="24.0.0" />
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <!-- Roslyn for dynamic C# script execution -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <!-- Display load instructions after build -->
+    <Message Text="Build completed. Load the plugin in AutoCAD with: NETLOAD $(TargetPath)" Importance="high" />
+  </Target>
+
+</Project>

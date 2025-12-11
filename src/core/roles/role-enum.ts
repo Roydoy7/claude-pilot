@@ -8,6 +8,9 @@ export enum RoleType {
   // Office productivity
   OFFICE_ASSISTANT = 'office-assistant',
 
+  //AutoCAD design assistant
+  AUTOCAD_ASSISTANT = 'autocad-assistant',
+
   // Claude code
   CLAUDE_CODE = 'claude-code',
 }
@@ -17,6 +20,7 @@ export enum RoleType {
  */
 export const ROLE_DISPLAY_NAMES: Record<RoleType, string> = {
   [RoleType.OFFICE_ASSISTANT]: 'Office Assistant',
+  [RoleType.AUTOCAD_ASSISTANT]: 'AutoCAD Assistant',
   [RoleType.CLAUDE_CODE]: 'Claude Code',
 };
 

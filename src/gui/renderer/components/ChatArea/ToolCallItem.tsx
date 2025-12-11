@@ -12,6 +12,13 @@ import rehypeHighlight from 'rehype-highlight';
 import type { ReactNode } from 'react';
 import type { MessageListItem, ToolResponse, ToolProgressEntry } from '../../../preload/preload-types';
 import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  AutoCADIcon,
+  getAutocadInlineText,
+  hasAutocadDetails,
+  renderAutocadButton,
+  renderAutocadContent,
+} from './AutoCADToolDisplay';
 
 /**
  * Approval waiting icon - clock indicating waiting for user action
@@ -2953,6 +2960,18 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
       return elements.length > 0 ? <>{elements}</> : null;
     },
   },
+  autocad: {
+    icon: AutoCADIcon,
+    getInlineText: getAutocadInlineText,
+    hasDetails: hasAutocadDetails,
+    defaultExpanded: false,
+    renderButton: renderAutocadButton,
+    renderContent: (args, showResult, response, showDetails) => {
+      // Map parameters: ToolConfig passes (args, showResult, response, showDetails)
+      // renderAutocadContent expects (args, showDetails, showResult, response)
+      return renderAutocadContent(args, showDetails ?? false, showResult ?? false, response);
+    },
+  },
 };
 
 /**
@@ -2963,6 +2982,7 @@ const TOOL_ALIASES: Record<string, string> = {
   'mcp__pdf__process': 'pdf',
   'mcp__convert__convert': 'convert',
   'mcp__typescript__execute': 'typescript',
+  'mcp__autocad__autocad': 'autocad',
 };
 
 /**
@@ -3542,6 +3562,9 @@ export function ToolCallItem({
           {showDetails && toolConfig.renderContent(toolCall.args, false, undefined, showDetails)}
           {showResult && response && toolConfig.renderContent(toolCall.args, true, response, showDetails)}
         </>
+      ) : (toolCall.name === 'mcp__autocad__autocad') ? (
+        // Specialized rendering for autocad - single call with both flags
+        toolConfig.renderContent(toolCall.args, showResult, response, showDetails)
       ) : (
         // Default rendering for other tools
         hasDetails && (showDetails || showResult) && toolConfig.renderContent(toolCall.args, showResult, response, showDetails)

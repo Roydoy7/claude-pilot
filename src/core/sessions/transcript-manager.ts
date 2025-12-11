@@ -117,8 +117,8 @@ function cwdToProjectName(cwd: string): string {
     normalized = normalized[0] + '-' + normalized.slice(2);
   }
 
-  // Replace all forward slashes with hyphens
-  return normalized.replace(/\//g, '-');
+  // Replace all forward slashes and dot with hyphens
+  return normalized.replace(/\//g, '-').replace(/\./g, '-').replace(/\_/g, '-');
 }
 
 /**

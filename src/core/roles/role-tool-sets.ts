@@ -17,6 +17,7 @@ import { pythonMcpServer } from '../tools/python-mcp-server.js';
 import { pdfMcpServer } from '../tools/pdf-mcp-server.js';
 import { convertMcpServer } from '../tools/convert-mcp-server.js';
 import { typescriptMcpServer } from '../tools/typescript-mcp-server.js';
+import { autocadMcpServer } from '../tools/autocad-mcp-server.js';
 
 /**
  * All available Claude SDK built-in tools
@@ -71,6 +72,10 @@ export const ROLE_AVAILABLE_TOOLS: Record<RoleType, readonly string[]> = {
     ...ALL_SDK_TOOLS,
   ],
 
+   [RoleType.AUTOCAD_ASSISTANT]: [
+    ...ALL_SDK_TOOLS,
+  ],
+
   [RoleType.CLAUDE_CODE]: [
     ...ALL_SDK_TOOLS,
   ],
@@ -82,6 +87,12 @@ export const ROLE_AVAILABLE_TOOLS: Record<RoleType, readonly string[]> = {
  */
 export const ROLE_AUTO_APPROVED_TOOLS: Record<RoleType, readonly string[]> = {
   [RoleType.OFFICE_ASSISTANT]: [
+    ...SAFE_READ_TOOLS,
+    ...SAFE_WEB_TOOLS,
+    ...SKILL,
+  ],
+
+  [RoleType.AUTOCAD_ASSISTANT]: [
     ...SAFE_READ_TOOLS,
     ...SAFE_WEB_TOOLS,
     ...SKILL,
@@ -131,6 +142,11 @@ export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
     pdf: pdfMcpServer,
     convert: convertMcpServer,
     typescript: typescriptMcpServer,
+  },
+
+  [RoleType.AUTOCAD_ASSISTANT]: {
+    python: pythonMcpServer,
+    autocad: autocadMcpServer,
   },
 
   [RoleType.CLAUDE_CODE]: {},
