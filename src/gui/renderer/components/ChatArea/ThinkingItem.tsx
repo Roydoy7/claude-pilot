@@ -59,7 +59,13 @@ export const ThinkingItem = memo(function ThinkingItem({ item }: ThinkingItemPro
     : firstLine;
 
   return (
-    <div className="message message-ai" style={{ marginTop: '-0.5rem', marginBottom: '-0.5rem' }}>
+    <div
+      className="message message-ai"
+      style={{
+        marginTop: expanded ? '0' : '-0.5rem',
+        marginBottom: expanded ? '0' : '-0.5rem',
+      }}
+    >
       {/* Avatar placeholder to match message layout */}
       <div className="message-avatar">
         <div style={{ width: '2rem', height: '2rem' }} />

@@ -691,7 +691,10 @@ export function createPythonMcpServer() {
         'Execute Python code using embedded Python 3.13 runtime. ' +
         'Write complete, standalone scripts with all necessary imports. ' +
         'Packages can be auto-installed via requirements parameter. ' +
-        'Default timeout is 5 minutes.',
+        'Default timeout is 5 minutes. ' +
+        'IMPORTANT: This runs on Windows. Do NOT use Unix paths like /tmp. ' +
+        'Use tempfile.gettempdir() or os.environ.get("TEMP") for temp files. ' +
+        'Use os.path.join() for cross-platform path handling.',
         pythonToolSchema,
         async (args) => {
           const { description, code, requirements, timeout } = args;
