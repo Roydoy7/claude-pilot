@@ -7,6 +7,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
+import { deployAutoCADPlugin } from '../../core/services/autocad-plugin-deployer';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -40,6 +41,18 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // Deploy AutoCAD plugin if source files are available
+  try {
+    const result = deployAutoCADPlugin();
+    if (result.success) {
+      console.log('[AutoCAD Plugin]', result.message);
+    } else {
+      console.warn('[AutoCAD Plugin]', result.message);
+    }
+  } catch (error) {
+    console.warn('[AutoCAD Plugin] Deployment check failed:', error);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

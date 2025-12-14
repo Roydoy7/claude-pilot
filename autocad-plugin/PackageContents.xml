@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage
+    SchemaVersion="1.0"
+    Name="ClaudePilot"
+    Description="Claude Pilot AutoCAD Integration - AI-powered CAD assistant"
+    AppVersion="1.0.0"
+    ProductCode="{E8F3A5B2-1C4D-4E6F-9A8B-7C2D3E4F5A6B}"
+    Author="Claude Pilot">
+
+  <CompanyDetails
+      Name="Claude Pilot"
+      Url="https://github.com/Roydoy7/claude-pilot"
+      Email="support@claudepilot.com" />
+
+  <RuntimeRequirements
+      OS="Win64"
+      Platform="AutoCAD"
+      SeriesMin="R24.0" />
+
+  <Components Description="Main components">
+    <!-- AutoCAD 2021-2025 (.NET Framework 4.7+) -->
+    <ComponentEntry
+        AppName="ClaudePilot"
+        ModuleName="./Contents/ClaudePilot.AutoCAD.dll"
+        AppDescription="Claude Pilot AutoCAD Integration"
+        AppType="Command"
+        LoadOnAutoCADStartup="True"
+        PerDocument="False" />
+  </Components>
+
+</ApplicationPackage>

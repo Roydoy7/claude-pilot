@@ -26,8 +26,27 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <!-- Display load instructions after build -->
-    <Message Text="Build completed. Load the plugin in AutoCAD with: NETLOAD $(TargetPath)" Importance="high" />
+    <!-- Define bundle target path -->
+    <PropertyGroup>
+      <BundlePath>$(APPDATA)\Autodesk\ApplicationPlugins\ClaudePilot.bundle</BundlePath>
+      <BundleContentsPath>$(BundlePath)\Contents</BundleContentsPath>
+    </PropertyGroup>
+
+    <!-- Create bundle directories -->
+    <MakeDir Directories="$(BundleContentsPath)" Condition="!Exists('$(BundleContentsPath)')" />
+
+    <!-- Copy PackageContents.xml to bundle root -->
+    <Copy SourceFiles="$(ProjectDir)PackageContents.xml" DestinationFolder="$(BundlePath)" SkipUnchangedFiles="true" />
+
+    <!-- Copy only necessary files (exclude AutoCAD SDK dlls which are provided by AutoCAD) -->
+    <ItemGroup>
+      <OutputFiles Include="$(TargetDir)**\*.*"
+        Exclude="$(TargetDir)Ac*.dll;$(TargetDir)Ad*.dll;$(TargetDir)acdbmgdbrep.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(BundleContentsPath)" SkipUnchangedFiles="true" />
+
+    <Message Text="AutoCAD plugin deployed to: $(BundlePath)" Importance="high" />
+    <Message Text="Restart AutoCAD to load the plugin automatically." Importance="high" />
   </Target>
 
 </Project>
