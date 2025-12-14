@@ -596,23 +596,28 @@ export class ClaudeAgent {
           case 'user': {
             const userMessage = chunk as SDKUserMessage;
 
-            // Check if this is a compact summary message (SDK includes this flag but not in type definition)
-            const isCompactSummary = (userMessage as SDKUserMessage & { isCompactSummary?: boolean }).isCompactSummary;
+            // Check if this is a compact summary message
+            // SDK may include isCompactSummary flag, or the content may start with the compact summary prefix
+            const COMPACT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
+            const messageContent = userMessage.message?.content;
+            const isCompactSummaryFlag = (userMessage as SDKUserMessage & { isCompactSummary?: boolean }).isCompactSummary;
+            const contentStartsWithSummary = typeof messageContent === 'string' && messageContent.startsWith(COMPACT_SUMMARY_PREFIX);
+            const isCompactSummary = isCompactSummaryFlag || contentStartsWithSummary;
+
             if (isCompactSummary) {
               // Extract summary text from message content
-              const summaryContent = userMessage.message?.content;
-              if (typeof summaryContent === 'string') {
+              if (typeof messageContent === 'string') {
                 // Yield the compact summary as an assistant message for display
                 yield {
                   type: 'message',
-                  content: summaryContent,
+                  content: messageContent,
                   timestamp: Date.now(),
                   isCompactSummary: true,
                 };
                 // Also store in conversation history
                 this.conversationHistory.push({
                   role: 'assistant',
-                  content: summaryContent,
+                  content: messageContent,
                   timestamp: Date.now(),
                   isCompactSummary: true,
                 });
@@ -622,7 +627,6 @@ export class ClaudeAgent {
 
             // Process tool_result blocks from message content
             // Each tool_result has its own tool_use_id, allowing parallel tool results
-            const messageContent = userMessage.message?.content;
             if (Array.isArray(messageContent)) {
               for (const block of messageContent) {
                 if (block.type === 'tool_result' && 'tool_use_id' in block) {
