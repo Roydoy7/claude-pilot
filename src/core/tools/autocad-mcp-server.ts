@@ -363,9 +363,11 @@ function createAutoCADMcpServer() {
    - Returns path to entities.jsonl for grep-based entity lookup
    - Index auto-syncs on each command
 
-6. **sync_index** - Force rebuild DWG index
+6. **sync_index** - Build/rebuild DWG index (supports external files)
+   - filePath: optional, can index ANY DWG file without opening it
    - forceRebuild: true to rebuild even if up-to-date
-   - Use when index seems stale or after external changes
+   - Indexes: entities, layers, blocks, text styles, dim styles, linetypes
+   - Use to index reference drawings for style/convention analysis
 
 **View Operations (returns view bounds: centerPoint, minPoint, maxPoint, width, height):**
 
@@ -505,7 +507,7 @@ attRef.TransformBy(Matrix3d.Displacement(moveVector));
 
           // Index parameters
           filePath: z.string().optional()
-            .describe('File path for get_index_path or sync_index (defaults to current document)'),
+            .describe('DWG file path for sync_index. Can be ANY DWG file - will read it without opening. Defaults to current document'),
           forceRebuild: z.boolean().optional()
             .describe('Force rebuild index even if up-to-date (for sync_index)'),
 

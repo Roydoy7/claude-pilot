@@ -12,20 +12,18 @@
       Url="https://github.com/Roydoy7/claude-pilot"
       Email="support@claudepilot.com" />
 
-  <RuntimeRequirements
-      OS="Win64"
-      Platform="AutoCAD"
-      SeriesMin="R24.0" />
-
   <Components Description="Main components">
-    <!-- AutoCAD 2021-2025 (.NET Framework 4.7+) -->
+    <RuntimeRequirements
+        OS="Win64"
+        Platform="AutoCAD"
+        SeriesMin="R24.1"
+        SeriesMax="R25.1" />
+
     <ComponentEntry
         AppName="ClaudePilot"
         ModuleName="./Contents/ClaudePilot.AutoCAD.dll"
         AppDescription="Claude Pilot AutoCAD Integration"
-        AppType="Command"
-        LoadOnAutoCADStartup="True"
-        PerDocument="False" />
+        LoadOnAutoCADStartup="True" />
   </Components>
 
 </ApplicationPackage>
