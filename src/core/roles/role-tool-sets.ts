@@ -69,6 +69,7 @@ const SKILL = ['Skill'] as const;
 export const ROLE_AVAILABLE_TOOLS: Record<RoleType, readonly string[]> = {
   [RoleType.OFFICE_ASSISTANT]: [
     ...ALL_SDK_TOOLS,
+    ...SKILL,
   ],
 
   [RoleType.CLAUDE_CODE]: [

@@ -46,6 +46,7 @@ export type ProgressCallback = (data: ProgressEntry) => void;
 interface TypeScriptExecutorConfig {
   workingDir?: string;
   timeout?: number;
+  packages?: string[];
   onProgress?: ProgressCallback;
 }
 
@@ -60,6 +61,130 @@ function getProjectRoot(): string {
   }
   // In development, use current working directory
   return process.cwd();
+}
+
+/**
+ * Check if an npm package is installed
+ */
+function isPackageInstalled(
+  projectRoot: string,
+  packageName: string
+): boolean {
+  // Handle scoped packages like @types/node
+  const packagePath = path.join(projectRoot, 'node_modules', packageName);
+  return fs.existsSync(packagePath);
+}
+
+/**
+ * Install npm packages using npm
+ */
+async function installPackages(
+  projectRoot: string,
+  packages: string[],
+  onProgress?: ProgressCallback
+): Promise<{ success: boolean; installedPackages: string[]; errors: string[] }> {
+  if (packages.length === 0) {
+    return { success: true, installedPackages: [], errors: [] };
+  }
+
+  // Check which packages need to be installed
+  const packagesToInstall: string[] = [];
+  for (const pkg of packages) {
+    if (!isPackageInstalled(projectRoot, pkg)) {
+      packagesToInstall.push(pkg);
+    } else {
+      onProgress?.({
+        type: 'stdout',
+        message: `Package ${pkg} already installed`,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  if (packagesToInstall.length === 0) {
+    return { success: true, installedPackages: [], errors: [] };
+  }
+
+  onProgress?.({
+    type: 'stdout',
+    message: `Installing packages: ${packagesToInstall.join(', ')}...`,
+    timestamp: Date.now(),
+  });
+
+  return new Promise((resolve) => {
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const args = ['install', '--save-dev', '--no-audit', '--no-fund', ...packagesToInstall];
+
+    const npmProcess = spawn(npmCommand, args, {
+      cwd: projectRoot,
+      env: process.env,
+      shell: process.platform === 'win32',
+      windowsHide: true,
+    });
+
+    let stderr = '';
+
+    npmProcess.stdout.on('data', (data) => {
+      const message = data.toString();
+      onProgress?.({
+        type: 'stdout',
+        message: message.trim(),
+        timestamp: Date.now(),
+      });
+    });
+
+    npmProcess.stderr.on('data', (data) => {
+      const message = data.toString();
+      stderr += message;
+      // npm often outputs warnings to stderr, show them as stdout
+      onProgress?.({
+        type: 'stdout',
+        message: message.trim(),
+        timestamp: Date.now(),
+      });
+    });
+
+    npmProcess.on('close', (code) => {
+      if (code === 0) {
+        onProgress?.({
+          type: 'stdout',
+          message: `Successfully installed ${packagesToInstall.join(', ')}`,
+          timestamp: Date.now(),
+        });
+        resolve({
+          success: true,
+          installedPackages: packagesToInstall,
+          errors: [],
+        });
+      } else {
+        const errorMsg = `Failed to install packages: ${stderr || 'Unknown error'}`;
+        onProgress?.({
+          type: 'error',
+          message: errorMsg,
+          timestamp: Date.now(),
+        });
+        resolve({
+          success: false,
+          installedPackages: [],
+          errors: [errorMsg],
+        });
+      }
+    });
+
+    npmProcess.on('error', (error) => {
+      const errorMsg = `npm error: ${error.message}`;
+      onProgress?.({
+        type: 'error',
+        message: errorMsg,
+        timestamp: Date.now(),
+      });
+      resolve({
+        success: false,
+        installedPackages: [],
+        errors: [errorMsg],
+      });
+    });
+  });
 }
 
 /**
@@ -100,7 +225,7 @@ async function executeTypeScriptCode(
 ): Promise<TypeScriptExecutionResult> {
   const startTime = Date.now();
   const progressHistory: ProgressEntry[] = [];
-  const { workingDir, timeout = 60000, onProgress } = config;
+  const { workingDir, timeout = 60000, packages = [], onProgress } = config;
 
   const addProgress = (entry: ProgressEntry) => {
     progressHistory.push(entry);
@@ -116,6 +241,25 @@ async function executeTypeScriptCode(
   // Get project root for node_modules access
   const projectRoot = getProjectRoot();
   const effectiveWorkingDir = workingDir || projectRoot;
+
+  // Install required packages if specified
+  if (packages.length > 0) {
+    addProgress({
+      type: 'stdout',
+      message: `Checking required packages: ${packages.join(', ')}`,
+      timestamp: Date.now(),
+    });
+
+    const installResult = await installPackages(projectRoot, packages, addProgress);
+    if (!installResult.success) {
+      return {
+        success: false,
+        error: `Failed to install required packages:\n${installResult.errors.join('\n')}`,
+        executionTime: Date.now() - startTime,
+        progressHistory,
+      };
+    }
+  }
 
   // Create temporary file in project root so it can access node_modules
   const tempDir = path.join(projectRoot, '.ts-exec-temp');
@@ -319,12 +463,13 @@ Features:
 - Full access to Node.js APIs
 - Support for ES modules and modern TypeScript features
 - Automatic type checking
+- Automatic npm package installation via packages parameter
 
 Usage:
 - Write TypeScript code that will be executed
 - Use console.log() for output
 - Import Node.js modules directly (e.g., import fs from 'fs')
-- Import npm packages if available in the project
+- Specify required npm packages in the packages parameter for auto-installation
 
 Example:
 \`\`\`typescript
@@ -342,18 +487,32 @@ const person: Person = { name: 'John', age: 30 };
 console.log(JSON.stringify(person, null, 2));
 \`\`\`
 
+Example with external package:
+\`\`\`typescript
+// Use packages: ["lodash", "@types/lodash"] for type support
+import _ from 'lodash';
+
+const numbers = [1, 2, 3, 4, 5];
+console.log('Sum:', _.sum(numbers));
+\`\`\`
+
 Notes:
 - Execution timeout is 60 seconds by default
 - Working directory defaults to the current project root
-- tsx must be available via npx`,
+- Packages are installed to the project's node_modules`,
         {
           code: z.string().describe('TypeScript code to execute'),
+          packages: z.array(z.string()).optional().describe(
+            'List of npm packages to install before execution (e.g., ["lodash", "@types/lodash", "axios"]). ' +
+            'Packages will be checked and installed if missing.'
+          ),
           workingDirectory: z.string().optional().describe('Working directory for code execution'),
           timeout: z.number().optional().describe('Execution timeout in milliseconds (default: 60000)'),
         },
-        async ({ code, workingDirectory, timeout }) => {
+        async ({ code, packages, workingDirectory, timeout }) => {
           const result = await executeTypeScriptCode(code, {
             workingDir: workingDirectory,
+            packages: packages || [],
             timeout: timeout ?? 60000,
           });
 
