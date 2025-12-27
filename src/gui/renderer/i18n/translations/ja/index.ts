@@ -79,6 +79,7 @@ export const jaTranslations: Translation = {
     aiThinking: 'AIが考え中...',
     executingTool: (toolName: string) => `${toolName}を実行中...`,
     waitingForApproval: 'ツールの承認待ち',
+    messageQueued: 'メッセージがキュー中...',
     commands: {
       compact: '会話を圧縮中...',
       clear: '会話をクリア中...',

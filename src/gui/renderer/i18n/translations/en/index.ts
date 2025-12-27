@@ -79,6 +79,7 @@ export const enTranslations: Translation = {
     aiThinking: 'AI is thinking...',
     executingTool: (toolName: string) => `Executing ${toolName}...`,
     waitingForApproval: 'Waiting for tool approval',
+    messageQueued: 'Message queued, waiting...',
     commands: {
       compact: 'Compacting conversation...',
       clear: 'Clearing conversation...',

@@ -207,6 +207,50 @@ function TerminalIcon() {
   );
 }
 
+/**
+ * SVG Queue Icon for queued messages
+ */
+function QueueIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="queue-icon"
+    >
+      {/* Three stacked horizontal lines representing queue */}
+      <path
+        d="M4 6H20"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4 12H20"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4 18H20"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      {/* Arrow pointing right on top line */}
+      <path
+        d="M16 3L20 6L16 9"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
   const { t } = useLanguage();
 
@@ -221,8 +265,9 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
   const hasThinking = state.thinking;
   const hasTool = state.tool !== undefined;
   const hasCommand = state.command !== undefined && state.command.status === 'running';
+  const hasQueued = state.queued === true;
 
-  if (!hasThinking && !hasTool && !hasCommand) {
+  if (!hasThinking && !hasTool && !hasCommand && !hasQueued) {
     return null; // Idle state - nothing to display
   }
 
@@ -247,7 +292,23 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
         color: 'var(--text-secondary)',
       }}
     >
-      {/* Command state indicator - shown first (highest priority) */}
+      {/* Queued state indicator - shown first (message is waiting in queue) */}
+      {hasQueued && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span className="status-icon-queue">
+            <QueueIcon />
+          </span>
+          <AnimatedText text={t.status.messageQueued || 'Message queued...'} />
+        </div>
+      )}
+
+      {/* Command state indicator - shown second (highest priority after queue) */}
       {hasCommand && state.command && (
         <div
           style={{
@@ -349,6 +410,14 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
           color: var(--accent-secondary, #10b981);
         }
 
+        .status-icon-queue {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          animation: queueSlide 1.2s ease-in-out infinite;
+          color: var(--text-tertiary);
+        }
+
         /* Terminal pulse animation */
         @keyframes terminalPulse {
           0%, 100% {
@@ -356,6 +425,18 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
           }
           50% {
             opacity: 0.6;
+          }
+        }
+
+        /* Queue slide animation - lines slide right */
+        @keyframes queueSlide {
+          0%, 100% {
+            transform: translateX(0);
+            opacity: 0.6;
+          }
+          50% {
+            transform: translateX(2px);
+            opacity: 1;
           }
         }
 

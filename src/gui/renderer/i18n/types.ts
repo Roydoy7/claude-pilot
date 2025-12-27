@@ -227,6 +227,7 @@ export interface Translation {
     aiThinking: string;
     executingTool: (toolName: string) => string;
     waitingForApproval: string;
+    messageQueued: string;
     // Slash command execution states
     commands?: {
       compact: string;

@@ -79,6 +79,7 @@ export const zhTranslations: Translation = {
     aiThinking: 'AI 正在思考...',
     executingTool: (toolName: string) => `正在执行 ${toolName}...`,
     waitingForApproval: '等待工具审批',
+    messageQueued: '消息已排队，请等待...',
     commands: {
       compact: '正在压缩对话...',
       clear: '正在清除对话...',
