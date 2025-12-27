@@ -39,7 +39,6 @@ export class SessionAgent {
   // Streaming message buffer (for real-time text display)
   private streamingText: string = '';
   private streamingMessageId: string | null = null;
-  private streamingItemIndex: number = -1; // Index of streaming item in displayItems (-1 if none)
   private streamingUsage: UsageMetadata | undefined = undefined; // Store usage from first delta
 
   // Streaming tool calls buffer (for tracking in-progress tool calls)
@@ -136,8 +135,8 @@ export class SessionAgent {
     // Remove any existing status item (filter it out from any position)
     const itemsWithoutStatus = this.displayItems.filter(item => item.type !== 'status');
 
-    // Add new status item if not idle (thinking or tool state active)
-    const isIdle = !state.thinking && !state.tool;
+    // Add new status item if not idle (thinking, tool state, or queued)
+    const isIdle = !state.thinking && !state.tool && !state.command && !state.queued;
 
     if (!isIdle) {
       const statusItem: MessageListItem = {
@@ -155,6 +154,23 @@ export class SessionAgent {
 
     // Notify UI
     this.notifyDisplayItemsChanged();
+  }
+
+  /**
+   * Add item to displayItems, keeping status item at the end
+   * This ensures "AI is thinking" indicator always appears at the bottom
+   */
+  private addItemKeepingStatusAtEnd(item: MessageListItem) {
+    // Find existing status item
+    const statusIndex = this.displayItems.findIndex(i => i.type === 'status');
+
+    if (statusIndex === -1) {
+      // No status item, just append
+      this.displayItems.push(item);
+    } else {
+      // Insert before status item to keep status at the end
+      this.displayItems.splice(statusIndex, 0, item);
+    }
   }
 
   /**
@@ -180,7 +196,6 @@ export class SessionAgent {
           // Start new streaming message
           this.streamingMessageId = `streaming-${this.sessionId}-${Date.now()}`;
           this.streamingText = '';
-          this.streamingItemIndex = -1; // Will be set when we actually add the item
           this.streamingUsage = undefined; // Reset usage storage
         }
 
@@ -197,7 +212,10 @@ export class SessionAgent {
         const hasText = this.streamingText.trim().length > 0;
 
         if (hasText) {
-          if (this.streamingItemIndex === -1) {
+          // Always find by ID to handle array changes during streaming
+          const streamingIndex = this.displayItems.findIndex(i => i.id === this.streamingMessageId);
+
+          if (streamingIndex === -1) {
             // First time we have actual text - create the item with stored usage
             const newStreamingItem: MessageListItem = {
               type: 'message',
@@ -208,12 +226,11 @@ export class SessionAgent {
               usage: this.streamingUsage, // Use stored usage from first delta
             };
 
-            this.displayItems.push(newStreamingItem);
-            this.streamingItemIndex = this.displayItems.length - 1;
+            this.addItemKeepingStatusAtEnd(newStreamingItem);
           } else {
             // Update existing streaming item with latest text and usage
-            const existingItem = this.displayItems[this.streamingItemIndex];
-            this.displayItems[this.streamingItemIndex] = {
+            const existingItem = this.displayItems[streamingIndex];
+            this.displayItems[streamingIndex] = {
               ...existingItem,
               content: this.streamingText,
               usage: this.streamingUsage ?? existingItem.usage,
@@ -234,7 +251,7 @@ export class SessionAgent {
           thinking: event.thinking,
         };
 
-        this.displayItems.push(thinkingItem);
+        this.addItemKeepingStatusAtEnd(thinkingItem);
         this.notifyDisplayItemsChanged();
         break;
       }
@@ -278,8 +295,8 @@ export class SessionAgent {
           needsApproval: hasPendingApproval, // Set if approval request already received
         };
 
-        // Add to displayItems immediately (so it's displayed)
-        this.displayItems.push(toolStartItem);
+        // Add to displayItems immediately (so it's displayed), keeping status at end
+        this.addItemKeepingStatusAtEnd(toolStartItem);
 
         // Store in streaming tool calls buffer
         this.streamingToolCalls.set(event.toolCallId, toolStartItem);
@@ -386,7 +403,6 @@ export class SessionAgent {
         // Clear text streaming buffers (ready for next item)
         this.streamingText = '';
         this.streamingMessageId = null;
-        this.streamingItemIndex = -1;
         this.streamingUsage = undefined;
 
         // No need to notify UI - item is already in displayItems
@@ -404,7 +420,7 @@ export class SessionAgent {
           isCompactSummary: event.isCompactSummary,
         };
 
-        this.displayItems.push(messageItem);
+        this.addItemKeepingStatusAtEnd(messageItem);
 
         // Notify UI
         this.notifyDisplayItemsChanged();
@@ -421,7 +437,7 @@ export class SessionAgent {
           content: `❌ Error: ${event.error}${event.details ? '\n\nDetails: ' + event.details : ''}`,
         };
 
-        this.displayItems.push(errorMessageItem);
+        this.addItemKeepingStatusAtEnd(errorMessageItem);
 
         // Clear status item (set to idle)
         this.updateStatusItem({ thinking: false });
@@ -438,7 +454,7 @@ export class SessionAgent {
           timestamp: Date.now(),
         };
 
-        this.displayItems.push(cancelledItem);
+        this.addItemKeepingStatusAtEnd(cancelledItem);
 
         // Clear status item (set to idle)
         this.updateStatusItem({ thinking: false });
@@ -456,7 +472,7 @@ export class SessionAgent {
           usageLimitMessage: event.message,
         };
 
-        this.displayItems.push(usageLimitItem);
+        this.addItemKeepingStatusAtEnd(usageLimitItem);
 
         // Clear status item (set to idle)
         this.updateStatusItem({ thinking: false });
@@ -502,7 +518,6 @@ export class SessionAgent {
 
         this.streamingText = '';
         this.streamingMessageId = null;
-        this.streamingItemIndex = -1;
         this.streamingUsage = undefined;
         this.streamingToolCalls.clear();
 
@@ -901,37 +916,21 @@ export class SessionAgent {
 
     if (commandName) {
       // Slash command: don't show user message, only show command status
-      const statusItem: MessageListItem = {
-        type: 'status',
-        id: `status-${Date.now()}`,
-        timestamp: Date.now(),
-        agentState: {
-          thinking: false,
-          command: {
-            name: commandName,
-            status: 'running',
-          },
+      // Use updateStatusItem to ensure proper status management
+      this.updateStatusItem({
+        thinking: false,
+        command: {
+          name: commandName,
+          status: 'running',
         },
-      };
-
-      this.displayItems.push(statusItem);
+      });
     } else {
-      // Regular message: show user message + thinking status
-      this.displayItems.push(userMessage);
+      // Regular message: add user message before status, then update status
+      this.addItemKeepingStatusAtEnd(userMessage);
 
-      // Create status item manually to avoid array recreation issue
-      const statusItem: MessageListItem = {
-        type: 'status',
-        id: `status-${Date.now()}`,
-        timestamp: Date.now(),
-        agentState: { thinking: true },
-      };
-
-      this.displayItems.push(statusItem);
+      // Update status to thinking (this will properly manage the status item)
+      this.updateStatusItem({ thinking: true });
     }
-
-    // Notify UI
-    this.notifyDisplayItemsChanged();
   }
 
   /**
@@ -944,7 +943,6 @@ export class SessionAgent {
     // Clear streaming state when deactivating
     this.streamingText = '';
     this.streamingMessageId = null;
-    this.streamingItemIndex = -1;
     this.streamingUsage = undefined;
     this.streamingToolCalls.clear();
 
@@ -968,7 +966,6 @@ export class SessionAgent {
     // Clear streaming state
     this.streamingText = '';
     this.streamingMessageId = null;
-    this.streamingItemIndex = -1;
     this.streamingUsage = undefined;
     this.streamingToolCalls.clear();
 

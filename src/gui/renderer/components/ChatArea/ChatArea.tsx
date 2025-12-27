@@ -377,6 +377,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
       )}
       <InputArea
         sessionId={sessionId || undefined}
+        cwd={sessionConfig.cwd || undefined}
         onSend={handleSendMessage}
         onCancel={handleCancelRequest}
         isProcessing={isProcessing}
