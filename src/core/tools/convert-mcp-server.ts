@@ -17,6 +17,39 @@ import { spawn } from 'child_process';
 const PANDOC_VERSION = '3.8.3';
 
 /**
+ * Calibre installation paths to check
+ */
+const CALIBRE_PATHS = [
+  'C:\\Program Files\\Calibre2\\ebook-convert.exe',
+  'C:\\Program Files (x86)\\Calibre2\\ebook-convert.exe',
+];
+
+/**
+ * Ebook formats - Calibre ONLY (Pandoc cannot handle these properly)
+ * These formats require Calibre for proper conversion with images/formatting
+ */
+const EBOOK_FORMATS = [
+  'azw', 'azw3', 'azw4', 'cbz', 'cbr', 'cbc', 'chm', 'djvu',
+  'epub', 'fb2', 'fbz', 'lit', 'lrf', 'mobi', 'prc', 'pdb', 'pml', 'rb', 'snb', 'tcr',
+] as const;
+
+/**
+ * Calibre supported input formats
+ */
+const CALIBRE_INPUT_FORMATS = [
+  ...EBOOK_FORMATS,
+  'docx', 'html', 'htmlz', 'odt', 'pdf', 'rtf', 'txt', 'txtz',
+] as const;
+
+/**
+ * Calibre supported output formats
+ */
+const CALIBRE_OUTPUT_FORMATS = [
+  'azw3', 'docx', 'epub', 'fb2', 'htmlz', 'lit', 'lrf', 'mobi', 'oeb',
+  'pdb', 'pdf', 'pml', 'rb', 'rtf', 'snb', 'tcr', 'txt', 'txtz', 'zip',
+] as const;
+
+/**
  * wkhtmltopdf version bundled with the application
  */
 const WKHTMLTOPDF_VERSION = '0.12.6-1';
@@ -85,6 +118,143 @@ interface ConvertExecutionResult {
   error?: string;
   executionTime: number;
   pandocVersion?: string;
+}
+
+/**
+ * Get Calibre ebook-convert executable path
+ */
+function getCalibrePath(): string | null {
+  for (const calibrePath of CALIBRE_PATHS) {
+    if (existsSync(calibrePath)) {
+      return calibrePath;
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if Calibre is installed
+ */
+function isCalibreInstalled(): boolean {
+  return getCalibrePath() !== null;
+}
+
+/**
+ * Check if format is supported by Calibre as input
+ */
+function isCalibreInputFormat(format: string): boolean {
+  return CALIBRE_INPUT_FORMATS.includes(format.toLowerCase() as typeof CALIBRE_INPUT_FORMATS[number]);
+}
+
+/**
+ * Check if format is supported by Calibre as output
+ */
+function isCalibreOutputFormat(format: string): boolean {
+  return CALIBRE_OUTPUT_FORMATS.includes(format.toLowerCase() as typeof CALIBRE_OUTPUT_FORMATS[number]);
+}
+
+/**
+ * Check if conversion can be done with Calibre
+ */
+function canUseCalibre(inputFormat: string, outputFormat: string): boolean {
+  return isCalibreInstalled() && isCalibreInputFormat(inputFormat) && isCalibreOutputFormat(outputFormat);
+}
+
+/**
+ * Check if format is an ebook format (requires Calibre)
+ */
+function isEbookFormat(format: string): boolean {
+  return (EBOOK_FORMATS as readonly string[]).includes(format.toLowerCase());
+}
+
+/**
+ * Check if conversion requires Calibre (ebook formats involved)
+ */
+function requiresCalibre(inputFormat: string, outputFormat: string): boolean {
+  return isEbookFormat(inputFormat) || isEbookFormat(outputFormat);
+}
+
+/**
+ * Execute Calibre ebook-convert command
+ */
+async function executeCalibre(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
+  const calibrePath = getCalibrePath();
+
+  if (!calibrePath) {
+    return { stdout: '', stderr: 'Calibre is not installed', code: 1 };
+  }
+
+  return new Promise((resolve) => {
+    const proc = spawn(calibrePath, args, {
+      windowsHide: true,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on('data', (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      resolve({ stdout, stderr, code: code ?? 0 });
+    });
+
+    proc.on('error', (error) => {
+      resolve({ stdout, stderr: error.message, code: 1 });
+    });
+  });
+}
+
+/**
+ * Convert document using Calibre
+ */
+async function convertWithCalibre(
+  inputFile: string,
+  outputFile: string,
+  options?: {
+    pdfPageSize?: string;
+    pdfFontSize?: number;
+    cover?: string;
+    title?: string;
+    authors?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const args: string[] = [inputFile, outputFile];
+
+  // Add PDF options
+  if (options?.pdfPageSize) {
+    args.push('--pdf-page-size', options.pdfPageSize);
+  }
+
+  if (options?.pdfFontSize) {
+    args.push('--pdf-default-font-size', options.pdfFontSize.toString());
+  }
+
+  // Add metadata options
+  if (options?.cover) {
+    args.push('--cover', options.cover);
+  }
+
+  if (options?.title) {
+    args.push('--title', options.title);
+  }
+
+  if (options?.authors) {
+    args.push('--authors', options.authors);
+  }
+
+  const { stderr, code } = await executeCalibre(args);
+
+  if (code !== 0) {
+    return { success: false, error: `Calibre conversion failed: ${stderr}` };
+  }
+
+  return { success: true };
 }
 
 /**
@@ -407,6 +577,7 @@ async function convertDocument(
     template?: string;
     cssFile?: string;
     referenceDoc?: string;
+    pdfFontSize?: number;
   }
 ): Promise<ConvertExecutionResult> {
   const startTime = Date.now();
@@ -427,7 +598,65 @@ async function convertDocument(
     const fromFormat = inputFormat || detectFormat(inputFile);
     const toFormat = outputFormat || detectFormat(outputFile);
 
-    // Handle conversion to Markdown using markitdown for supported formats
+    // Route 1: Ebook formats - Calibre ONLY (no fallback)
+    // EPUB, MOBI, AZW3, CBZ, CBR, FB2, LIT, etc. require Calibre for proper conversion
+    if (requiresCalibre(fromFormat, toFormat)) {
+      if (!isCalibreInstalled()) {
+        return {
+          success: false,
+          operation: 'convert',
+          inputFile,
+          outputFile,
+          inputFormat: fromFormat,
+          outputFormat: toFormat,
+          error: `Ebook format conversion (${fromFormat} → ${toFormat}) requires Calibre. Please install Calibre from https://calibre-ebook.com`,
+          executionTime: Date.now() - startTime,
+        };
+      }
+
+      if (!canUseCalibre(fromFormat, toFormat)) {
+        return {
+          success: false,
+          operation: 'convert',
+          inputFile,
+          outputFile,
+          inputFormat: fromFormat,
+          outputFormat: toFormat,
+          error: `Calibre does not support this conversion: ${fromFormat} → ${toFormat}`,
+          executionTime: Date.now() - startTime,
+        };
+      }
+
+      const calibreResult = await convertWithCalibre(inputFile, outputFile, {
+        pdfFontSize: options?.pdfFontSize,
+      });
+      if (!calibreResult.success) {
+        return {
+          success: false,
+          operation: 'convert',
+          inputFile,
+          outputFile,
+          inputFormat: fromFormat,
+          outputFormat: toFormat,
+          error: calibreResult.error,
+          executionTime: Date.now() - startTime,
+        };
+      }
+
+      const stats = await fs.stat(outputFile);
+      return {
+        success: true,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        fileSize: stats.size,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    // Route 2: Handle conversion to Markdown using markitdown for supported formats
     const isMarkdownOutput = toFormat === 'markdown' || toFormat === 'md';
     if (isMarkdownOutput && isMarkitdownSupported(fromFormat)) {
       const mdResult = await convertToMarkdown(inputFile, outputFile);
@@ -682,23 +911,24 @@ function createConvertMcpServer() {
     tools: [
       tool(
         'convert',
-        `Document format conversion tool using Pandoc, pdf2docx, and markitdown.
+        `Document format conversion tool with specialized engines for different format types.
 
-Supported conversions:
-- Word (docx) ↔ Markdown, HTML, PDF, EPUB, ODT, RTF
-- Markdown ↔ Word, HTML, PDF, EPUB, LaTeX, RST
-- HTML ↔ Word, Markdown, PDF, EPUB
-- LaTeX ↔ PDF, Word, HTML, Markdown
-- EPUB ↔ Word, HTML, Markdown
-- Plain text (txt) → Any format
-- RST (reStructuredText) ↔ Various formats
-- Org-mode ↔ Various formats
-- PDF → Markdown (via markitdown), Word/DOCX (via pdf2docx)
-- Excel (xlsx/xls) → Markdown (via markitdown)
-- PowerPoint (pptx) → Markdown (via markitdown)
+Conversion engines (each handles its specialized formats, NO fallback):
 
-Note: PDF output requires wkhtmltopdf (bundled).
-Note: Excel and PowerPoint can only be converted to Markdown.
+1. **Calibre** (ebook-convert) - REQUIRED for ebook formats:
+   - Formats: EPUB, MOBI, AZW, AZW3, FB2, CBZ, CBR, LIT, PRC, PDB, etc.
+   - Calibre installation required: https://calibre-ebook.com
+
+2. **markitdown** - For converting documents to Markdown:
+   - Input: PDF, DOCX, PPTX, XLSX, HTML
+
+3. **pdf2docx** - For PDF to DOCX conversion
+
+4. **Pandoc** - For text-based document formats:
+   - Formats: Markdown, LaTeX, RST, Org-mode, HTML, DOCX, ODT, RTF
+   - PDF output via wkhtmltopdf (bundled)
+
+IMPORTANT: Ebook formats (EPUB, MOBI, AZW3, etc.) REQUIRE Calibre. No fallback is provided because Pandoc cannot preserve images and formatting properly.
 
 Operations:
 - convert: Convert a document from one format to another
@@ -715,6 +945,7 @@ Operations:
           template: z.string().optional().describe('Custom template file path'),
           css: z.string().optional().describe('CSS file for HTML/EPUB output'),
           referenceDoc: z.string().optional().describe('Reference document for styling (docx/pptx/odt)'),
+          pdfFontSize: z.number().optional().describe('Font size for PDF output when using Calibre (default: 12). Use smaller values like 10 or 11 if fonts appear too large.'),
           workingDirectory: z.string().optional().describe('Working directory for relative paths'),
         },
         async ({
@@ -729,6 +960,7 @@ Operations:
           template,
           css,
           referenceDoc,
+          pdfFontSize,
           workingDirectory,
         }) => {
           // Resolve file paths
@@ -778,6 +1010,7 @@ Operations:
                 template: template ? resolveFilePath(template) : undefined,
                 cssFile: css ? resolveFilePath(css) : undefined,
                 referenceDoc: referenceDoc ? resolveFilePath(referenceDoc) : undefined,
+                pdfFontSize,
               });
               break;
             }
