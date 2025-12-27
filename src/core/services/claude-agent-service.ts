@@ -85,6 +85,15 @@ export interface ChatResponse {
 }
 
 /**
+ * Pending chat request in the queue
+ */
+interface PendingChatRequest {
+  request: ChatRequest;
+  resolve: (value: ChatResponse) => void;
+  reject: (error: Error) => void;
+}
+
+/**
  * Claude Agent Service - Singleton
  */
 export class ClaudeAgentService {
@@ -93,6 +102,10 @@ export class ClaudeAgentService {
   private sessionManager: SessionManager;
   private initialized: boolean = false;
   private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null;
+
+  // Request queue for sequential message processing
+  private requestQueue: Map<string, PendingChatRequest[]> = new Map(); // sessionId -> queue
+  private processingSession: string | null = null; // Currently processing session
 
   private constructor() {
     this.sessionManager = SessionManager.getInstance();
@@ -227,8 +240,78 @@ export class ClaudeAgentService {
 
   /**
    * Send message to agent
+   * Messages are queued per-session to prevent concurrent processing
    */
   async chat(request: ChatRequest): Promise<ChatResponse> {
+    const { sessionId } = request;
+
+    // Determine effective session ID
+    let effectiveSessionId = sessionId;
+    if (!effectiveSessionId && this.currentAgent) {
+      effectiveSessionId = this.currentAgent.getSessionId();
+    }
+
+    // If this session is currently being processed, queue the request
+    if (effectiveSessionId && this.processingSession === effectiveSessionId) {
+      return this.enqueueRequest(effectiveSessionId, request);
+    }
+
+    // Execute immediately
+    return this.executeChat(request);
+  }
+
+  /**
+   * Enqueue a chat request for later processing
+   */
+  private enqueueRequest(sessionId: string, request: ChatRequest): Promise<ChatResponse> {
+    return new Promise((resolve, reject) => {
+      // Get or create queue for this session
+      let queue = this.requestQueue.get(sessionId);
+      if (!queue) {
+        queue = [];
+        this.requestQueue.set(sessionId, queue);
+      }
+
+      // Add to queue
+      queue.push({ request, resolve, reject });
+
+      // Notify frontend that message is queued
+      const { streamEventCallback } = request;
+      if (streamEventCallback) {
+        streamEventCallback(sessionId, {
+          type: 'state',
+          state: { thinking: false, queued: true },
+        });
+      }
+
+      console.log(`[ClaudeAgentService] Request queued for session ${sessionId}, queue size: ${queue.length}`);
+    });
+  }
+
+  /**
+   * Process the next request in the queue for a session
+   */
+  private async processQueue(sessionId: string): Promise<void> {
+    const queue = this.requestQueue.get(sessionId);
+    if (!queue || queue.length === 0) {
+      return;
+    }
+
+    const pending = queue.shift()!;
+    console.log(`[ClaudeAgentService] Processing queued request for session ${sessionId}, remaining: ${queue.length}`);
+
+    try {
+      const response = await this.executeChat(pending.request);
+      pending.resolve(response);
+    } catch (error) {
+      pending.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Execute a chat request (internal implementation)
+   */
+  private async executeChat(request: ChatRequest): Promise<ChatResponse> {
     try {
       const { message, sessionId, streamEventCallback } = request;
 
@@ -251,26 +334,38 @@ export class ClaudeAgentService {
       }
 
       const agentSessionId = this.currentAgent.getSessionId();
-      const eventStream = this.currentAgent.run(message);
 
-      for await (const event of eventStream) {
-        if (streamEventCallback) {
-          streamEventCallback(agentSessionId, event);
+      // Mark this session as being processed
+      this.processingSession = agentSessionId;
+
+      try {
+        const eventStream = this.currentAgent.run(message);
+
+        for await (const event of eventStream) {
+          if (streamEventCallback) {
+            streamEventCallback(agentSessionId, event);
+          }
+
+          if (event.type === 'interrupt') {
+            break;
+          }
         }
 
-        if (event.type === 'interrupt') {
-          break;
-        }
+        // Update session timestamp to mark as recently used
+        this.sessionManager.touchSession(agentSessionId);
+
+        return {
+          success: true,
+          data: '',
+          sessionId: agentSessionId,
+        };
+      } finally {
+        // Clear processing flag
+        this.processingSession = null;
+
+        // Process next queued request for this session
+        this.processQueue(agentSessionId);
       }
-
-      // Update session timestamp to mark as recently used
-      this.sessionManager.touchSession(agentSessionId);
-
-      return {
-        success: true,
-        data: '',
-        sessionId: agentSessionId,
-      };
     } catch (error) {
       console.error('Chat error:', error);
       return {

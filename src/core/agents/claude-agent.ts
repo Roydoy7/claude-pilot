@@ -122,6 +122,8 @@ export interface AgentState {
     name: string; // e.g., 'compact', 'help', 'clear'
     status: 'running' | 'completed';
   };
+  // Message is queued (another request is being processed)
+  queued?: boolean;
 }
 
 /**
