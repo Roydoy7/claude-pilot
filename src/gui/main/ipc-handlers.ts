@@ -512,6 +512,78 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   });
 
   /**
+   * Get file tree for a specific directory (no session required)
+   * Used by InputArea @ button when session is not yet created
+   */
+  ipcMain.handle('workspace:getFileTreeForDirectory', async (_event, directoryPath: string) => {
+    interface FileNode {
+      name: string;
+      path: string;
+      type: 'file' | 'directory';
+      children?: FileNode[];
+    }
+
+    const buildTree = (dirPath: string): FileNode | null => {
+      try {
+        const stat = fs.statSync(dirPath);
+        const name = path.basename(dirPath);
+
+        if (stat.isFile()) {
+          return {
+            name,
+            path: dirPath,
+            type: 'file',
+          };
+        } else if (stat.isDirectory()) {
+          const children: FileNode[] = [];
+          const entries = fs.readdirSync(dirPath);
+
+          for (const entry of entries) {
+            // Skip hidden files and common ignore patterns
+            if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
+              continue;
+            }
+
+            const childPath = path.join(dirPath, entry);
+            const childNode = buildTree(childPath);
+
+            if (childNode) {
+              children.push(childNode);
+            }
+          }
+
+          // Sort: directories first, then files, alphabetically
+          children.sort((a, b) => {
+            if (a.type !== b.type) {
+              return a.type === 'directory' ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+          });
+
+          return {
+            name,
+            path: dirPath,
+            type: 'directory',
+            children,
+          };
+        }
+      } catch (error) {
+        console.error(`Error reading ${dirPath}:`, error);
+        return null;
+      }
+      return null;
+    };
+
+    const tree = buildTree(directoryPath);
+    return [{
+      directoryType: 'cwd' as const,
+      directoryPath,
+      directoryLabel: 'Working Directory',
+      tree,
+    }];
+  });
+
+  /**
    * Cache Management
    */
 

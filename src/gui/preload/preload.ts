@@ -167,6 +167,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       } | null;
     }>> =>
       ipcRenderer.invoke('workspace:getFileTree'),
+
+    getFileTreeForDirectory: (directoryPath: string): Promise<Array<{
+      directoryType: 'cwd' | 'additional';
+      directoryPath: string;
+      directoryLabel: string;
+      tree: {
+        name: string;
+        path: string;
+        type: 'file' | 'directory';
+        children?: unknown[];
+      } | null;
+    }>> =>
+      ipcRenderer.invoke('workspace:getFileTreeForDirectory', directoryPath),
   },
 
   // Cache management

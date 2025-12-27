@@ -336,6 +336,12 @@ export interface ElectronAPI {
       workspacePath: string;
       tree: FileTreeNode | null;
     }>>;
+    getFileTreeForDirectory: (directoryPath: string) => Promise<Array<{
+      directoryType: 'cwd' | 'additional';
+      directoryPath: string;
+      directoryLabel: string;
+      tree: FileTreeNode | null;
+    }>>;
   };
 
   // Cache management

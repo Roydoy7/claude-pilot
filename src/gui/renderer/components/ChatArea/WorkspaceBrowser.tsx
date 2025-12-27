@@ -19,7 +19,8 @@ interface DirectoryTree {
 }
 
 interface WorkspaceBrowserProps {
-  sessionId: string;
+  sessionId?: string;
+  cwd?: string; // Alternative: use cwd directly when sessionId is not available
   onSelect: (paths: string[]) => void;
   onClose: () => void;
 }
@@ -175,25 +176,33 @@ function TreeNode({ node, level, selectedPaths, onToggle }: TreeNodeProps) {
   );
 }
 
-export function WorkspaceBrowser({ sessionId, onSelect, onClose }: WorkspaceBrowserProps) {
+export function WorkspaceBrowser({ sessionId, cwd, onSelect, onClose }: WorkspaceBrowserProps) {
   const { t } = useLanguage();
   const [trees, setTrees] = useState<DirectoryTree[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSessionDirectories();
-  }, [sessionId]);
+    loadDirectories();
+  }, [sessionId, cwd]);
 
-  const loadSessionDirectories = async () => {
+  const loadDirectories = async () => {
     try {
       setLoading(true);
 
-      // Get file trees for session directories from backend
-      const directoryTrees = await window.electronAPI.session.getFileTree(sessionId);
-      setTrees(directoryTrees);
+      if (sessionId) {
+        // Get file trees for session directories from backend
+        const directoryTrees = await window.electronAPI.session.getFileTree(sessionId);
+        setTrees(directoryTrees);
+      } else if (cwd) {
+        // Get file tree for specified cwd directly
+        const directoryTrees = await window.electronAPI.workspace.getFileTreeForDirectory(cwd);
+        setTrees(directoryTrees);
+      } else {
+        setTrees([]);
+      }
     } catch (error) {
-      console.error('Failed to load session directories:', error);
+      console.error('Failed to load directories:', error);
     } finally {
       setLoading(false);
     }
