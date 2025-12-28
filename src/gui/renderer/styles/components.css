@@ -1738,3 +1738,67 @@ body.resizing-panel {
   background-color: #dc2626;
 }
 
+/* ========================================
+   MCP Tool Result Markdown
+   ======================================== */
+
+.mcp-tool-result-markdown {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.mcp-tool-result-markdown h1,
+.mcp-tool-result-markdown h2,
+.mcp-tool-result-markdown h3,
+.mcp-tool-result-markdown h4,
+.mcp-tool-result-markdown h5,
+.mcp-tool-result-markdown h6 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem 0;
+  line-height: 1.4;
+}
+
+.mcp-tool-result-markdown h1:first-child,
+.mcp-tool-result-markdown h2:first-child,
+.mcp-tool-result-markdown h3:first-child {
+  margin-top: 0;
+}
+
+.mcp-tool-result-markdown p {
+  margin: 0.25rem 0;
+  font-size: 0.75rem;
+}
+
+.mcp-tool-result-markdown ul,
+.mcp-tool-result-markdown ol {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+  font-size: 0.75rem;
+}
+
+.mcp-tool-result-markdown li {
+  margin: 0.125rem 0;
+}
+
+.mcp-tool-result-markdown code {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.25rem;
+  background-color: var(--bg-secondary);
+  border-radius: 3px;
+}
+
+.mcp-tool-result-markdown pre {
+  font-size: 0.7rem;
+  margin: 0.25rem 0;
+  padding: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.mcp-tool-result-markdown pre code {
+  padding: 0;
+  background-color: transparent;
+}
+
