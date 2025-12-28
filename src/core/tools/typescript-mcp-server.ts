@@ -458,48 +458,108 @@ function createTypeScriptMcpServer() {
         'execute',
         `Execute TypeScript code using tsx (TypeScript Execute).
 
-Features:
+## Features
 - Direct TypeScript execution without compilation step
 - Full access to Node.js APIs
 - Support for ES modules and modern TypeScript features
-- Automatic type checking
 - Automatic npm package installation via packages parameter
 
-Usage:
-- Write TypeScript code that will be executed
-- Use console.log() for output
-- Import Node.js modules directly (e.g., import fs from 'fs')
-- Specify required npm packages in the packages parameter for auto-installation
+## Pre-installed Packages (no need to specify in packages parameter)
 
-Example:
+### Office Documents
+- **pptxgenjs** - Create PowerPoint presentations
+- **exceljs** - Read/write Excel files (.xlsx)
+- **docx** - Create Word documents (.docx)
+- **pdf-lib** - Create/modify PDF files
+- **adm-zip** - Read/write ZIP files (also works for PPTX/DOCX/XLSX)
+
+### Utilities
+- **lodash** - Utility functions
+- **dayjs** - Date manipulation
+- **uuid** - Generate UUIDs
+- **zod** - Schema validation
+
+## Usage Examples
+
+### Create PowerPoint:
 \`\`\`typescript
+import PptxGenJS from 'pptxgenjs';
+
+const pptx = new PptxGenJS();
+const slide = pptx.addSlide();
+slide.addText('Hello World', { x: 1, y: 1, fontSize: 24 });
+await pptx.writeFile({ fileName: 'output.pptx' });
+\`\`\`
+
+### Create Excel:
+\`\`\`typescript
+import ExcelJS from 'exceljs';
+
+const workbook = new ExcelJS.Workbook();
+const sheet = workbook.addWorksheet('Sheet1');
+sheet.addRow(['Name', 'Age']);
+sheet.addRow(['John', 30]);
+await workbook.xlsx.writeFile('output.xlsx');
+\`\`\`
+
+### Create Word:
+\`\`\`typescript
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 import * as fs from 'fs';
 
-const files = fs.readdirSync('.');
-console.log('Files:', files);
-
-interface Person {
-  name: string;
-  age: number;
-}
-
-const person: Person = { name: 'John', age: 30 };
-console.log(JSON.stringify(person, null, 2));
+const doc = new Document({
+  sections: [{ children: [new Paragraph({ children: [new TextRun('Hello World')] })] }]
+});
+const buffer = await Packer.toBuffer(doc);
+fs.writeFileSync('output.docx', buffer);
 \`\`\`
 
-Example with external package:
+### Modify PDF:
 \`\`\`typescript
-// Use packages: ["lodash", "@types/lodash"] for type support
-import _ from 'lodash';
+import { PDFDocument, rgb } from 'pdf-lib';
+import * as fs from 'fs';
 
-const numbers = [1, 2, 3, 4, 5];
-console.log('Sum:', _.sum(numbers));
+const pdfDoc = await PDFDocument.create();
+const page = pdfDoc.addPage();
+page.drawText('Hello World', { x: 50, y: 700, size: 30 });
+const pdfBytes = await pdfDoc.save();
+fs.writeFileSync('output.pdf', pdfBytes);
 \`\`\`
 
-Notes:
+## Important: Avoid Top-level Await
+
+**DO NOT use top-level await directly.** Wrap async code in an IIFE:
+
+\`\`\`typescript
+// ❌ WRONG - will cause error
+const data = await fetchData();
+
+// ✅ CORRECT - wrap in async IIFE
+(async () => {
+  const data = await fetchData();
+  console.log(data);
+})();
+\`\`\`
+
+## Important: Escape Special Quotes in Strings
+
+Curly/smart quotes ("" '') cause parse errors. Always use straight quotes:
+
+\`\`\`typescript
+// ❌ WRONG - curly quotes break parsing
+const text = "Hello "World"";
+
+// ✅ CORRECT - use straight quotes with escape
+const text = "Hello \\"World\\"";
+
+// ✅ CORRECT - use single quotes for outer string
+const text = 'He said "Hello"';
+\`\`\`
+
+## Notes
 - Execution timeout is 60 seconds by default
-- Working directory defaults to the current project root
-- Packages are installed to the project's node_modules`,
+- Use packages parameter for packages not listed above
+- Working directory defaults to current project root`,
         {
           code: z.string().describe('TypeScript code to execute'),
           packages: z.array(z.string()).optional().describe(

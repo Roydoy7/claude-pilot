@@ -664,7 +664,7 @@ async function getPDFInfo(file: string): Promise<PDFExecutionResult> {
       if (isEncryptionError(errorMessage)) {
         return {
           success: false,
-          operation: 'info',
+          operation: 'get-info',
           file,
           error: `PDF appears to be encrypted or password-protected:\n${errorMessage}\n\nSuggestions:\n- Try removing password protection using another tool\n- Contact the PDF creator for an unencrypted version`,
           executionTime: Date.now() - startTime,
@@ -672,7 +672,7 @@ async function getPDFInfo(file: string): Promise<PDFExecutionResult> {
       }
       return {
         success: false,
-        operation: 'info',
+        operation: 'get-info',
         file,
         error: `Failed to load PDF: ${errorMessage}`,
         executionTime: Date.now() - startTime,
@@ -702,7 +702,7 @@ async function getPDFInfo(file: string): Promise<PDFExecutionResult> {
 
     return {
       success: true,
-      operation: 'info',
+      operation: 'get-info',
       file,
       pageCount,
       fileSize: stats.size,
@@ -713,7 +713,7 @@ async function getPDFInfo(file: string): Promise<PDFExecutionResult> {
   } catch (error) {
     return {
       success: false,
-      operation: 'info',
+      operation: 'get-info',
       file,
       error: `Failed to get PDF info: ${error instanceof Error ? error.message : 'Unknown error'}`,
       executionTime: Date.now() - startTime,
@@ -1047,12 +1047,12 @@ async function splitPDF(
  */
 const pdfToolSchema = {
   operation: z
-    .enum(['create', 'info', 'extracttext', 'search', 'merge', 'split'])
+    .enum(['create', 'get-info', 'extracttext', 'search', 'merge', 'split'])
     .describe('Operation to perform on PDF file'),
   file: z
     .string()
     .optional()
-    .describe('PDF file path. Required for info, extracttext, search, split operations. Not needed for merge (uses sources instead)'),
+    .describe('PDF file path. Required for get-info, extracttext, search, split operations. Not needed for merge (uses sources instead)'),
   pages: z
     .string()
     .optional()
@@ -1117,10 +1117,10 @@ export function createPdfMcpServer() {
               break;
             }
 
-            case 'info':
+            case 'get-info':
               if (!file) {
                 return {
-                  content: [{ type: 'text' as const, text: 'Error: Info operation requires file parameter' }],
+                  content: [{ type: 'text' as const, text: 'Error: get-info operation requires file parameter' }],
                 };
               }
               result = await getPDFInfo(resolveFilePath(file));
