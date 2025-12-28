@@ -2,9 +2,13 @@
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
  * Skill Manager - Manages skill marketplaces and installation
- * Fetches skills from GitHub repositories and installs them to session's cwd
- * Skills are installed to {cwd}/.claude/skills/{skill-name}/
- * Claude Agent SDK automatically discovers and loads these skills
+ *
+ * Skill sources:
+ * 1. Built-in marketplace: src/core/custom-skills/ (virtual marketplace, local files)
+ * 2. GitHub marketplaces: Remote repositories (e.g., anthropics/skills)
+ *
+ * All skills are installed to: {cwd}/.claude/skills/{skill-name}/
+ * Claude Agent SDK automatically discovers and loads these skills.
  */
 
 import type {
@@ -16,8 +20,53 @@ import type {
 } from './skill-types.js';
 import { DEFAULT_MARKETPLACE } from './skill-types.js';
 import * as fs from 'fs/promises';
+import { existsSync, cpSync } from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import type { RoleType } from '../roles/role-enum.js';
+import { getDefaultSkills } from '../roles/role-tool-sets.js';
+
+/** Built-in marketplace ID */
+export const BUILTIN_MARKETPLACE_ID = 'builtin';
+
+/**
+ * Built-in skills marketplace (virtual, from local files)
+ */
+export const BUILTIN_MARKETPLACE: SkillMarketplace = {
+  id: BUILTIN_MARKETPLACE_ID,
+  name: 'Built-in Skills',
+  owner: 'local',
+  repo: 'custom-skills',
+  branch: 'main',
+  skillsPath: '',
+  description: 'Skills shipped with Claude Pilot',
+};
+
+/**
+ * Get the path to built-in custom-skills directory
+ * In development: src/core/custom-skills
+ * In production: resources/custom-skills (copied during build)
+ */
+function getBuiltinSkillsPath(): string {
+  // Check if running in packaged app
+  if (app?.isPackaged && process.resourcesPath) {
+    return path.join(process.resourcesPath, 'custom-skills');
+  }
+  // Development mode - try multiple possible locations
+  const possiblePaths = [
+    path.join(__dirname, 'custom-skills'),
+    path.join(__dirname, '..', 'custom-skills'),
+    path.join(process.cwd(), 'src', 'core', 'custom-skills'),
+  ];
+
+  for (const p of possiblePaths) {
+    if (existsSync(p)) {
+      return p;
+    }
+  }
+
+  return path.join(process.cwd(), 'src', 'core', 'custom-skills');
+}
 
 /**
  * GitHub API response for directory contents
@@ -32,6 +81,7 @@ interface GitHubContent {
 
 /**
  * Parse SKILL.md frontmatter to extract metadata
+ * Supports YAML multi-line strings (| and >)
  */
 function parseSkillFrontmatter(content: string): SkillMetadata {
   const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---/;
@@ -44,13 +94,54 @@ function parseSkillFrontmatter(content: string): SkillMetadata {
   const frontmatter = match[1];
   const metadata: SkillMetadata = { name: '', description: '' };
 
-  // Parse YAML-like frontmatter (simple key: value pairs)
   const lines = frontmatter.split('\n');
+  let currentKey: string | null = null;
+  let multiLineValue: string[] = [];
+  let multiLineIndent = 0;
+
+  const saveMultiLineValue = () => {
+    if (currentKey && multiLineValue.length > 0) {
+      const value = multiLineValue.join(' ').trim();
+      if (currentKey === 'name') metadata.name = value;
+      else if (currentKey === 'description') metadata.description = value;
+      else if (currentKey === 'license') metadata.license = value;
+      else if (currentKey === 'version') metadata.version = value;
+      else if (currentKey === 'author') metadata.author = value;
+    }
+    currentKey = null;
+    multiLineValue = [];
+    multiLineIndent = 0;
+  };
+
   for (const line of lines) {
+    // Check if this is a continuation of multi-line value
+    if (currentKey && line.match(/^\s+\S/)) {
+      const indentMatch = line.match(/^(\s+)/);
+      const indent = indentMatch ? indentMatch[1].length : 0;
+      if (multiLineIndent === 0) multiLineIndent = indent;
+      if (indent >= multiLineIndent) {
+        multiLineValue.push(line.trim());
+        continue;
+      }
+    }
+
+    // Save previous multi-line value if any
+    if (currentKey) {
+      saveMultiLineValue();
+    }
+
     const colonIndex = line.indexOf(':');
-    if (colonIndex > 0) {
+    if (colonIndex > 0 && !line.startsWith(' ')) {
       const key = line.substring(0, colonIndex).trim();
       let value = line.substring(colonIndex + 1).trim();
+
+      // Check for multi-line indicator (| or >)
+      if (value === '|' || value === '>') {
+        currentKey = key;
+        multiLineValue = [];
+        multiLineIndent = 0;
+        continue;
+      }
 
       // Remove quotes if present
       if ((value.startsWith('"') && value.endsWith('"')) ||
@@ -74,6 +165,9 @@ function parseSkillFrontmatter(content: string): SkillMetadata {
     }
   }
 
+  // Save any remaining multi-line value
+  saveMultiLineValue();
+
   if (!metadata.name) {
     throw new Error('Invalid SKILL.md: missing name field');
   }
@@ -84,19 +178,31 @@ function parseSkillFrontmatter(content: string): SkillMetadata {
 /**
  * Skills Manager class
  * Manages marketplace config globally, but installs skills to session's cwd
+ * Uses singleton pattern for global access
  */
 export class SkillManager {
+  private static instance: SkillManager;
   private config: SkillsConfig;
   private configPath: string;
   private initialized = false;
 
-  constructor() {
+  private constructor() {
     const userDataPath = app?.getPath('userData') || process.cwd();
     this.configPath = path.join(userDataPath, 'skills-config.json');
     this.config = {
       marketplaces: [DEFAULT_MARKETPLACE],
       enabled: true,
     };
+  }
+
+  /**
+   * Get the singleton instance of SkillManager
+   */
+  public static getInstance(): SkillManager {
+    if (!SkillManager.instance) {
+      SkillManager.instance = new SkillManager();
+    }
+    return SkillManager.instance;
   }
 
   /**
@@ -128,10 +234,11 @@ export class SkillManager {
   }
 
   /**
-   * Get all registered marketplaces
+   * Get all registered marketplaces (including built-in)
    */
   getMarketplaces(): SkillMarketplace[] {
-    return this.config.marketplaces;
+    // Always include built-in marketplace first
+    return [BUILTIN_MARKETPLACE, ...this.config.marketplaces];
   }
 
   /**
@@ -154,11 +261,56 @@ export class SkillManager {
   }
 
   /**
+   * Fetch available skills from built-in marketplace (local files)
+   */
+  private async fetchBuiltinSkills(cwd?: string): Promise<AvailableSkill[]> {
+    const builtinDir = getBuiltinSkillsPath();
+    const skills: AvailableSkill[] = [];
+
+    try {
+      const entries = await fs.readdir(builtinDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const skillPath = path.join(builtinDir, entry.name);
+          const skillMdPath = path.join(skillPath, 'SKILL.md');
+
+          try {
+            const content = await fs.readFile(skillMdPath, 'utf-8');
+            const metadata = parseSkillFrontmatter(content);
+
+            // Check if installed in the given cwd
+            const installed = cwd ? await this.isSkillInstalled(cwd, entry.name) : false;
+
+            skills.push({
+              metadata,
+              marketplace: BUILTIN_MARKETPLACE_ID,
+              path: entry.name,  // Just the directory name for builtin
+              installed,
+            });
+          } catch {
+            // Skip invalid skills
+          }
+        }
+      }
+    } catch {
+      // Built-in skills directory doesn't exist
+    }
+
+    return skills;
+  }
+
+  /**
    * Fetch available skills from a marketplace
    * @param marketplaceId - The marketplace ID to fetch from
    * @param cwd - Optional cwd to check installed status
    */
   async fetchMarketplaceSkills(marketplaceId: string, cwd?: string): Promise<AvailableSkill[]> {
+    // Handle built-in marketplace specially
+    if (marketplaceId === BUILTIN_MARKETPLACE_ID) {
+      return this.fetchBuiltinSkills(cwd);
+    }
+
     const marketplace = this.config.marketplaces.find((m) => m.id === marketplaceId);
     if (!marketplace) {
       throw new Error(`Marketplace not found: ${marketplaceId}`);
@@ -307,14 +459,53 @@ export class SkillManager {
   }
 
   /**
+   * Install a skill from built-in marketplace (copy local files)
+   */
+  private async installBuiltinSkill(skillName: string, cwd: string): Promise<InstalledSkillInfo> {
+    const builtinDir = getBuiltinSkillsPath();
+    const sourceDir = path.join(builtinDir, skillName);
+    const targetDir = path.join(cwd, '.claude', 'skills', skillName);
+
+    // Check source exists
+    if (!existsSync(sourceDir)) {
+      throw new Error(`Built-in skill not found: ${skillName}`);
+    }
+
+    // Check if already installed
+    if (await this.isSkillInstalled(cwd, skillName)) {
+      throw new Error(`Skill already installed: ${skillName}`);
+    }
+
+    // Copy skill directory recursively
+    await fs.mkdir(path.dirname(targetDir), { recursive: true });
+    cpSync(sourceDir, targetDir, { recursive: true });
+
+    // Read metadata
+    const skillMdPath = path.join(targetDir, 'SKILL.md');
+    const content = await fs.readFile(skillMdPath, 'utf-8');
+    const metadata = parseSkillFrontmatter(content);
+
+    return {
+      name: skillName,
+      metadata,
+      path: targetDir,
+    };
+  }
+
+  /**
    * Install a skill from a marketplace to the session's cwd
-   * Downloads the entire skill directory recursively
+   * Downloads the entire skill directory recursively (or copies for built-in)
    */
   async installSkill(
     marketplaceId: string,
     skillPath: string,
     cwd: string
   ): Promise<InstalledSkillInfo> {
+    // Handle built-in marketplace specially
+    if (marketplaceId === BUILTIN_MARKETPLACE_ID) {
+      return this.installBuiltinSkill(skillPath, cwd);
+    }
+
     const marketplace = this.config.marketplaces.find((m) => m.id === marketplaceId);
     if (!marketplace) {
       throw new Error(`Marketplace not found: ${marketplaceId}`);
@@ -414,17 +605,31 @@ export class SkillManager {
   isGlobalEnabled(): boolean {
     return this.config.enabled;
   }
-}
 
-// Singleton instance
-let skillManagerInstance: SkillManager | null = null;
+  /**
+   * Install default skills for a role to the session's cwd
+   * Skips skills that are already installed
+   */
+  async installDefaultSkillsForRole(role: RoleType, cwd: string): Promise<InstalledSkillInfo[]> {
+    const defaultSkills = getDefaultSkills(role);
+    const installed: InstalledSkillInfo[] = [];
 
-/**
- * Get the skill manager instance
- */
-export function getSkillManager(): SkillManager {
-  if (!skillManagerInstance) {
-    skillManagerInstance = new SkillManager();
+    for (const skillName of defaultSkills) {
+      try {
+        // Skip if already installed
+        if (await this.isSkillInstalled(cwd, skillName)) {
+          continue;
+        }
+
+        // Install from built-in marketplace
+        const skillInfo = await this.installBuiltinSkill(skillName, cwd);
+        installed.push(skillInfo);
+      } catch (error) {
+        // Log but don't fail - continue with other skills
+        console.warn(`Failed to install default skill ${skillName}:`, error);
+      }
+    }
+
+    return installed;
   }
-  return skillManagerInstance;
 }

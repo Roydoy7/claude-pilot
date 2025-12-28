@@ -171,12 +171,13 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
     }
   }, [selectedMarketplace, sessionId]);
 
-  // Fetch marketplace when switching to marketplace view
+  // Fetch marketplace when switching to marketplace view or changing marketplace
   useEffect(() => {
-    if (view === 'marketplace' && availableSkills.length === 0 && sessionId) {
+    if (view === 'marketplace' && sessionId) {
       fetchMarketplace();
     }
-  }, [view, fetchMarketplace, availableSkills.length, sessionId]);
+  }, [view, selectedMarketplace, sessionId]);
+  // Note: fetchMarketplace intentionally excluded to avoid stale closure issues
 
   const handleInstall = useCallback(async (skill: AvailableSkill) => {
     if (!sessionId) return;
@@ -383,7 +384,6 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
                 value={selectedMarketplace}
                 onChange={(e) => {
                   setSelectedMarketplace(e.target.value);
-                  setAvailableSkills([]);
                 }}
                 style={{
                   width: '100%',

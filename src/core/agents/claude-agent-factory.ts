@@ -13,6 +13,7 @@ import { getSystemReminders } from '../context/system-reminders.js';
 import { getAvailableTools, getAutoApprovedTools, getMcpServers } from '../roles/role-tool-sets.js';
 import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel, supportsExtendedThinking } from '../providers/model-list-manager.js';
+import { SkillManager } from '../skills/skill-manager.js';
 
 /**
  * Agent cache - stores created agents by session ID
@@ -85,13 +86,14 @@ export function getAgentCacheStats(): {
 
 /**
  * Build combined system prompt for a role
- * Includes role-specific prompt and system reminders
+ * Includes role-specific prompt, cwd info, and system reminders
  * Note: Skills are automatically discovered by Claude Agent SDK from {cwd}/.claude/skills/
  */
-function buildSystemPrompt(role: RoleType): string {
+function buildSystemPrompt(role: RoleType, cwd?: string): string {
   const rolePrompt = getRoleSystemPrompt(role);
+  const cwdPrompt = cwd ? `\nYour current working directory is: ${cwd}\n` : '';
   const reminders = getSystemReminders();
-  return [rolePrompt, reminders].join('\n');
+  return [rolePrompt, cwdPrompt, reminders].join('\n');
 }
 
 /**
@@ -141,7 +143,7 @@ export async function createAgentFromSessionData(
   const systemPrompt: string | { type: 'preset'; preset: 'claude_code'; append?: string } =
     session.role === RoleType.CLAUDE_CODE
       ? { type: 'preset', preset: 'claude_code' }
-      : buildSystemPrompt(session.role);
+      : buildSystemPrompt(session.role, session.cwd);
 
   // Get tools for this role:
   // - availableTools: All tools the agent CAN use (passed as 'tools')
@@ -187,6 +189,11 @@ export async function createNewAgent(
 
   // Create new session (provider is always Claude now)
   const session = sessionManager.createSession(title, role, modelName, cwd);
+
+  // Install default skills for this role
+  const skillManager = SkillManager.getInstance();
+  await skillManager.initialize();
+  await skillManager.installDefaultSkillsForRole(role, cwd);
 
   // Create agent from session
   const agent = await createAgentFromSessionData(session);

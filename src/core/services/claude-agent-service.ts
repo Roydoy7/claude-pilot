@@ -31,7 +31,7 @@ import { authManager, type AuthStatus } from '../auth/auth-manager.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
 import { deleteTranscript } from '../sessions/transcript-manager.js';
-import { getSkillManager } from '../skills/skill-manager.js';
+import { SkillManager } from '../skills/skill-manager.js';
 
 /**
  * Extract text content from MessageContent for use as session title
@@ -147,7 +147,7 @@ export class ClaudeAgentService {
   }> {
     try {
       // Initialize skill manager first (needed for system prompt injection)
-      const skillManager = getSkillManager();
+      const skillManager = SkillManager.getInstance();
       await skillManager.initialize();
 
       const sessions = this.sessionManager.getAllSessions();

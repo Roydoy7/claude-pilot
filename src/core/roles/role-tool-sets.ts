@@ -17,6 +17,9 @@ import { pythonMcpServer } from '../tools/python-mcp-server.js';
 import { pdfMcpServer } from '../tools/pdf-mcp-server.js';
 import { convertMcpServer } from '../tools/convert-mcp-server.js';
 import { typescriptMcpServer } from '../tools/typescript-mcp-server.js';
+import { imageMcpServer } from '../tools/image-mcp-server.js';
+import { pptxMcpServer } from '../tools/pptx-mcp-server.js';
+import { xlsxMcpServer } from '../tools/xlsx-mcp-server.js';
 
 /**
  * All available Claude SDK built-in tools
@@ -74,6 +77,7 @@ export const ROLE_AVAILABLE_TOOLS: Record<RoleType, readonly string[]> = {
 
   [RoleType.CLAUDE_CODE]: [
     ...ALL_SDK_TOOLS,
+    ...SKILL,
   ],
 };
 
@@ -132,6 +136,9 @@ export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
     pdf: pdfMcpServer,
     convert: convertMcpServer,
     typescript: typescriptMcpServer,
+    image: imageMcpServer,
+    pptx: pptxMcpServer,
+    xlsx: xlsxMcpServer,
   },
 
   [RoleType.CLAUDE_CODE]: {},
@@ -142,4 +149,25 @@ export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
  */
 export function getMcpServers(role: RoleType): Record<string, McpServer> {
   return ROLE_MCP_SERVERS[role];
+}
+
+/**
+ * Default skills for each role (built-in skill names)
+ * These skills are automatically installed when a session is created
+ */
+export const ROLE_DEFAULT_SKILLS: Record<RoleType, readonly string[]> = {
+  [RoleType.OFFICE_ASSISTANT]: [
+    'pptx-processor',
+    'excel-processor',
+    'docx-processor',
+  ],
+
+  [RoleType.CLAUDE_CODE]: [],
+};
+
+/**
+ * Get default skills for a specific role
+ */
+export function getDefaultSkills(role: RoleType): readonly string[] {
+  return ROLE_DEFAULT_SKILLS[role];
 }

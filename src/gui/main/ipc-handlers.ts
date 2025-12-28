@@ -14,7 +14,7 @@ import { modelListManager } from '../../core/providers/model-list-manager.js';
 import { templateManager } from '../../core/templates/template-manager.js';
 import { authManager } from '../../core/auth/auth-manager.js';
 import type { OAuthLoginOptions } from '../../core/auth/auth-manager.js';
-import { getSkillManager } from '../../core/skills/skill-manager.js';
+import { SkillManager } from '../../core/skills/skill-manager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -711,7 +711,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Get skills data for a session (marketplaces, installed skills, enabled state)
    */
   ipcMain.handle('skills:getData', async (_event, sessionId: string) => {
-    const skillManager = getSkillManager();
+    const skillManager = SkillManager.getInstance();
     await skillManager.initialize();
 
     // Get cwd from session to find installed skills
@@ -730,7 +730,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Fetch available skills from a marketplace
    */
   ipcMain.handle('skills:fetchMarketplace', async (_event, marketplaceId: string, sessionId: string) => {
-    const skillManager = getSkillManager();
+    const skillManager = SkillManager.getInstance();
 
     // Get cwd from session to check which skills are installed
     const sessionManager = SessionManager.getInstance();
@@ -751,7 +751,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       throw new Error('Session not found or has no working directory');
     }
 
-    const skillManager = getSkillManager();
+    const skillManager = SkillManager.getInstance();
     return await skillManager.installSkill(marketplaceId, skillPath, session.cwd);
   });
 
@@ -766,7 +766,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       throw new Error('Session not found or has no working directory');
     }
 
-    const skillManager = getSkillManager();
+    const skillManager = SkillManager.getInstance();
     await skillManager.uninstallSkill(session.cwd, skillName);
     return { success: true };
   });
@@ -775,7 +775,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Set global skills enabled/disabled
    */
   ipcMain.handle('skills:setGlobalEnabled', async (_event, enabled: boolean) => {
-    const skillManager = getSkillManager();
+    const skillManager = SkillManager.getInstance();
     await skillManager.setGlobalEnabled(enabled);
     return { success: true };
   });
