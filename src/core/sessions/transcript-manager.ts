@@ -117,8 +117,13 @@ function cwdToProjectName(cwd: string): string {
     normalized = normalized[0] + '-' + normalized.slice(2);
   }
 
-  // Replace all forward slashes with hyphens
-  return normalized.replace(/\//g, '-');
+  // Replace non-ASCII characters with hyphens (SDK behavior for CJK characters, etc.)
+  // Then replace forward slashes, dots, and underscores with hyphens
+  return normalized
+    .replace(/[^\x00-\x7F]/g, '-')
+    .replace(/\//g, '-')
+    .replace(/\./g, '-')
+    .replace(/_/g, '-');
 }
 
 /**
