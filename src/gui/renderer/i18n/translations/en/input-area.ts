@@ -60,4 +60,9 @@ export const inputAreaEn = {
   slashCommands: {
     label: 'Commands',
   },
+  promptsButton: {
+    tooltip: 'Quick Prompts',
+    title: 'Prompt Templates',
+    noTemplates: 'No templates yet',
+  },
 };

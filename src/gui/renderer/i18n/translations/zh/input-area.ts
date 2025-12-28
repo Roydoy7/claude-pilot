@@ -60,4 +60,9 @@ export const inputAreaZh = {
   slashCommands: {
     label: '命令',
   },
+  promptsButton: {
+    tooltip: '快捷提示',
+    title: '提示模板',
+    noTemplates: '暂无模板',
+  },
 };

@@ -162,6 +162,11 @@ export interface Translation {
     slashCommands?: {
       label: string;
     };
+    promptsButton?: {
+      tooltip: string;
+      title: string;
+      noTemplates: string;
+    };
   };
 
   // Message

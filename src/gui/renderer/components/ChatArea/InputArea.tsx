@@ -179,6 +179,8 @@ export function InputArea({
   const [showPermissionMenu, setShowPermissionMenu] = useState(false);
   const [showSettingSourcesMenu, setShowSettingSourcesMenu] = useState(false);
   const [showSlashCommandMenu, setShowSlashCommandMenu] = useState(false);
+  const [showPromptsMenu, setShowPromptsMenu] = useState(false);
+  const [promptTemplates, setPromptTemplates] = useState<{ id: string; name: string; content: string }[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Max heights for normal and expanded modes
@@ -191,6 +193,7 @@ export function InputArea({
   const permissionMenuRef = useRef<HTMLDivElement>(null);
   const settingSourcesMenuRef = useRef<HTMLDivElement>(null);
   const slashCommandMenuRef = useRef<HTMLDivElement>(null);
+  const promptsMenuRef = useRef<HTMLDivElement>(null);
 
   // Close permission menu when clicking outside
   useEffect(() => {
@@ -279,6 +282,50 @@ export function InputArea({
     }
     setShowSlashCommandMenu(false);
   }, [onSlashCommandSelect]);
+
+  // Load prompt templates
+  const loadPromptTemplates = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.templates.list();
+      const templates = Array.isArray(result) ? result : (result as { templates?: { id: string; name: string; content: string }[] }).templates || [];
+      setPromptTemplates(templates);
+    } catch (error) {
+      console.error('Failed to load prompt templates:', error);
+    }
+  }, []);
+
+  // Load templates when menu opens
+  useEffect(() => {
+    if (showPromptsMenu) {
+      loadPromptTemplates();
+    }
+  }, [showPromptsMenu, loadPromptTemplates]);
+
+  // Close prompts menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (promptsMenuRef.current && !promptsMenuRef.current.contains(event.target as Node)) {
+        setShowPromptsMenu(false);
+      }
+    };
+
+    if (showPromptsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showPromptsMenu]);
+
+  // Handle prompt template selection
+  const handlePromptSelect = useCallback((content: string) => {
+    setMessage(content);
+    setShowPromptsMenu(false);
+    // Auto-expand textarea to fit content
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const newHeight = Math.min(textareaRef.current.scrollHeight, currentMaxHeight);
+      textareaRef.current.style.height = `${newHeight}px`;
+    }
+  }, [currentMaxHeight]);
 
   // Apply template content when it changes
   useEffect(() => {
@@ -610,6 +657,81 @@ export function InputArea({
               <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
             </svg>
           </button>
+          {/* Prompts button */}
+          <div ref={promptsMenuRef} style={{ position: 'relative' }}>
+            <button
+              className="toolbar-btn"
+              onClick={() => setShowPromptsMenu(!showPromptsMenu)}
+              title={t.inputArea.promptsButton?.tooltip || 'Quick Prompts'}
+              disabled={disabled}
+              style={{
+                backgroundColor: showPromptsMenu ? 'var(--bg-tertiary)' : undefined,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {/* Document/template icon */}
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </button>
+            {/* Prompts dropdown menu */}
+            {showPromptsMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: '0',
+                  marginBottom: '4px',
+                  minWidth: '200px',
+                  maxWidth: '300px',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  zIndex: 1000,
+                }}
+              >
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  {t.inputArea.promptsButton?.title || 'Prompt Templates'}
+                </div>
+                {promptTemplates.length === 0 ? (
+                  <div style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                    {t.inputArea.promptsButton?.noTemplates || 'No templates yet'}
+                  </div>
+                ) : (
+                  promptTemplates.map((template) => (
+                    <div
+                      key={template.id}
+                      onClick={() => handlePromptSelect(template.content)}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-primary)',
+                        borderBottom: '1px solid var(--border)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {template.name}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <button
           className="toolbar-btn"

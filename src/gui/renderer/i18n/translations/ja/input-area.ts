@@ -60,4 +60,9 @@ export const inputAreaJa = {
   slashCommands: {
     label: 'コマンド',
   },
+  promptsButton: {
+    tooltip: 'クイックプロンプト',
+    title: 'プロンプトテンプレート',
+    noTemplates: 'テンプレートがありません',
+  },
 };
