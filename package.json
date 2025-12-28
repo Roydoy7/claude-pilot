@@ -13,9 +13,10 @@
     "preview": "vite preview",
     "electron:dev": "vite",
     "electron:build": "vite build && electron-builder",
-    "postinstall": "patch-package && node scripts/setup-python-env.js && node scripts/setup-pandoc.js && node scripts/beautify-cli.js",
+    "postinstall": "patch-package && node scripts/setup-python-env.js && node scripts/setup-pandoc.js && node scripts/setup-calibre.js && node scripts/beautify-cli.js",
     "setup:python": "node scripts/setup-python-env.js",
     "setup:pandoc": "node scripts/setup-pandoc.js",
+    "setup:calibre": "node scripts/setup-calibre.js",
     "beautify:cli": "node scripts/beautify-cli.js",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -26,12 +27,13 @@
     "@anthropic-ai/claude-agent-sdk": "^0.1.60",
     "@mohtasham/md-to-docx": "^2.4.0",
     "@tanstack/react-virtual": "^3.13.12",
-    "@types/adm-zip": "^0.5.7",
     "@types/diff": "^8.0.0",
     "@types/xml2js": "^0.4.14",
     "adm-zip": "^0.5.16",
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
+    "docx": "^9.5.1",
+    "exceljs": "^4.4.0",
     "markitdown-ts": "^0.0.7",
     "officegen": "^0.6.5",
     "open": "^10.2.0",
@@ -39,17 +41,20 @@
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.449",
     "pdfkit": "^0.17.2",
+    "pptx-automizer": "^0.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-virtualized-auto-sizer": "^1.0.26",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.34.5",
     "xml2js": "^0.6.2",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@types/adm-zip": "^0.5.7",
     "@types/pdfkit": "^0.17.4",
     "@types/react": "^19.2.4",
     "@types/react-dom": "^19.2.3",
@@ -61,6 +66,8 @@
     "electron": "^37.7.6",
     "electron-builder": "^26.0.12",
     "patch-package": "^8.0.1",
+    "playwright": "^1.57.0",
+    "pptxgenjs": "^4.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
@@ -82,9 +89,17 @@
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk/**/*",
       "node_modules/@napi-rs/**/*",
-      "node_modules/@img/**/*"
+      "node_modules/@img/**/*",
+      "node_modules/sharp/**/*"
     ],
     "extraResources": [
+      {
+        "from": "src/core/custom-skills",
+        "to": "custom-skills",
+        "filter": [
+          "**/*"
+        ]
+      },
       {
         "from": "packages/python-3.13.11-embed-amd64",
         "to": "python-3.13.11-embed-amd64",

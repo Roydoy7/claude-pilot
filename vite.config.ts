@@ -50,6 +50,7 @@ export default defineConfig({
                 'canvas', // Optional dependency of jsdom
                 'bufferutil', // Optional dependency of ws (WebSocket)
                 'utf-8-validate', // Optional dependency of ws (WebSocket)
+                'sharp', // Native image processing module
               ],
             },
           },
