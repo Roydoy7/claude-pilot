@@ -7,6 +7,7 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface McpToolResultProps {
   /** Raw output from MCP tool (may be JSON string) */
@@ -128,8 +129,8 @@ export function McpToolResult({
         </div>
 
         {/* Content - render as Markdown */}
-        <div style={styles.markdown} className="mcp-tool-result-markdown">
-          <ReactMarkdown>{text}</ReactMarkdown>
+        <div style={styles.markdown} className="tool-result-markdown">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
         </div>
       </div>
     </div>

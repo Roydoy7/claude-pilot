@@ -5,6 +5,7 @@
  */
 
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { ToolConfig, ToolArgs } from './types';
 import { getButtonStyle, contentContainerStyle, isMcpToolError, parseMcpOutput } from './types';
@@ -196,8 +197,8 @@ export const convertRenderer: ToolConfig = {
               </pre>
             </div>
           ) : (
-            <div style={{ color: 'var(--text-primary)' }}>
-              <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+            <div className="tool-result-markdown" style={{ color: 'var(--text-primary)' }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                 {displayOutput}
               </ReactMarkdown>
             </div>

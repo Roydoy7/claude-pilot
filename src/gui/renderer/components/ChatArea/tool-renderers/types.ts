@@ -91,6 +91,14 @@ export const codeStyle: React.CSSProperties = {
 };
 
 /**
+ * Markdown content container styles - limits heading sizes
+ */
+export const markdownContentStyle: React.CSSProperties = {
+  fontSize: '0.75rem',
+  lineHeight: '1.5',
+};
+
+/**
  * Check if MCP tool response is an error
  */
 export function isMcpToolError(response: ToolResponse | undefined): boolean {
