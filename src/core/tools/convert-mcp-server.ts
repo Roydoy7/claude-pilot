@@ -1,20 +1,53 @@
 /**
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
- * Convert MCP Server - Document conversion tool using Pandoc
- * Supports conversion between various document formats
+ * Convert MCP Server - Document conversion tool
+ * Uses LibreOffice headless for document format conversions
+ * Uses Calibre for ebook format conversions
+ * Uses markitdown for converting to Markdown
+ * Uses pdf2docx for PDF to DOCX conversion
  */
 
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { promises as fs, existsSync } from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
- * Pandoc version bundled with the application
+ * LibreOffice version for portable installation
  */
-const PANDOC_VERSION = '3.8.3';
+const LIBREOFFICE_VERSION = '25.2.3';
+
+/**
+ * LibreOffice paths configuration
+ */
+const LIBREOFFICE_PATHS = {
+  // Portable version in packages folder
+  portable: path.join(
+    process.cwd(),
+    'packages',
+    `libreoffice-${LIBREOFFICE_VERSION}`,
+    'App',
+    'libreoffice',
+    'program',
+    'soffice.exe'
+  ),
+  // Alternative portable structure
+  portableAlt: path.join(
+    process.cwd(),
+    'packages',
+    `libreoffice-${LIBREOFFICE_VERSION}`,
+    'program',
+    'soffice.exe'
+  ),
+  // Standard installation paths
+  programFiles: 'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+  programFilesX86: 'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+};
 
 /**
  * Calibre installation paths to check
@@ -25,7 +58,7 @@ const CALIBRE_PATHS = [
 ];
 
 /**
- * Ebook formats - Calibre ONLY (Pandoc cannot handle these properly)
+ * Ebook formats - Calibre ONLY
  * These formats require Calibre for proper conversion with images/formatting
  */
 const EBOOK_FORMATS = [
@@ -50,58 +83,85 @@ const CALIBRE_OUTPUT_FORMATS = [
 ] as const;
 
 /**
- * wkhtmltopdf version bundled with the application
- */
-const WKHTMLTOPDF_VERSION = '0.12.6-1';
-
-/**
  * Python version bundled with the application
  */
 const PYTHON_VERSION = '3.13.11';
 
 /**
- * Supported input formats
+ * LibreOffice supported input formats for conversion
+ * Grouped by document type for clarity
+ */
+const LIBREOFFICE_INPUT_FORMATS = [
+  // Word documents
+  'docx', 'doc', 'odt', 'rtf', 'txt', 'html', 'htm',
+  // Excel spreadsheets
+  'xlsx', 'xls', 'ods', 'csv',
+  // PowerPoint presentations
+  'pptx', 'ppt', 'odp',
+] as const;
+
+/**
+ * LibreOffice supported output formats by input type
+ */
+const LIBREOFFICE_WORD_OUTPUT = ['pdf', 'txt', 'html', 'odt', 'docx'] as const;
+const LIBREOFFICE_EXCEL_OUTPUT = ['pdf', 'csv', 'html', 'xlsx', 'ods'] as const;
+const LIBREOFFICE_PPTX_OUTPUT = ['pdf', 'png', 'jpg', 'odp', 'pptx'] as const;
+
+/**
+ * Word document formats
+ */
+const WORD_FORMATS = ['docx', 'doc', 'odt', 'rtf', 'txt', 'html', 'htm'] as const;
+
+/**
+ * Excel spreadsheet formats
+ */
+const EXCEL_FORMATS = ['xlsx', 'xls', 'ods', 'csv'] as const;
+
+/**
+ * PowerPoint presentation formats
+ */
+const PPTX_FORMATS = ['pptx', 'ppt', 'odp'] as const;
+
+/**
+ * Supported input formats (combined)
  */
 const INPUT_FORMATS = [
-  'docx',
-  'html',
-  'markdown',
-  'md',
-  'txt',
-  'rst',
-  'org',
-  'latex',
-  'tex',
+  // Word documents
+  'docx', 'doc', 'odt', 'rtf',
+  // Excel spreadsheets
+  'xlsx', 'xls', 'ods', 'csv',
+  // PowerPoint presentations
+  'pptx', 'ppt', 'odp',
+  // Web/Text
+  'html', 'htm', 'txt',
+  // Markdown
+  'markdown', 'md',
+  // Ebook (Calibre)
   'epub',
-  'odt',
-  'rtf',
-  'json',
-  'csv',
-  'pdf', // PDF input supported via pdf2docx and markitdown
-  'pptx', // PowerPoint input supported via markitdown (to Markdown only)
-  'xlsx', // Excel input supported via markitdown (to Markdown only)
-  'xls', // Excel input supported via markitdown (to Markdown only)
+  // PDF (via pdf2docx/markitdown)
+  'pdf',
 ] as const;
 
 /**
  * Supported output formats
  */
 const OUTPUT_FORMATS = [
-  'docx',
-  'html',
-  'markdown',
-  'md',
+  // Word documents
+  'docx', 'odt',
+  // Excel spreadsheets
+  'xlsx', 'ods', 'csv',
+  // PowerPoint presentations
+  'pptx', 'odp',
+  // Web/Text
+  'html', 'txt',
+  // Markdown
+  'markdown', 'md',
+  // PDF
   'pdf',
-  'txt',
-  'rst',
-  'org',
-  'latex',
-  'tex',
+  // Images (from PPTX)
+  'png', 'jpg',
+  // Ebook (Calibre)
   'epub',
-  'odt',
-  'rtf',
-  'pptx',
-  'json',
 ] as const;
 
 /**
@@ -117,7 +177,91 @@ interface ConvertExecutionResult {
   fileSize?: number;
   error?: string;
   executionTime: number;
-  pandocVersion?: string;
+  engine?: string;
+}
+
+/**
+ * Find LibreOffice executable
+ */
+function findLibreOffice(): string | null {
+  if (existsSync(LIBREOFFICE_PATHS.portable)) {
+    return LIBREOFFICE_PATHS.portable;
+  }
+  if (existsSync(LIBREOFFICE_PATHS.portableAlt)) {
+    return LIBREOFFICE_PATHS.portableAlt;
+  }
+  if (existsSync(LIBREOFFICE_PATHS.programFiles)) {
+    return LIBREOFFICE_PATHS.programFiles;
+  }
+  if (existsSync(LIBREOFFICE_PATHS.programFilesX86)) {
+    return LIBREOFFICE_PATHS.programFilesX86;
+  }
+  return null;
+}
+
+/**
+ * Check if LibreOffice is installed
+ */
+function isLibreOfficeInstalled(): boolean {
+  return findLibreOffice() !== null;
+}
+
+/**
+ * Check if format is supported by LibreOffice as input
+ */
+function isLibreOfficeInputFormat(format: string): boolean {
+  return LIBREOFFICE_INPUT_FORMATS.includes(format.toLowerCase() as typeof LIBREOFFICE_INPUT_FORMATS[number]);
+}
+
+/**
+ * Check if input format is a Word document type
+ */
+function isWordFormat(format: string): boolean {
+  return WORD_FORMATS.includes(format.toLowerCase() as typeof WORD_FORMATS[number]);
+}
+
+/**
+ * Check if input format is an Excel spreadsheet type
+ */
+function isExcelFormat(format: string): boolean {
+  return EXCEL_FORMATS.includes(format.toLowerCase() as typeof EXCEL_FORMATS[number]);
+}
+
+/**
+ * Check if input format is a PowerPoint presentation type
+ */
+function isPptxFormat(format: string): boolean {
+  return PPTX_FORMATS.includes(format.toLowerCase() as typeof PPTX_FORMATS[number]);
+}
+
+/**
+ * Check if conversion can be done with LibreOffice
+ * Validates that the input/output format combination is valid
+ */
+function canUseLibreOffice(inputFormat: string, outputFormat: string): boolean {
+  if (!isLibreOfficeInstalled() || !isLibreOfficeInputFormat(inputFormat)) {
+    return false;
+  }
+
+  const from = inputFormat.toLowerCase();
+  const to = outputFormat.toLowerCase();
+
+  // Word documents → PDF, TXT, HTML, ODT, DOCX
+  if (isWordFormat(from)) {
+    return LIBREOFFICE_WORD_OUTPUT.includes(to as typeof LIBREOFFICE_WORD_OUTPUT[number]);
+  }
+
+  // Excel spreadsheets → PDF, CSV, HTML, XLSX, ODS
+  if (isExcelFormat(from)) {
+    return LIBREOFFICE_EXCEL_OUTPUT.includes(to as typeof LIBREOFFICE_EXCEL_OUTPUT[number]);
+  }
+
+  // PowerPoint presentations → PDF, PNG, JPG, ODP, PPTX
+  if (isPptxFormat(from)) {
+    return LIBREOFFICE_PPTX_OUTPUT.includes(to as typeof LIBREOFFICE_PPTX_OUTPUT[number]);
+  }
+
+  return false;
 }
 
 /**
@@ -258,67 +402,52 @@ async function convertWithCalibre(
 }
 
 /**
- * Get Pandoc executable path
+ * Convert document using LibreOffice headless
  */
-function getPandocPath(): string {
-  // Check embedded Pandoc in packages folder
-  const embeddedPandoc = path.join(
-    process.cwd(),
-    'packages',
-    `pandoc-${PANDOC_VERSION}`,
-    'pandoc.exe'
-  );
+async function convertWithLibreOffice(
+  inputFile: string,
+  outputFormat: string,
+  outputDir: string
+): Promise<{ success: boolean; outputFile?: string; error?: string }> {
+  const libreOfficePath = findLibreOffice();
 
-  if (existsSync(embeddedPandoc)) {
-    return embeddedPandoc;
+  if (!libreOfficePath) {
+    return {
+      success: false,
+      error: 'LibreOffice not found. Please install LibreOffice or run: npm run setup:libreoffice',
+    };
   }
 
-  // Check in resources folder (for packaged app)
-  const resourcesPandoc = path.join(
-    process.resourcesPath || process.cwd(),
-    `pandoc-${PANDOC_VERSION}`,
-    'pandoc.exe'
-  );
-
-  if (existsSync(resourcesPandoc)) {
-    return resourcesPandoc;
+  // Ensure output directory exists
+  if (!existsSync(outputDir)) {
+    await fs.mkdir(outputDir, { recursive: true });
   }
 
-  // Fallback to system pandoc
-  return 'pandoc';
-}
+  // Build LibreOffice command
+  const command = `"${libreOfficePath}" --headless --convert-to ${outputFormat} --outdir "${outputDir}" "${inputFile}"`;
 
-/**
- * Get wkhtmltopdf executable path
- */
-function getWkhtmltopdfPath(): string | null {
-  // Check embedded wkhtmltopdf in packages folder
-  const embeddedWkhtmltopdf = path.join(
-    process.cwd(),
-    'packages',
-    `wkhtmltopdf-${WKHTMLTOPDF_VERSION}`,
-    'bin',
-    'wkhtmltopdf.exe'
-  );
-
-  if (existsSync(embeddedWkhtmltopdf)) {
-    return embeddedWkhtmltopdf;
+  try {
+    await execAsync(command, { timeout: 120000 }); // 2 minute timeout
+  } catch (execError) {
+    const errorMessage = execError instanceof Error ? execError.message : String(execError);
+    return {
+      success: false,
+      error: `LibreOffice conversion failed: ${errorMessage}`,
+    };
   }
 
-  // Check in resources folder (for packaged app)
-  const resourcesWkhtmltopdf = path.join(
-    process.resourcesPath || process.cwd(),
-    `wkhtmltopdf-${WKHTMLTOPDF_VERSION}`,
-    'bin',
-    'wkhtmltopdf.exe'
-  );
+  // Determine output file path
+  const baseName = path.basename(inputFile, path.extname(inputFile));
+  const outputFile = path.join(outputDir, `${baseName}.${outputFormat}`);
 
-  if (existsSync(resourcesWkhtmltopdf)) {
-    return resourcesWkhtmltopdf;
+  if (!existsSync(outputFile)) {
+    return {
+      success: false,
+      error: `Conversion completed but output file not found: ${outputFile}`,
+    };
   }
 
-  // wkhtmltopdf not found
-  return null;
+  return { success: true, outputFile };
 }
 
 /**
@@ -492,50 +621,6 @@ function isMarkitdownSupported(format: string): boolean {
 }
 
 /**
- * Execute Pandoc command
- */
-async function executePandoc(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
-  const pandocPath = getPandocPath();
-
-  return new Promise((resolve) => {
-    const proc = spawn(pandocPath, args, {
-      windowsHide: true,
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    proc.stderr.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    proc.on('close', (code) => {
-      resolve({ stdout, stderr, code: code ?? 0 });
-    });
-
-    proc.on('error', (error) => {
-      resolve({ stdout, stderr: error.message, code: 1 });
-    });
-  });
-}
-
-/**
- * Get Pandoc version
- */
-async function getPandocVersion(): Promise<string> {
-  const { stdout, code } = await executePandoc(['--version']);
-  if (code === 0) {
-    const match = stdout.match(/pandoc\s+([\d.]+)/);
-    return match ? match[1] : 'unknown';
-  }
-  return 'not found';
-}
-
-/**
  * Detect format from file extension
  */
 function detectFormat(filePath: string): string {
@@ -563,7 +648,7 @@ function getOutputExtension(format: string): string {
 }
 
 /**
- * Convert document using Pandoc
+ * Convert document - main conversion logic
  */
 async function convertDocument(
   inputFile: string,
@@ -571,233 +656,29 @@ async function convertDocument(
   inputFormat?: string,
   outputFormat?: string,
   options?: {
-    standalone?: boolean;
-    tableOfContents?: boolean;
-    numberSections?: boolean;
-    template?: string;
-    cssFile?: string;
-    referenceDoc?: string;
     pdfFontSize?: number;
   }
 ): Promise<ConvertExecutionResult> {
   const startTime = Date.now();
 
-  try {
-    // Verify input file exists
-    if (!existsSync(inputFile)) {
-      return {
-        success: false,
-        operation: 'convert',
-        inputFile,
-        error: `Input file not found: ${inputFile}`,
-        executionTime: Date.now() - startTime,
-      };
-    }
-
-    // Detect formats if not specified
-    const fromFormat = inputFormat || detectFormat(inputFile);
-    const toFormat = outputFormat || detectFormat(outputFile);
-
-    // Route 1: Ebook formats - Calibre ONLY (no fallback)
-    // EPUB, MOBI, AZW3, CBZ, CBR, FB2, LIT, etc. require Calibre for proper conversion
-    if (requiresCalibre(fromFormat, toFormat)) {
-      if (!isCalibreInstalled()) {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: `Ebook format conversion (${fromFormat} → ${toFormat}) requires Calibre. Please install Calibre from https://calibre-ebook.com`,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      if (!canUseCalibre(fromFormat, toFormat)) {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: `Calibre does not support this conversion: ${fromFormat} → ${toFormat}`,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      const calibreResult = await convertWithCalibre(inputFile, outputFile, {
-        pdfFontSize: options?.pdfFontSize,
-      });
-      if (!calibreResult.success) {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: calibreResult.error,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      const stats = await fs.stat(outputFile);
-      return {
-        success: true,
-        operation: 'convert',
-        inputFile,
-        outputFile,
-        inputFormat: fromFormat,
-        outputFormat: toFormat,
-        fileSize: stats.size,
-        executionTime: Date.now() - startTime,
-      };
-    }
-
-    // Route 2: Handle conversion to Markdown using markitdown for supported formats
-    const isMarkdownOutput = toFormat === 'markdown' || toFormat === 'md';
-    if (isMarkdownOutput && isMarkitdownSupported(fromFormat)) {
-      const mdResult = await convertToMarkdown(inputFile, outputFile);
-      if (!mdResult.success) {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: mdResult.error,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      const stats = await fs.stat(outputFile);
-      return {
-        success: true,
-        operation: 'convert',
-        inputFile,
-        outputFile,
-        inputFormat: fromFormat,
-        outputFormat: toFormat,
-        fileSize: stats.size,
-        executionTime: Date.now() - startTime,
-      };
-    }
-
-    // Handle PDF input using pdf2docx (Pandoc cannot read PDF)
-    if (fromFormat === 'pdf') {
-      if (toFormat !== 'docx') {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: `PDF can only be converted to DOCX format. For other formats, first convert PDF to DOCX, then convert DOCX to ${toFormat}.`,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      const pdfResult = await convertPdfToDocx(inputFile, outputFile);
-      if (!pdfResult.success) {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: pdfResult.error,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      const stats = await fs.stat(outputFile);
-      return {
-        success: true,
-        operation: 'convert',
-        inputFile,
-        outputFile,
-        inputFormat: fromFormat,
-        outputFormat: toFormat,
-        fileSize: stats.size,
-        executionTime: Date.now() - startTime,
-      };
-    }
-
-    // Handle xlsx/pptx input - only Markdown output is supported via markitdown
-    if (fromFormat === 'xlsx' || fromFormat === 'xls' || fromFormat === 'pptx') {
-      return {
-        success: false,
-        operation: 'convert',
-        inputFile,
-        outputFile,
-        inputFormat: fromFormat,
-        outputFormat: toFormat,
-        error: `${fromFormat.toUpperCase()} files can only be converted to Markdown format via markitdown.`,
-        executionTime: Date.now() - startTime,
-      };
-    }
-
-    // Build Pandoc arguments
-    const args: string[] = [
+  // Verify input file exists
+  if (!existsSync(inputFile)) {
+    return {
+      success: false,
+      operation: 'convert',
       inputFile,
-      '-o', outputFile,
-      '-f', fromFormat,
-      '-t', toFormat,
-    ];
+      error: `Input file not found: ${inputFile}`,
+      executionTime: Date.now() - startTime,
+    };
+  }
 
-    // Add optional flags
-    if (options?.standalone !== false) {
-      args.push('-s'); // Standalone document
-    }
+  // Detect formats if not specified
+  const fromFormat = inputFormat || detectFormat(inputFile);
+  const toFormat = outputFormat || detectFormat(outputFile);
 
-    if (options?.tableOfContents) {
-      args.push('--toc');
-    }
-
-    if (options?.numberSections) {
-      args.push('--number-sections');
-    }
-
-    if (options?.template) {
-      args.push('--template', options.template);
-    }
-
-    if (options?.cssFile && (toFormat === 'html' || toFormat === 'epub')) {
-      args.push('--css', options.cssFile);
-    }
-
-    if (options?.referenceDoc && (toFormat === 'docx' || toFormat === 'pptx' || toFormat === 'odt')) {
-      args.push('--reference-doc', options.referenceDoc);
-    }
-
-    // For PDF output, use wkhtmltopdf as the PDF engine
-    if (toFormat === 'pdf') {
-      const wkhtmltopdfPath = getWkhtmltopdfPath();
-      if (wkhtmltopdfPath) {
-        args.push('--pdf-engine', wkhtmltopdfPath);
-      } else {
-        return {
-          success: false,
-          operation: 'convert',
-          inputFile,
-          outputFile,
-          inputFormat: fromFormat,
-          outputFormat: toFormat,
-          error: 'PDF conversion requires wkhtmltopdf which is not installed. Run "npm run setup:pandoc" to install it.',
-          executionTime: Date.now() - startTime,
-        };
-      }
-    }
-
-    // Execute Pandoc
-    const { stderr, code } = await executePandoc(args);
-
-    if (code !== 0) {
+  // Route 1: Ebook formats - Calibre ONLY (no fallback)
+  if (requiresCalibre(fromFormat, toFormat)) {
+    if (!isCalibreInstalled()) {
       return {
         success: false,
         operation: 'convert',
@@ -805,14 +686,41 @@ async function convertDocument(
         outputFile,
         inputFormat: fromFormat,
         outputFormat: toFormat,
-        error: `Pandoc conversion failed: ${stderr}`,
+        error: `Ebook format conversion (${fromFormat} → ${toFormat}) requires Calibre. Please install Calibre from https://calibre-ebook.com`,
         executionTime: Date.now() - startTime,
       };
     }
 
-    // Get output file size
-    const stats = await fs.stat(outputFile);
+    if (!canUseCalibre(fromFormat, toFormat)) {
+      return {
+        success: false,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        error: `Calibre does not support this conversion: ${fromFormat} → ${toFormat}`,
+        executionTime: Date.now() - startTime,
+      };
+    }
 
+    const calibreResult = await convertWithCalibre(inputFile, outputFile, {
+      pdfFontSize: options?.pdfFontSize,
+    });
+    if (!calibreResult.success) {
+      return {
+        success: false,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        error: calibreResult.error,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    const stats = await fs.stat(outputFile);
     return {
       success: true,
       operation: 'convert',
@@ -822,25 +730,142 @@ async function convertDocument(
       outputFormat: toFormat,
       fileSize: stats.size,
       executionTime: Date.now() - startTime,
-      pandocVersion: PANDOC_VERSION,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      operation: 'convert',
-      inputFile,
-      error: `Conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      executionTime: Date.now() - startTime,
+      engine: 'Calibre',
     };
   }
+
+  // Route 2: Handle conversion to Markdown using markitdown for supported formats
+  const isMarkdownOutput = toFormat === 'markdown' || toFormat === 'md';
+  if (isMarkdownOutput && isMarkitdownSupported(fromFormat)) {
+    const mdResult = await convertToMarkdown(inputFile, outputFile);
+    if (!mdResult.success) {
+      return {
+        success: false,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        error: mdResult.error,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    const stats = await fs.stat(outputFile);
+    return {
+      success: true,
+      operation: 'convert',
+      inputFile,
+      outputFile,
+      inputFormat: fromFormat,
+      outputFormat: toFormat,
+      fileSize: stats.size,
+      executionTime: Date.now() - startTime,
+      engine: 'markitdown',
+    };
+  }
+
+  // Route 3: Handle PDF input using pdf2docx
+  if (fromFormat === 'pdf') {
+    if (toFormat !== 'docx') {
+      return {
+        success: false,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        error: `PDF can only be converted to DOCX format. For other formats, first convert PDF to DOCX, then convert DOCX to ${toFormat}.`,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    const pdfResult = await convertPdfToDocx(inputFile, outputFile);
+    if (!pdfResult.success) {
+      return {
+        success: false,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        error: pdfResult.error,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    const stats = await fs.stat(outputFile);
+    return {
+      success: true,
+      operation: 'convert',
+      inputFile,
+      outputFile,
+      inputFormat: fromFormat,
+      outputFormat: toFormat,
+      fileSize: stats.size,
+      executionTime: Date.now() - startTime,
+      engine: 'pdf2docx',
+    };
+  }
+
+  // Route 4: Use LibreOffice for document format conversions
+  if (canUseLibreOffice(fromFormat, toFormat)) {
+    const outputDir = path.dirname(outputFile);
+    const loResult = await convertWithLibreOffice(inputFile, toFormat, outputDir);
+
+    if (!loResult.success) {
+      return {
+        success: false,
+        operation: 'convert',
+        inputFile,
+        outputFile,
+        inputFormat: fromFormat,
+        outputFormat: toFormat,
+        error: loResult.error,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    // LibreOffice generates file with same basename in output dir
+    const actualOutputFile = loResult.outputFile || outputFile;
+
+    // If the generated file has a different name, rename it
+    if (actualOutputFile !== outputFile && existsSync(actualOutputFile)) {
+      await fs.rename(actualOutputFile, outputFile);
+    }
+
+    const stats = await fs.stat(outputFile);
+    return {
+      success: true,
+      operation: 'convert',
+      inputFile,
+      outputFile,
+      inputFormat: fromFormat,
+      outputFormat: toFormat,
+      fileSize: stats.size,
+      executionTime: Date.now() - startTime,
+      engine: 'LibreOffice',
+    };
+  }
+
+  // No suitable conversion engine found
+  return {
+    success: false,
+    operation: 'convert',
+    inputFile,
+    outputFile,
+    inputFormat: fromFormat,
+    outputFormat: toFormat,
+    error: `No conversion engine available for ${fromFormat} → ${toFormat}. LibreOffice is ${isLibreOfficeInstalled() ? 'installed' : 'not installed'}.`,
+    executionTime: Date.now() - startTime,
+  };
 }
 
 /**
  * List supported formats
  */
-async function listFormats(): Promise<ConvertExecutionResult & { inputFormats?: string[]; outputFormats?: string[] }> {
+function listFormats(): ConvertExecutionResult & { inputFormats?: string[]; outputFormats?: string[] } {
   const startTime = Date.now();
-  const version = await getPandocVersion();
 
   return {
     success: true,
@@ -848,54 +873,71 @@ async function listFormats(): Promise<ConvertExecutionResult & { inputFormats?: 
     inputFile: '',
     inputFormats: [...INPUT_FORMATS],
     outputFormats: [...OUTPUT_FORMATS],
-    pandocVersion: version,
     executionTime: Date.now() - startTime,
   };
 }
 
 /**
- * Format result for LLM
+ * Format result for LLM - uses Markdown list for proper line breaks
  */
 function formatResultForLLM(result: ConvertExecutionResult & { inputFormats?: string[]; outputFormats?: string[] }): string {
   const lines: string[] = [];
 
-  lines.push(`# Document Conversion Result\n`);
-  lines.push(`**Status**: ${result.success ? 'Success' : 'Failed'}`);
-  lines.push(`**Execution Time**: ${result.executionTime}ms`);
+  lines.push(`# Document Conversion Result`);
+  lines.push('');
+  lines.push(`- **Status**: ${result.success ? 'Success' : 'Failed'}`);
+  lines.push(`- **Execution Time**: ${result.executionTime}ms`);
 
-  if (result.pandocVersion) {
-    lines.push(`**Pandoc Version**: ${result.pandocVersion}`);
+  if (result.engine) {
+    lines.push(`- **Engine**: ${result.engine}`);
   }
 
   if (result.operation === 'list-formats') {
-    lines.push('\n## Supported Input Formats\n');
+    lines.push('');
+    lines.push('## Supported Input Formats');
+    lines.push('');
     lines.push(result.inputFormats?.join(', ') || 'None');
-    lines.push('\n## Supported Output Formats\n');
+    lines.push('');
+    lines.push('## Supported Output Formats');
+    lines.push('');
     lines.push(result.outputFormats?.join(', ') || 'None');
+    lines.push('');
+    lines.push('## Conversion Engines');
+    lines.push('');
+    lines.push(`- **LibreOffice** (${isLibreOfficeInstalled() ? 'Installed' : 'Not installed'}):`);
+    lines.push(`  - Word: DOCX/DOC/ODT/RTF/HTML/TXT → PDF, TXT, HTML, ODT, DOCX`);
+    lines.push(`  - Excel: XLSX/XLS/ODS/CSV → PDF, CSV, HTML, XLSX, ODS`);
+    lines.push(`  - PowerPoint: PPTX/PPT/ODP → PDF, PNG, JPG, ODP, PPTX`);
+    lines.push(`- **Calibre** (${isCalibreInstalled() ? 'Installed' : 'Not installed'}): Ebook formats (EPUB, MOBI, AZW3, etc.)`);
+    lines.push(`- **markitdown**: PDF/DOCX/PPTX/XLSX/HTML → Markdown`);
+    lines.push(`- **pdf2docx**: PDF → DOCX`);
   } else {
     if (result.inputFile) {
-      lines.push(`**Input File**: ${result.inputFile}`);
+      lines.push(`- **Input File**: ${result.inputFile}`);
     }
 
     if (result.outputFile) {
-      lines.push(`**Output File**: ${result.outputFile}`);
+      lines.push(`- **Output File**: ${result.outputFile}`);
     }
 
     if (result.inputFormat) {
-      lines.push(`**Input Format**: ${result.inputFormat}`);
+      lines.push(`- **Input Format**: ${result.inputFormat}`);
     }
 
     if (result.outputFormat) {
-      lines.push(`**Output Format**: ${result.outputFormat}`);
+      lines.push(`- **Output Format**: ${result.outputFormat}`);
     }
 
     if (result.fileSize !== undefined) {
-      lines.push(`**Output Size**: ${Math.round(result.fileSize / 1024)}KB`);
+      lines.push(`- **Output Size**: ${Math.round(result.fileSize / 1024)}KB`);
     }
   }
 
   if (result.error) {
-    lines.push(`\n## Error\n\n${result.error}`);
+    lines.push('');
+    lines.push('## Error');
+    lines.push('');
+    lines.push(result.error);
   }
 
   return lines.join('\n');
@@ -913,22 +955,22 @@ function createConvertMcpServer() {
         'convert',
         `Document format conversion tool with specialized engines for different format types.
 
-Conversion engines (each handles its specialized formats, NO fallback):
+Conversion engines:
 
-1. **Calibre** (ebook-convert) - REQUIRED for ebook formats:
+1. **LibreOffice** (headless) - For Office documents:
+   - Word: DOCX/DOC/ODT/RTF/HTML/TXT → PDF, TXT, HTML, ODT, DOCX
+   - Excel: XLSX/XLS/ODS/CSV → PDF, CSV, HTML, XLSX, ODS
+   - PowerPoint: PPTX/PPT/ODP → PDF, PNG, JPG, ODP, PPTX
+   - High-quality output with formatting preserved
+
+2. **Calibre** (ebook-convert) - For ebook formats:
    - Formats: EPUB, MOBI, AZW, AZW3, FB2, CBZ, CBR, LIT, PRC, PDB, etc.
    - Calibre installation required: https://calibre-ebook.com
 
-2. **markitdown** - For converting documents to Markdown:
+3. **markitdown** - For converting to Markdown:
    - Input: PDF, DOCX, PPTX, XLSX, HTML
 
-3. **pdf2docx** - For PDF to DOCX conversion
-
-4. **Pandoc** - For text-based document formats:
-   - Formats: Markdown, LaTeX, RST, Org-mode, HTML, DOCX, ODT, RTF
-   - PDF output via wkhtmltopdf (bundled)
-
-IMPORTANT: Ebook formats (EPUB, MOBI, AZW3, etc.) REQUIRE Calibre. No fallback is provided because Pandoc cannot preserve images and formatting properly.
+4. **pdf2docx** - For PDF to DOCX conversion
 
 Operations:
 - convert: Convert a document from one format to another
@@ -939,12 +981,6 @@ Operations:
           output: z.string().optional().describe('Output file path. If not specified, uses input filename with new extension'),
           from: z.string().optional().describe('Input format (auto-detected from extension if not specified)'),
           to: z.string().optional().describe('Output format (auto-detected from output extension if not specified)'),
-          standalone: z.boolean().optional().describe('Generate standalone document with header/footer (default: true)'),
-          toc: z.boolean().optional().describe('Include table of contents'),
-          numberSections: z.boolean().optional().describe('Number section headings'),
-          template: z.string().optional().describe('Custom template file path'),
-          css: z.string().optional().describe('CSS file for HTML/EPUB output'),
-          referenceDoc: z.string().optional().describe('Reference document for styling (docx/pptx/odt)'),
           pdfFontSize: z.number().optional().describe('Font size for PDF output when using Calibre (default: 12). Use smaller values like 10 or 11 if fonts appear too large.'),
           workingDirectory: z.string().optional().describe('Working directory for relative paths'),
         },
@@ -954,12 +990,6 @@ Operations:
           output,
           from,
           to,
-          standalone,
-          toc,
-          numberSections,
-          template,
-          css,
-          referenceDoc,
           pdfFontSize,
           workingDirectory,
         }) => {
@@ -975,7 +1005,7 @@ Operations:
 
           switch (operation) {
             case 'list-formats':
-              result = await listFormats();
+              result = listFormats();
               break;
 
             case 'convert': {
@@ -1004,12 +1034,6 @@ Operations:
               }
 
               result = await convertDocument(inputFile, outputFile, from, to, {
-                standalone,
-                tableOfContents: toc,
-                numberSections,
-                template: template ? resolveFilePath(template) : undefined,
-                cssFile: css ? resolveFilePath(css) : undefined,
-                referenceDoc: referenceDoc ? resolveFilePath(referenceDoc) : undefined,
                 pdfFontSize,
               });
               break;
