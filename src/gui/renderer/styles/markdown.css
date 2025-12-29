@@ -205,3 +205,74 @@
 .message-bubble pre::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.5);
 }
+
+/* Tool result markdown - smaller font sizes for compact display */
+.tool-result-markdown {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.tool-result-markdown h1,
+.tool-result-markdown h2,
+.tool-result-markdown h3,
+.tool-result-markdown h4,
+.tool-result-markdown h5,
+.tool-result-markdown h6 {
+  margin: 0.5em 0 0.25em 0;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.tool-result-markdown h1 { font-size: 0.95rem; }
+.tool-result-markdown h2 { font-size: 0.875rem; }
+.tool-result-markdown h3 { font-size: 0.8rem; }
+.tool-result-markdown h4,
+.tool-result-markdown h5,
+.tool-result-markdown h6 { font-size: 0.75rem; }
+
+.tool-result-markdown p {
+  margin: 0.25em 0;
+}
+
+.tool-result-markdown p:first-child {
+  margin-top: 0;
+}
+
+.tool-result-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.tool-result-markdown ul,
+.tool-result-markdown ol {
+  margin: 0.25em 0;
+  padding-left: 1.25em;
+}
+
+.tool-result-markdown li {
+  margin: 0.125em 0;
+}
+
+.tool-result-markdown code {
+  font-size: 0.7rem;
+  padding: 0.1em 0.25em;
+  background-color: var(--bg-secondary);
+  border-radius: 3px;
+}
+
+.tool-result-markdown pre {
+  margin: 0.25em 0;
+  padding: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.tool-result-markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.tool-result-markdown strong {
+  font-weight: 600;
+}
