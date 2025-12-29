@@ -20,6 +20,7 @@ import { typescriptMcpServer } from '../tools/typescript-mcp-server.js';
 import { imageMcpServer } from '../tools/image-mcp-server.js';
 import { pptxMcpServer } from '../tools/pptx-mcp-server.js';
 import { xlsxMcpServer } from '../tools/xlsx-mcp-server.js';
+import { docxMcpServer } from '../tools/docx-mcp-server.js';
 
 /**
  * All available Claude SDK built-in tools
@@ -139,6 +140,7 @@ export const ROLE_MCP_SERVERS: Record<RoleType, Record<string, McpServer>> = {
     image: imageMcpServer,
     pptx: pptxMcpServer,
     xlsx: xlsxMcpServer,
+    docx: docxMcpServer,
   },
 
   [RoleType.CLAUDE_CODE]: {},
