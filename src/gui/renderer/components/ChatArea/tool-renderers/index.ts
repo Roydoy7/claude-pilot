@@ -40,6 +40,9 @@ export {
   WordDocIcon,
 } from './convert-renderer';
 
+// DOCX tool renderer
+export { docxRenderer, DocxIcon } from './docx-renderer';
+
 // Claude Agent SDK tool renderers
 export {
   readRenderer,

@@ -20,6 +20,7 @@ import {
   convertRenderer,
   markitdownRenderer,
   markdownToWordRenderer,
+  docxRenderer,
   readRenderer,
   writeRenderer,
   editRenderer,
@@ -91,6 +92,7 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
   image: imageRenderer,
   pptx: pptxRenderer,
   xlsx: xlsxRenderer,
+  docx: docxRenderer,
 };
 
 /**
@@ -104,6 +106,7 @@ const TOOL_ALIASES: Record<string, string> = {
   'mcp__image__process': 'image',
   'mcp__pptx__process': 'pptx',
   'mcp__xlsx__process': 'xlsx',
+  'mcp__docx__docx': 'docx',
 };
 
 /**
