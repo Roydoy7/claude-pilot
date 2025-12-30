@@ -1,16 +1,12 @@
 /**
- * Setup Calibre script
- * Downloads and installs Calibre for ebook conversion
- * Runs during npm install (postinstall hook)
+ * Setup Calibre Portable script
+ * Downloads and extracts Calibre Portable for ebook conversion
  */
 
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-
-const execAsync = promisify(exec);
+const { spawn } = require('child_process');
 
 // ANSI color codes
 const colors = {
@@ -26,16 +22,26 @@ function log(message, color = colors.reset) {
   console.log(`${color}${message}${colors.reset}`);
 }
 
-// Configuration - Calibre
+// Configuration - Calibre Portable
+// Note: Calibre Portable installer has a 59 character path limit, so we use a short directory name
 const CALIBRE_VERSION = '8.16.2';
-const CALIBRE_URL = `https://github.com/kovidgoyal/calibre/releases/download/v${CALIBRE_VERSION}/calibre-64bit-${CALIBRE_VERSION}.msi`;
-const CALIBRE_INSTALL_PATH = 'C:\\Program Files\\Calibre2';
-const CALIBRE_EXE = path.join(CALIBRE_INSTALL_PATH, 'ebook-convert.exe');
-const TEMP_DIR = process.env.TEMP || 'C:\\temp';
-const CALIBRE_MSI = path.join(TEMP_DIR, `calibre-${CALIBRE_VERSION}.msi`);
+const CALIBRE_URL = `https://download.calibre-ebook.com/${CALIBRE_VERSION}/calibre-portable-installer-${CALIBRE_VERSION}.exe`;
+const PACKAGES_DIR = path.join(__dirname, '..', 'packages');
+const CALIBRE_DIR = path.join(PACKAGES_DIR, 'calibre');
+const CALIBRE_EXE = path.join(CALIBRE_DIR, 'Calibre Portable', 'Calibre', 'ebook-convert.exe');
+const INSTALLER_PATH = path.join(PACKAGES_DIR, `calibre-portable-installer-${CALIBRE_VERSION}.exe`);
 
 /**
- * Check if Calibre is already installed
+ * Ensure directory exists
+ */
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+/**
+ * Check if Calibre Portable is already installed
  */
 function isCalibreInstalled() {
   return fs.existsSync(CALIBRE_EXE);
@@ -47,7 +53,9 @@ function isCalibreInstalled() {
 function downloadFile(url, destPath) {
   return new Promise((resolve, reject) => {
     log(`   Downloading from: ${url}`, colors.cyan);
+    log(`   Size: ~180 MB (this may take a few minutes)`, colors.cyan);
 
+    ensureDir(path.dirname(destPath));
     const file = fs.createWriteStream(destPath);
     let downloadedBytes = 0;
     let totalBytes = 0;
@@ -99,112 +107,110 @@ function downloadFile(url, destPath) {
 }
 
 /**
- * Install Calibre using msiexec (interactive install with UI)
+ * Remove directory recursively
  */
-async function installCalibre() {
-  log('   Installing Calibre...', colors.cyan);
-  log('   A Windows installer window will open. Please follow the prompts.', colors.yellow);
+function removeDir(dir) {
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
-  try {
-    // Use msiexec with passive mode (shows progress but no user interaction needed)
-    // /passive = unattended mode with progress bar
-    // /norestart = don't restart
-    // If passive fails, fall back to full UI
-    await execAsync(`msiexec /i "${CALIBRE_MSI}" /passive /norestart`, {
-      timeout: 600000, // 10 minutes timeout
+/**
+ * Extract Calibre Portable using the installer
+ * The portable installer accepts target directory as argument
+ */
+function extractCalibre() {
+  return new Promise((resolve, reject) => {
+    log(`   Extracting to: ${CALIBRE_DIR}`, colors.cyan);
+    log(`   This may take a minute...`, colors.cyan);
+
+    // Remove existing directory to avoid "Failed to move" error
+    // The installer needs a clean target directory
+    if (fs.existsSync(CALIBRE_DIR)) {
+      log(`   Removing existing directory...`, colors.cyan);
+      removeDir(CALIBRE_DIR);
+    }
+
+    // Ensure parent directory exists
+    ensureDir(PACKAGES_DIR);
+
+    // Calibre portable installer extracts to the specified directory
+    const proc = spawn(INSTALLER_PATH, [CALIBRE_DIR], {
+      stdio: 'inherit',
+      windowsHide: true,
     });
 
-    log('   Installation complete', colors.green);
-    return true;
-  } catch (error) {
-    // If passive mode fails, try with full UI
-    log('   Passive install failed, trying with full UI...', colors.yellow);
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Installer exited with code ${code}`));
+      }
+    });
+
+    proc.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Clean up installer file
+ */
+function cleanup() {
+  if (fs.existsSync(INSTALLER_PATH)) {
+    log(`   Removing installer: ${path.basename(INSTALLER_PATH)}`, colors.cyan);
     try {
-      await execAsync(`msiexec /i "${CALIBRE_MSI}" /norestart`, {
-        timeout: 600000,
-      });
-      log('   Installation complete', colors.green);
-      return true;
-    } catch (uiError) {
-      log(`   ⚠️  Installation failed: ${uiError.message}`, colors.yellow);
-      return false;
+      fs.unlinkSync(INSTALLER_PATH);
+    } catch {
+      // Ignore cleanup errors
     }
   }
 }
 
 /**
- * Clean up temporary files
- */
-function cleanup() {
-  if (fs.existsSync(CALIBRE_MSI)) {
-    log(`   Removing temporary file: ${path.basename(CALIBRE_MSI)}`, colors.cyan);
-    fs.unlinkSync(CALIBRE_MSI);
-  }
-}
-
-/**
- * Setup Calibre
+ * Setup Calibre Portable
  */
 async function setupCalibre() {
   if (isCalibreInstalled()) {
-    log(`✅ Calibre is already installed`, colors.green);
-    log(`   Location: ${CALIBRE_EXE}`, colors.cyan);
-
-    // Get version info
-    try {
-      const { stdout } = await execAsync(`"${CALIBRE_EXE}" --version`);
-      const versionLine = stdout.split('\n')[0];
-      log(`   ${versionLine}`, colors.cyan);
-    } catch {
-      // Version check failed, but installation exists
-    }
+    log(`✅ Calibre Portable is already installed`, colors.green);
+    log(`   Location: ${CALIBRE_DIR}`, colors.cyan);
     return true;
   }
 
-  log('\n📥 Downloading Calibre...', colors.blue);
+  log('\n📥 Downloading Calibre Portable...', colors.blue);
   log(`   Version: ${CALIBRE_VERSION}`, colors.cyan);
-  log(`   Size: ~170 MB`, colors.cyan);
 
   try {
-    // Ensure temp directory exists
-    if (!fs.existsSync(TEMP_DIR)) {
-      fs.mkdirSync(TEMP_DIR, { recursive: true });
+    // Download installer if not exists
+    if (!fs.existsSync(INSTALLER_PATH)) {
+      await downloadFile(CALIBRE_URL, INSTALLER_PATH);
+      log('✅ Download complete', colors.green);
+    } else {
+      log(`   Installer already downloaded`, colors.cyan);
     }
 
-    await downloadFile(CALIBRE_URL, CALIBRE_MSI);
-    log('✅ Download complete', colors.green);
+    log('\n📦 Extracting Calibre Portable...', colors.blue);
+    await extractCalibre();
 
-    log('\n📦 Installing Calibre...', colors.blue);
-    const installed = await installCalibre();
-
-    if (!installed) {
-      log('\n⚠️  Automatic installation failed (administrator privileges required)', colors.yellow);
-      log('   Please install Calibre manually:', colors.yellow);
-      log(`   1. Run as Administrator: msiexec /i "${CALIBRE_MSI}"`, colors.yellow);
-      log(`   2. Or download from: https://calibre-ebook.com/download_windows`, colors.yellow);
-      return false;
-    }
-
-    if (fs.existsSync(CALIBRE_EXE)) {
-      log('✅ Calibre installed successfully!', colors.green);
-      log(`   Location: ${CALIBRE_EXE}`, colors.cyan);
-
-      // Get version info
-      try {
-        const { stdout } = await execAsync(`"${CALIBRE_EXE}" --version`);
-        const versionLine = stdout.split('\n')[0];
-        log(`   ${versionLine}`, colors.cyan);
-      } catch {
-        // Version check failed, but installation succeeded
-      }
+    if (isCalibreInstalled()) {
+      log('✅ Calibre Portable installed successfully!', colors.green);
+      log(`   Location: ${CALIBRE_DIR}`, colors.cyan);
       return true;
     } else {
-      throw new Error('ebook-convert.exe not found after installation');
+      // Check alternative structure
+      const altExe = path.join(CALIBRE_DIR, 'ebook-convert.exe');
+      if (fs.existsSync(altExe)) {
+        log('✅ Calibre Portable installed successfully!', colors.green);
+        log(`   Location: ${CALIBRE_DIR}`, colors.cyan);
+        return true;
+      }
+      throw new Error('ebook-convert.exe not found after extraction');
     }
   } catch (error) {
-    log(`❌ Failed to install Calibre: ${error.message}`, colors.red);
+    log(`❌ Failed to install Calibre Portable: ${error.message}`, colors.red);
     log('   You can manually download from:', colors.yellow);
-    log(`   https://calibre-ebook.com/download_windows`, colors.yellow);
+    log(`   https://calibre-ebook.com/download_portable`, colors.yellow);
     return false;
   }
 }
@@ -213,7 +219,7 @@ async function setupCalibre() {
  * Main setup function
  */
 async function main() {
-  log('\n📚 Setting up Calibre (Ebook Conversion Tool)...', colors.blue);
+  log('\n📚 Setting up Calibre Portable (Ebook Conversion Tool)...', colors.blue);
   log('='.repeat(50), colors.blue);
 
   await setupCalibre();
@@ -223,7 +229,7 @@ async function main() {
   cleanup();
 
   log('\n' + '='.repeat(50), colors.blue);
-  log('✨ Calibre setup complete!\n', colors.green);
+  log('✨ Calibre Portable setup complete!\n', colors.green);
 }
 
 // Run setup
