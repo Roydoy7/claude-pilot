@@ -36,12 +36,10 @@ yarn-error.log*
 
 # Ignore python
 packages/python-3.13.11-embed-amd64/
-# Ignore pandoc
-packages/pandoc-3.8.3/
 # Ignore 7za
 packages/7za/
-# Ignore wkhtmltopdf
-packages/wkhtmltopdf-0.12.6-1/
+# Ignore calibre
+packages/calibre
 
 # User data and runtime files (should not be committed)
 # Session data with SQLite checkpoints
