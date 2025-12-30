@@ -416,7 +416,7 @@ export class ClaudeAgent {
 
     this.pendingToolApproval.resolve({
       approved: false,
-      message: message || 'Tool execution rejected by user',
+      message: message || 'Tool execution rejected by user, stop and waiting for next instruction.',
     });
     return true;
   }
