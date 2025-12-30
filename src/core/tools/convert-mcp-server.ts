@@ -50,12 +50,23 @@ const LIBREOFFICE_PATHS = {
 };
 
 /**
- * Calibre installation paths to check
+ * Calibre paths configuration
+ * Note: Portable installer creates "Calibre Portable" subdirectory
  */
-const CALIBRE_PATHS = [
-  'C:\\Program Files\\Calibre2\\ebook-convert.exe',
-  'C:\\Program Files (x86)\\Calibre2\\ebook-convert.exe',
-];
+const CALIBRE_PATHS = {
+  // Portable version in packages folder (highest priority)
+  portable: path.join(
+    process.cwd(),
+    'packages',
+    'calibre',
+    'Calibre Portable',
+    'Calibre',
+    'ebook-convert.exe'
+  ),
+  // Standard installation paths
+  programFiles: 'C:\\Program Files\\Calibre2\\ebook-convert.exe',
+  programFilesX86: 'C:\\Program Files (x86)\\Calibre2\\ebook-convert.exe',
+};
 
 /**
  * Ebook formats - Calibre ONLY
@@ -268,10 +279,16 @@ function canUseLibreOffice(inputFormat: string, outputFormat: string): boolean {
  * Get Calibre ebook-convert executable path
  */
 function getCalibrePath(): string | null {
-  for (const calibrePath of CALIBRE_PATHS) {
-    if (existsSync(calibrePath)) {
-      return calibrePath;
-    }
+  // Check portable version first (highest priority)
+  if (existsSync(CALIBRE_PATHS.portable)) {
+    return CALIBRE_PATHS.portable;
+  }
+  // Check standard installation paths
+  if (existsSync(CALIBRE_PATHS.programFiles)) {
+    return CALIBRE_PATHS.programFiles;
+  }
+  if (existsSync(CALIBRE_PATHS.programFilesX86)) {
+    return CALIBRE_PATHS.programFilesX86;
   }
   return null;
 }
@@ -329,6 +346,7 @@ async function executeCalibre(args: string[]): Promise<{ stdout: string; stderr:
   }
 
   return new Promise((resolve) => {
+    // Use windowsVerbatimArguments to prevent shell interpretation of special characters
     const proc = spawn(calibrePath, args, {
       windowsHide: true,
     });
@@ -660,6 +678,33 @@ async function convertDocument(
   }
 ): Promise<ConvertExecutionResult> {
   const startTime = Date.now();
+
+  // Check for problematic Unicode characters in filename
+  // Smart quotes and other special characters may be corrupted during parameter passing
+  const problematicChars = /[\u2018\u2019\u201C\u201D\u2013\u2014\u2026]/;
+  const fileName = path.basename(inputFile);
+  if (problematicChars.test(fileName)) {
+    const charMap: Record<string, string> = {
+      '\u2018': "' (left single quote)",
+      '\u2019': "' (right single quote)",
+      '\u201C': '" (left double quote)',
+      '\u201D': '" (right double quote)',
+      '\u2013': '– (en dash)',
+      '\u2014': '— (em dash)',
+      '\u2026': '… (ellipsis)',
+    };
+    const foundChars = fileName.match(problematicChars);
+    const charDesc = foundChars
+      ? [...new Set(foundChars)].map((c) => charMap[c] || `U+${c.charCodeAt(0).toString(16).toUpperCase()}`).join(', ')
+      : 'special Unicode characters';
+    return {
+      success: false,
+      operation: 'convert',
+      inputFile,
+      error: `Filename contains special Unicode characters that may cause issues: ${charDesc}. Please rename the file to use standard ASCII characters (e.g., replace smart quotes ' ' with regular quotes ').`,
+      executionTime: Date.now() - startTime,
+    };
+  }
 
   // Verify input file exists
   if (!existsSync(inputFile)) {
