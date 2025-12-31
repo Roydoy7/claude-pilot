@@ -179,6 +179,9 @@ export interface ClaudeAgentConfig extends Options {
   // Override model to make it required via modelName alias
   model?: string;
   modelName: string;
+
+  // Auto-approved MCP tools (bypass canUseTool callback)
+  autoApprovedMcpTools?: string[];
 }
 
 /**
@@ -345,6 +348,15 @@ export class ClaudeAgent {
       toolInput: Record<string, unknown>,
       options: { signal: AbortSignal; toolUseID: string }
     ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }> => {
+      // Check if this MCP tool is auto-approved
+      const autoApprovedMcpTools = this.config.autoApprovedMcpTools || [];
+      if (autoApprovedMcpTools.includes(toolName)) {
+        return {
+          behavior: 'allow',
+          updatedInput: toolInput,
+        };
+      }
+
       // Create a Promise that will be resolved when user approves/rejects
       const approvalPromise = new Promise<ToolApprovalResult>((resolve) => {
         this.pendingToolApproval = {

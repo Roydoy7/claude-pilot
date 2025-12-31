@@ -128,6 +128,51 @@ export function getAutoApprovedTools(role: RoleType): readonly string[] {
 type McpServer = typeof pythonMcpServer;
 
 /**
+ * Auto-approved MCP tools for each role
+ * Format: 'mcp__<server>__<tool>' (e.g., 'mcp__convert__convert')
+ *
+ * Actual tool names from MCP servers:
+ * - convert: mcp__convert__convert
+ * - pdf: mcp__pdf__process (operations: analyze, extract_text, extract_images, etc.)
+ * - image: mcp__image__process (operations: analyze, describe, extract_text, etc.)
+ * - pptx: mcp__pptx__pptx (operations: analyze, etc.)
+ * - xlsx: mcp__xlsx__xlsx (operations: get_info, etc.)
+ * - docx: mcp__docx__docx (operations: analyze, etc.)
+ * - python: mcp__python__run (NOT auto-approved - code execution)
+ * - typescript: mcp__typescript__execute (NOT auto-approved - code execution)
+ */
+const SAFE_MCP_TOOLS_OFFICE = [
+  // Convert - creates new files, doesn't modify originals
+  'mcp__convert__convert',
+  // PDF - read-only analysis operations
+  'mcp__pdf__process',
+  // Image - read-only analysis operations
+  'mcp__image__process',
+  // PPTX - read-only analysis
+  'mcp__pptx__pptx',
+  // XLSX - read-only analysis
+  'mcp__xlsx__xlsx',
+  // DOCX - read-only analysis
+  'mcp__docx__docx',
+] as const;
+
+/**
+ * Auto-approved MCP tools configuration per role
+ * These MCP tools bypass canUseTool callback (auto-approved)
+ */
+export const ROLE_AUTO_APPROVED_MCP_TOOLS: Record<RoleType, readonly string[]> = {
+  [RoleType.OFFICE_ASSISTANT]: SAFE_MCP_TOOLS_OFFICE,
+  [RoleType.CLAUDE_CODE]: [],
+};
+
+/**
+ * Get auto-approved MCP tools for a specific role
+ */
+export function getAutoApprovedMcpTools(role: RoleType): readonly string[] {
+  return ROLE_AUTO_APPROVED_MCP_TOOLS[role];
+}
+
+/**
  * MCP servers configuration for each role
  * Key is the server name, value is the server instance
  */
