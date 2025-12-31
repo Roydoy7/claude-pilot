@@ -31,10 +31,23 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [showSettingsOnMount, setShowSettingsOnMount] = useState(false);
+
   // Initialize service and load sessions
   useEffect(() => {
     async function initialize() {
       try {
+        // Check authentication status first
+        const authStatus = await window.electronAPI.auth.isAuthenticated();
+        setIsAuthenticated(authStatus.authenticated);
+
+        // If not authenticated, show settings dialog
+        if (!authStatus.authenticated) {
+          setShowSettingsOnMount(true);
+        }
+
         const result = await window.electronAPI.service.initialize();
         if (result.success) {
           const sessions = result.sessions || [];
@@ -51,6 +64,13 @@ function App() {
 
     initialize();
   }, []);
+
+  const handleAuthChange = (authenticated: boolean) => {
+    setIsAuthenticated(authenticated);
+    if (authenticated) {
+      setShowSettingsOnMount(false);
+    }
+  };
 
   const togglePanel = () => {
     setIsPanelVisible(!isPanelVisible);
@@ -112,7 +132,12 @@ function App() {
       <ThemeProvider>
         <LanguageProvider>
           <div className="app">
-            <Header onTogglePanel={togglePanel} isPanelVisible={isPanelVisible} />
+            <Header
+              onTogglePanel={togglePanel}
+              isPanelVisible={isPanelVisible}
+              isAuthenticated={isAuthenticated}
+              onAuthChange={handleAuthChange}
+            />
             <div
               className="main-layout"
               style={{
@@ -138,6 +163,9 @@ function App() {
             onTogglePanel={togglePanel}
             isPanelVisible={isPanelVisible}
             currentSession={currentSession}
+            isAuthenticated={isAuthenticated}
+            onAuthChange={handleAuthChange}
+            showSettingsOnMount={showSettingsOnMount}
           />
           <div className="main-layout">
             <ChatArea
