@@ -11,6 +11,7 @@ import { sessionConfigEn } from './session-config';
 import { inputAreaEn } from './input-area';
 import { rightPanelEn } from './right-panel';
 import { workspaceBrowserEn } from './workspace-browser';
+import { settingsEn } from './settings';
 
 export const enTranslations: Translation = {
   common: commonEn,
@@ -151,4 +152,7 @@ export const enTranslations: Translation = {
     failedToReadImage: 'Failed to read image file',
     failedToPasteImage: 'Failed to read pasted image',
   },
+
+  // Settings Dialog
+  settings: settingsEn,
 };

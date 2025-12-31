@@ -5,7 +5,7 @@
  */
 
 export const sessionConfigZh = {
-  title: '配置会话',
+  title: '开始新会话',
   chooseRole: '选择角色',
   chooseRoleDescription: '选择本次对话的助手角色',
   selectProviderModel: '选择提供商和模型',

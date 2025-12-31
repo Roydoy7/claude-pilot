@@ -11,6 +11,7 @@ import { sessionConfigJa } from './session-config.js';
 import { inputAreaJa } from './input-area.js';
 import { rightPanelJa } from './right-panel.js';
 import { workspaceBrowserJa } from './workspace-browser.js';
+import { settingsJa } from './settings.js';
 
 export const jaTranslations: Translation = {
   common: commonJa,
@@ -151,4 +152,7 @@ export const jaTranslations: Translation = {
     failedToReadImage: '画像ファイルの読み取りに失敗しました',
     failedToPasteImage: '貼り付けた画像の読み取りに失敗しました',
   },
+
+  // Settings Dialog
+  settings: settingsJa,
 };

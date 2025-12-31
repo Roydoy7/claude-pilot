@@ -5,7 +5,7 @@
  */
 
 export const sessionConfigEn = {
-  title: 'Configure Session',
+  title: 'Start New Session',
   chooseRole: 'Choose Role',
   chooseRoleDescription: "Select the assistant's role for this conversation",
   selectProviderModel: 'Select Provider & Model',

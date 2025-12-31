@@ -384,4 +384,57 @@ export interface Translation {
     failedToReadImage: string;
     failedToPasteImage: string;
   };
+
+  // Settings Dialog
+  settings?: {
+    title: string;
+    categories: {
+      account: string;
+      defaults: string;
+      appearance: string;
+    };
+    account: {
+      title: string;
+      authentication: string;
+      status: string;
+      authenticated: string;
+      notAuthenticated: string;
+      plan: string;
+      expires: string;
+      loginWithClaude: string;
+      loginWithConsole: string;
+      logout: string;
+      loggingIn: string;
+      loginFailed: string;
+      envHint: string;
+      welcomeMessage: string;
+    };
+    defaults: {
+      title: string;
+      description: string;
+      model: string;
+      selectModel: string;
+      modelDescription: string;
+      authRequired: string;
+      role: string;
+      selectRole: string;
+      roleDescription: string;
+      workingDirectory: string;
+      workingDirectoryDescription: string;
+      browse: string;
+      noDirectory: string;
+    };
+    appearance: {
+      title: string;
+      theme: string;
+      themeDescription: string;
+      themeLight: string;
+      themeDark: string;
+      language: string;
+      languageDescription: string;
+      languageEn: string;
+      languageZh: string;
+      languageJa: string;
+    };
+  };
 }

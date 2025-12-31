@@ -11,6 +11,7 @@ import { sessionConfigZh } from './session-config';
 import { inputAreaZh } from './input-area';
 import { rightPanelZh } from './right-panel';
 import { workspaceBrowserZh } from './workspace-browser';
+import { settingsZh } from './settings';
 
 export const zhTranslations: Translation = {
   common: commonZh,
@@ -151,4 +152,7 @@ export const zhTranslations: Translation = {
     failedToReadImage: '读取图片文件失败',
     failedToPasteImage: '读取粘贴的图片失败',
   },
+
+  // Settings Dialog
+  settings: settingsZh,
 };

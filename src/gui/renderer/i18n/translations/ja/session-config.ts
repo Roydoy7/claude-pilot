@@ -5,7 +5,7 @@
  */
 
 export const sessionConfigJa = {
-  title: 'セッション設定',
+  title: '新しいセッションを開始',
   chooseRole: '役割を選択',
   chooseRoleDescription: 'この会話におけるアシスタントの役割を選択してください',
   selectProviderModel: 'プロバイダーとモデルを選択',
