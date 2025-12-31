@@ -64,8 +64,26 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   }>({
     role: defaultRole || RoleType.OFFICE_ASSISTANT,
     modelName: defaultModel || 'claude-sonnet-4-20250514',
-    cwd: '', // Will be loaded from getLastCwd in SessionConfig
+    cwd: '', // Will be loaded from settings or getLastCwd
   });
+
+  // Load default configuration from settings
+  useEffect(() => {
+    async function loadDefaultConfig() {
+      try {
+        const settings = await window.electronAPI.settings.get();
+        // Only use settings if no defaults were provided via props
+        setSessionConfig(prev => ({
+          role: defaultRole || settings.defaultRole || prev.role,
+          modelName: defaultModel || settings.defaultModel || prev.modelName,
+          cwd: settings.defaultCwd || prev.cwd,
+        }));
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    }
+    loadDefaultConfig();
+  }, [defaultRole, defaultModel]);
 
   // SessionAgent cache - persists across session switches
   const sessionAgentCacheRef = useRef<SessionAgentCache>(new SessionAgentCache());
@@ -372,6 +390,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         <SessionConfig
           defaultRole={sessionConfig.role}
           defaultModel={sessionConfig.modelName}
+          defaultCwd={sessionConfig.cwd}
           onConfigChange={setSessionConfig}
         />
       )}
