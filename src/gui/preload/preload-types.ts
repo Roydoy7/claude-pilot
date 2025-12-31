@@ -12,6 +12,7 @@ import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/type
 import type { AgentState, StreamEvent, PermissionMode, SettingSource } from '../../core/agents/claude-agent.js';
 import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
+import type { AppSettings } from '../../core/settings/settings-manager.js';
 
 /**
  * Re-export PermissionMode and SettingSource for frontend use
@@ -21,7 +22,7 @@ export type { PermissionMode, SettingSource };
 /**
  * Re-export types for consistency
  */
-export type { MessageContent, OAuthResult };
+export type { MessageContent, OAuthResult, AppSettings };
 
 /**
  * Service initialization request (no longer needs apiKey)
@@ -375,6 +376,14 @@ export interface ElectronAPI {
       expiresAt?: number;
       scopes?: string[];
     }>;
+  };
+
+  // Settings management
+  settings: {
+    get: () => Promise<AppSettings>;
+    update: (updates: Partial<AppSettings>) => Promise<{ success: boolean }>;
+    hasSettings: () => Promise<boolean>;
+    reset: () => Promise<{ success: boolean }>;
   };
 
   // Utility

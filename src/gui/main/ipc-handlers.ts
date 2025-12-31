@@ -15,6 +15,8 @@ import { templateManager } from '../../core/templates/template-manager.js';
 import { authManager } from '../../core/auth/auth-manager.js';
 import type { OAuthLoginOptions } from '../../core/auth/auth-manager.js';
 import { SkillManager } from '../../core/skills/skill-manager.js';
+import { settingsManager } from '../../core/settings/settings-manager.js';
+import type { AppSettings } from '../../core/settings/settings-manager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -777,6 +779,40 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle('skills:setGlobalEnabled', async (_event, enabled: boolean) => {
     const skillManager = SkillManager.getInstance();
     await skillManager.setGlobalEnabled(enabled);
+    return { success: true };
+  });
+
+  /**
+   * Settings Management
+   */
+
+  /**
+   * Get application settings
+   */
+  ipcMain.handle('settings:get', async () => {
+    return settingsManager.getSettings();
+  });
+
+  /**
+   * Update application settings
+   */
+  ipcMain.handle('settings:update', async (_event, updates: Partial<AppSettings>) => {
+    settingsManager.updateSettings(updates);
+    return { success: true };
+  });
+
+  /**
+   * Check if settings exist (first-time use detection)
+   */
+  ipcMain.handle('settings:hasSettings', async () => {
+    return settingsManager.hasSettings();
+  });
+
+  /**
+   * Reset settings to defaults
+   */
+  ipcMain.handle('settings:reset', async () => {
+    settingsManager.resetSettings();
     return { success: true };
   });
 }

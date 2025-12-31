@@ -24,6 +24,7 @@ import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
+import type { AppSettings } from '../../core/settings/settings-manager.js';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -233,5 +234,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       scopes?: string[];
     }> =>
       ipcRenderer.invoke('auth:getOAuthInfo'),
+  },
+
+  // Settings management
+  settings: {
+    get: (): Promise<AppSettings> =>
+      ipcRenderer.invoke('settings:get'),
+
+    update: (updates: Partial<AppSettings>): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('settings:update', updates),
+
+    hasSettings: (): Promise<boolean> =>
+      ipcRenderer.invoke('settings:hasSettings'),
+
+    reset: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('settings:reset'),
   },
 });
