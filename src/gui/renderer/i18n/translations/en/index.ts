@@ -12,6 +12,7 @@ import { inputAreaEn } from './input-area';
 import { rightPanelEn } from './right-panel';
 import { workspaceBrowserEn } from './workspace-browser';
 import { settingsEn } from './settings';
+import { suggestionsEn } from './suggestions';
 
 export const enTranslations: Translation = {
   common: commonEn,
@@ -155,4 +156,7 @@ export const enTranslations: Translation = {
 
   // Settings Dialog
   settings: settingsEn,
+
+  // Prompt Suggestions
+  suggestions: suggestionsEn,
 };

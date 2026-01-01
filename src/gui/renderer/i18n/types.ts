@@ -437,4 +437,13 @@ export interface Translation {
       languageJa: string;
     };
   };
+
+  // Prompt Suggestions
+  suggestions?: {
+    myTemplates: string;
+    tryThese: string;
+    refresh: string;
+    refreshing: string;
+    noSuggestions: string;
+  };
 }

@@ -12,6 +12,7 @@ import { inputAreaZh } from './input-area';
 import { rightPanelZh } from './right-panel';
 import { workspaceBrowserZh } from './workspace-browser';
 import { settingsZh } from './settings';
+import { suggestionsZh } from './suggestions';
 
 export const zhTranslations: Translation = {
   common: commonZh,
@@ -155,4 +156,7 @@ export const zhTranslations: Translation = {
 
   // Settings Dialog
   settings: settingsZh,
+
+  // Prompt Suggestions
+  suggestions: suggestionsZh,
 };

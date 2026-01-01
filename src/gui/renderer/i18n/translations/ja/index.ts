@@ -12,6 +12,7 @@ import { inputAreaJa } from './input-area.js';
 import { rightPanelJa } from './right-panel.js';
 import { workspaceBrowserJa } from './workspace-browser.js';
 import { settingsJa } from './settings.js';
+import { suggestionsJa } from './suggestions.js';
 
 export const jaTranslations: Translation = {
   common: commonJa,
@@ -155,4 +156,7 @@ export const jaTranslations: Translation = {
 
   // Settings Dialog
   settings: settingsJa,
+
+  // Prompt Suggestions
+  suggestions: suggestionsJa,
 };
