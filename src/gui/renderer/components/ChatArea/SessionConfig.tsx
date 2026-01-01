@@ -5,15 +5,17 @@
  * Keeps role and working directory selection, model comes from Settings
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { RoleType, ROLE_DISPLAY_NAMES } from '../../../../core/roles/role-enum.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
+import { PromptSuggestions } from './PromptSuggestions.js';
 
 interface SessionConfigProps {
   defaultRole?: RoleType;
   defaultModel?: string;
   defaultCwd?: string;
   onConfigChange?: (config: { role: RoleType; modelName: string; cwd: string }) => void;
+  onSuggestionClick?: (prompt: string) => void;
 }
 
 export function SessionConfig({
@@ -21,6 +23,7 @@ export function SessionConfig({
   defaultModel,
   defaultCwd,
   onConfigChange,
+  onSuggestionClick,
 }: SessionConfigProps): React.ReactElement {
   const { t } = useLanguage();
   const [selectedRole, setSelectedRole] = useState<RoleType>(defaultRole);
@@ -73,6 +76,10 @@ export function SessionConfig({
     setSelectedRole(role);
   };
 
+  const handleSuggestionClick = useCallback((prompt: string) => {
+    onSuggestionClick?.(prompt);
+  }, [onSuggestionClick]);
+
   const roles = Object.values(RoleType);
 
   return (
@@ -82,9 +89,11 @@ export function SessionConfig({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         padding: '2rem',
-        gap: '2rem',
+        paddingTop: '1rem',
+        gap: '1.5rem',
+        overflowY: 'auto',
       }}
     >
       {/* Welcome Section */}
@@ -270,6 +279,12 @@ export function SessionConfig({
           </style>
         </div>
       </div>
+
+      {/* Prompt Suggestions */}
+      <PromptSuggestions
+        role={selectedRole}
+        onSuggestionClick={handleSuggestionClick}
+      />
     </div>
   );
 }

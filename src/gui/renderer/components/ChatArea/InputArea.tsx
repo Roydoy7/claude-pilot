@@ -5,7 +5,8 @@
  */
 
 import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
-import type { MessageContent } from '../../../preload/preload-types';
+import type { MessageContent, PromptSuggestion, Language } from '../../../preload/preload-types';
+import type { RoleType } from '../../../../core/roles/role-enum.js';
 import { WorkspaceBrowser } from './WorkspaceBrowser';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -138,6 +139,7 @@ interface ContextUsage {
 interface InputAreaProps {
   sessionId?: string;
   cwd?: string; // Working directory - used for @ button when sessionId is not available
+  role?: RoleType; // Current role - used for smart suggestions
   onSend: (message: MessageContent) => void;
   onCancel?: () => void;
   disabled?: boolean;
@@ -157,6 +159,7 @@ interface InputAreaProps {
 export function InputArea({
   sessionId,
   cwd,
+  role,
   onSend,
   onCancel,
   disabled = false,
@@ -172,7 +175,7 @@ export function InputArea({
   slashCommands = [],
   onSlashCommandSelect,
 }: InputAreaProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [message, setMessage] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [showWorkspaceBrowser, setShowWorkspaceBrowser] = useState(false);
@@ -181,6 +184,8 @@ export function InputArea({
   const [showSlashCommandMenu, setShowSlashCommandMenu] = useState(false);
   const [showPromptsMenu, setShowPromptsMenu] = useState(false);
   const [promptTemplates, setPromptTemplates] = useState<{ id: string; name: string; content: string }[]>([]);
+  const [smartSuggestions, setSmartSuggestions] = useState<PromptSuggestion[]>([]);
+  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Max heights for normal and expanded modes
@@ -294,12 +299,42 @@ export function InputArea({
     }
   }, []);
 
-  // Load templates when menu opens
+  // Load smart suggestions
+  const loadSmartSuggestions = useCallback(async () => {
+    if (!role) return;
+    try {
+      const suggestions = await window.electronAPI.suggestions.getDefaults(role, language as Language);
+      // Filter out template suggestions (only show tool/llm based ones)
+      setSmartSuggestions(suggestions.filter(s => s.source !== 'template'));
+    } catch (error) {
+      console.error('Failed to load smart suggestions:', error);
+    }
+  }, [role, language]);
+
+  // Refresh smart suggestions with LLM
+  const refreshSmartSuggestions = useCallback(async () => {
+    if (!role) return;
+    setIsRefreshingSuggestions(true);
+    try {
+      const result = await window.electronAPI.suggestions.refresh(role, language as Language);
+      if (result.success && result.suggestions) {
+        // Filter out template suggestions
+        setSmartSuggestions(result.suggestions.filter(s => s.source !== 'template'));
+      }
+    } catch (error) {
+      console.error('Failed to refresh smart suggestions:', error);
+    } finally {
+      setIsRefreshingSuggestions(false);
+    }
+  }, [role, language]);
+
+  // Load templates and suggestions when menu opens
   useEffect(() => {
     if (showPromptsMenu) {
       loadPromptTemplates();
+      loadSmartSuggestions();
     }
-  }, [showPromptsMenu, loadPromptTemplates]);
+  }, [showPromptsMenu, loadPromptTemplates, loadSmartSuggestions]);
 
   // Close prompts menu when clicking outside
   useEffect(() => {
@@ -685,9 +720,9 @@ export function InputArea({
                   bottom: '100%',
                   left: '0',
                   marginBottom: '4px',
-                  minWidth: '200px',
-                  maxWidth: '300px',
-                  maxHeight: '300px',
+                  minWidth: '280px',
+                  maxWidth: '360px',
+                  maxHeight: '400px',
                   overflowY: 'auto',
                   backgroundColor: 'var(--bg-secondary)',
                   border: '1px solid var(--border)',
@@ -696,15 +731,17 @@ export function InputArea({
                   zIndex: 1000,
                 }}
               >
-                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  {t.inputArea.promptsButton?.title || 'Prompt Templates'}
+                {/* User Templates Section */}
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📌</span>
+                  <span>{t.suggestions?.myTemplates || 'My Templates'}</span>
                 </div>
                 {promptTemplates.length === 0 ? (
-                  <div style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                  <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', borderBottom: '1px solid var(--border)' }}>
                     {t.inputArea.promptsButton?.noTemplates || 'No templates yet'}
                   </div>
                 ) : (
-                  promptTemplates.map((template) => (
+                  promptTemplates.slice(0, 4).map((template) => (
                     <div
                       key={template.id}
                       onClick={() => handlePromptSelect(template.content)}
@@ -725,9 +762,92 @@ export function InputArea({
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      {template.name}
+                      📋 {template.name}
                     </div>
                   ))
+                )}
+
+                {/* Smart Suggestions Section */}
+                {role && (
+                  <>
+                    <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>💡</span>
+                        <span>{t.suggestions?.tryThese || 'Try These'}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          refreshSmartSuggestions();
+                        }}
+                        disabled={isRefreshingSuggestions}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          fontSize: '0.7rem',
+                          color: 'var(--text-secondary)',
+                          backgroundColor: 'transparent',
+                          border: '1px solid var(--border)',
+                          borderRadius: '4px',
+                          cursor: isRefreshingSuggestions ? 'wait' : 'pointer',
+                          opacity: isRefreshingSuggestions ? 0.6 : 1,
+                        }}
+                        title={t.suggestions?.refresh || 'Refresh'}
+                      >
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{
+                            animation: isRefreshingSuggestions ? 'spin 1s linear infinite' : 'none',
+                          }}
+                        >
+                          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                          <path d="M21 3v5h-5" />
+                        </svg>
+                      </button>
+                    </div>
+                    {smartSuggestions.length === 0 ? (
+                      <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                        {t.suggestions?.noSuggestions || 'No suggestions available'}
+                      </div>
+                    ) : (
+                      smartSuggestions.slice(0, 6).map((suggestion) => (
+                        <div
+                          key={suggestion.id}
+                          onClick={() => handlePromptSelect(suggestion.prompt)}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-primary)',
+                            borderBottom: '1px solid var(--border)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <span>{suggestion.icon}</span>
+                            <span style={{ fontWeight: 500 }}>{suggestion.title}</span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {suggestion.description}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </>
                 )}
               </div>
             )}

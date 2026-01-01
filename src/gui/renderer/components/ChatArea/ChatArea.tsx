@@ -55,6 +55,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [settingSources, setSettingSources] = useState<SettingSource[]>(['user', 'project', 'local']);
   const [slashCommands, setSlashCommands] = useState<string[]>(['/compact','/init']);
+  const [suggestionContent, setSuggestionContent] = useState<string | undefined>(undefined);
 
   // Session configuration state (for new sessions)
   const [sessionConfig, setSessionConfig] = useState<{
@@ -211,6 +212,16 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
   const handleSlashCommandSelect = async (command: string) => {
     // Send the slash command as a message
     await handleSendMessage(command);
+  };
+
+  // Handle suggestion click - fill input with suggestion prompt
+  const handleSuggestionClick = (prompt: string) => {
+    setSuggestionContent(prompt);
+  };
+
+  // Clear suggestion content after it's been applied
+  const handleSuggestionApplied = () => {
+    setSuggestionContent(undefined);
   };
 
   // Helper function to extract text from MessageContent for titles
@@ -392,16 +403,18 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
           defaultModel={sessionConfig.modelName}
           defaultCwd={sessionConfig.cwd}
           onConfigChange={setSessionConfig}
+          onSuggestionClick={handleSuggestionClick}
         />
       )}
       <InputArea
         sessionId={sessionId || undefined}
         cwd={sessionConfig.cwd || undefined}
+        role={sessionConfig.role}
         onSend={handleSendMessage}
         onCancel={handleCancelRequest}
         isProcessing={isProcessing}
-        templateContent={templateContent}
-        onTemplateApplied={onTemplateApplied}
+        templateContent={suggestionContent || templateContent}
+        onTemplateApplied={suggestionContent ? handleSuggestionApplied : onTemplateApplied}
         permissionMode={permissionMode}
         onPermissionModeChange={handlePermissionModeChange}
         settingSources={settingSources}
