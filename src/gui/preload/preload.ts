@@ -25,6 +25,8 @@ import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
+import type { PromptSuggestion, Language } from '../../core/suggestions/suggestions-manager.js';
+import type { RoleType } from '../../core/roles/role-enum.js';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -249,5 +251,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     reset: (): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('settings:reset'),
+  },
+
+  // Suggestions management
+  suggestions: {
+    get: (role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> =>
+      ipcRenderer.invoke('suggestions:get', role, language),
+
+    getTemplates: (): Promise<PromptSuggestion[]> =>
+      ipcRenderer.invoke('suggestions:getTemplates'),
+
+    getDefaults: (role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> =>
+      ipcRenderer.invoke('suggestions:getDefaults', role, language),
+
+    refresh: (role: RoleType, language: Language = 'en'): Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }> =>
+      ipcRenderer.invoke('suggestions:refresh', role, language),
+
+    clearCache: (role?: RoleType): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('suggestions:clearCache', role),
   },
 });

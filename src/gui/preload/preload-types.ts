@@ -13,6 +13,7 @@ import type { AgentState, StreamEvent, PermissionMode, SettingSource } from '../
 import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
+import type { PromptSuggestion, Language } from '../../core/suggestions/suggestions-manager.js';
 
 /**
  * Re-export PermissionMode and SettingSource for frontend use
@@ -22,7 +23,7 @@ export type { PermissionMode, SettingSource };
 /**
  * Re-export types for consistency
  */
-export type { MessageContent, OAuthResult, AppSettings };
+export type { MessageContent, OAuthResult, AppSettings, PromptSuggestion, Language };
 
 /**
  * Service initialization request (no longer needs apiKey)
@@ -384,6 +385,15 @@ export interface ElectronAPI {
     update: (updates: Partial<AppSettings>) => Promise<{ success: boolean }>;
     hasSettings: () => Promise<boolean>;
     reset: () => Promise<{ success: boolean }>;
+  };
+
+  // Suggestions management
+  suggestions: {
+    get: (role: RoleType, language?: Language) => Promise<PromptSuggestion[]>;
+    getTemplates: () => Promise<PromptSuggestion[]>;
+    getDefaults: (role: RoleType, language?: Language) => Promise<PromptSuggestion[]>;
+    refresh: (role: RoleType, language?: Language) => Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }>;
+    clearCache: (role?: RoleType) => Promise<{ success: boolean }>;
   };
 
   // Utility

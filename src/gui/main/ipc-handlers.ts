@@ -17,6 +17,7 @@ import type { OAuthLoginOptions } from '../../core/auth/auth-manager.js';
 import { SkillManager } from '../../core/skills/skill-manager.js';
 import { settingsManager } from '../../core/settings/settings-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
+import { suggestionsManager, type Language } from '../../core/suggestions/suggestions-manager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -813,6 +814,66 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    */
   ipcMain.handle('settings:reset', async () => {
     settingsManager.resetSettings();
+    return { success: true };
+  });
+
+  /**
+   * Suggestions Management
+   */
+
+  /**
+   * Get suggestions for a role (templates + cached LLM or defaults)
+   */
+  ipcMain.handle('suggestions:get', async (_event, role: RoleType, language: Language = 'en') => {
+    return suggestionsManager.getSuggestions(role, language);
+  });
+
+  /**
+   * Get only template suggestions
+   */
+  ipcMain.handle('suggestions:getTemplates', async () => {
+    return suggestionsManager.getTemplates();
+  });
+
+  /**
+   * Get default tool suggestions (without LLM)
+   */
+  ipcMain.handle('suggestions:getDefaults', async (_event, role: RoleType, language: Language = 'en') => {
+    return suggestionsManager.getDefaultSuggestions(role, language);
+  });
+
+  /**
+   * Refresh suggestions
+   * Generates new suggestions using LLM via Claude Agent SDK
+   */
+  ipcMain.handle('suggestions:refresh', async (_event, role: RoleType, language: Language = 'en') => {
+    try {
+      // Get template suggestions
+      const templateSuggestions = suggestionsManager.getTemplates();
+
+      // Generate new suggestions using LLM
+      const llmSuggestions = await suggestionsManager.generateWithLLM(role, language);
+
+      const suggestions = [...templateSuggestions, ...llmSuggestions];
+
+      return {
+        success: true,
+        suggestions,
+      };
+    } catch (error) {
+      console.error('[IPC] suggestions:refresh error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
+  /**
+   * Clear suggestions cache
+   */
+  ipcMain.handle('suggestions:clearCache', async (_event, role?: RoleType) => {
+    suggestionsManager.clearCache(role);
     return { success: true };
   });
 }
