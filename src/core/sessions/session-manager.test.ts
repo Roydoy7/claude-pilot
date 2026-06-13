@@ -10,14 +10,13 @@ import fs from 'fs';
 import path from 'path';
 import { SessionManager } from './session-manager.js';
 import { getSessionsDir } from '../storage/storage.js';
-import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel } from '../providers/model-list-manager.js';
 
 const sessionManager = SessionManager.getInstance();
 const createdSessionIds: string[] = [];
 
 function createTestSession(title: string): ReturnType<SessionManager['createSession']> {
-  const session = sessionManager.createSession(title, RoleType.OFFICE_ASSISTANT, ClaudeModel.SONNET_4_6, '/tmp');
+  const session = sessionManager.createSession(title, 'office-assist', ClaudeModel.SONNET_4_6, '/tmp');
   createdSessionIds.push(session.id);
   return session;
 }
@@ -34,7 +33,7 @@ describe('createSession / loadSession', () => {
     const session = createTestSession('Test session');
 
     expect(session.title).toBe('Test session');
-    expect(session.role).toBe(RoleType.OFFICE_ASSISTANT);
+    expect(session.agentId).toBe('office-assist');
     expect(session.modelName).toBe(ClaudeModel.SONNET_4_6);
     expect(session.cwd).toBe('/tmp');
     expect(session.id).toBeTruthy();

@@ -13,7 +13,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { ClaudeAgent, type ClaudeAgentConfig, type StreamEvent } from './claude-agent.js';
 import { SessionManager } from '../sessions/session-manager.js';
-import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel } from '../providers/model-list-manager.js';
 import type {
   Query,
@@ -243,7 +242,8 @@ async function collectEvents(agent: ClaudeAgent, messages: SDKMessage[]): Promis
 
 function makeAgent(): ClaudeAgent {
   const config: ClaudeAgentConfig = {
-    role: RoleType.OFFICE_ASSISTANT,
+    agentId: 'office-assist',
+    agentDisplayName: 'Office Assistant',
     modelName: ClaudeModel.SONNET_4_6,
   };
   return new ClaudeAgent(config, SESSION_ID, '/tmp');
@@ -254,11 +254,11 @@ beforeAll(() => {
   // during message processing succeed silently.
   const sessionManager = SessionManager.getInstance();
   if (!sessionManager.loadSession(SESSION_ID)) {
-    const session = sessionManager.createSession('Fixture session', RoleType.OFFICE_ASSISTANT, ClaudeModel.SONNET_4_6, '/tmp');
+    const session = sessionManager.createSession('Fixture session', 'office-assist', ClaudeModel.SONNET_4_6, '/tmp');
     // Re-key the generated session under our fixed SESSION_ID for reuse across tests.
     sessionManager.deleteSession(session.id);
   }
-  sessionManager.createSession('Fixture session', RoleType.OFFICE_ASSISTANT, ClaudeModel.SONNET_4_6, '/tmp');
+  sessionManager.createSession('Fixture session', 'office-assist', ClaudeModel.SONNET_4_6, '/tmp');
 });
 
 afterAll(() => {

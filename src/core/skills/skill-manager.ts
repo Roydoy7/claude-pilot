@@ -23,8 +23,7 @@ import * as fs from 'fs/promises';
 import { existsSync, cpSync } from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
-import type { RoleType } from '../roles/role-enum.js';
-import { getDefaultSkills } from '../roles/role-tool-sets.js';
+import { getAgentDefinition } from '../agents/agent-loader.js';
 
 /** Built-in marketplace ID */
 export const BUILTIN_MARKETPLACE_ID = 'builtin';
@@ -607,11 +606,12 @@ export class SkillManager {
   }
 
   /**
-   * Install default skills for a role to the session's cwd
+   * Install default skills for an agent to the session's cwd
    * Skips skills that are already installed
    */
-  async installDefaultSkillsForRole(role: RoleType, cwd: string): Promise<InstalledSkillInfo[]> {
-    const defaultSkills = getDefaultSkills(role);
+  async installDefaultSkillsForAgent(agentId: string, cwd: string): Promise<InstalledSkillInfo[]> {
+    const agentDef = await getAgentDefinition(agentId);
+    const defaultSkills = agentDef.defaultSkills;
     const installed: InstalledSkillInfo[] = [];
 
     for (const skillName of defaultSkills) {

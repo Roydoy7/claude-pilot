@@ -44,21 +44,12 @@ export {
   type Session,
 } from './sessions/session-manager.js';
 
-// Role exports
+// Agent definition exports
 export {
-  RoleType,
-  ROLE_DISPLAY_NAMES,
-  getRoleDisplayName,
-} from './roles/role-enum.js';
-
-export {
-  getRoleSystemPrompt,
-} from './roles/role-system-prompts.js';
-
-export {
-  ALL_SDK_TOOLS,
-  ROLE_ALLOWED_TOOLS,
-} from './roles/role-tool-sets.js';
+  type AgentDefinition,
+  getAgentDefinitions,
+  getAgentDefinition,
+} from './agents/agent-loader.js';
 
 // Model and Provider exports
 export {

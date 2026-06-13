@@ -8,15 +8,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { RoleType } from '../roles/role-enum.js';
 import { DEFAULT_MODEL } from '../providers/model-list-manager.js';
 
 /**
  * Application settings structure
  */
 export interface AppSettings {
-  /** Default role for new sessions */
-  defaultRole: RoleType;
+  /** Default agent id for new sessions */
+  defaultAgentId?: string;
   /** Default model name for new sessions */
   defaultModel: string;
   /** Default working directory for new sessions */
@@ -31,7 +30,6 @@ export interface AppSettings {
  * Default settings values
  */
 const DEFAULT_SETTINGS: AppSettings = {
-  defaultRole: RoleType.OFFICE_ASSISTANT,
   defaultModel: DEFAULT_MODEL,
   defaultCwd: os.homedir(),
   theme: 'light',

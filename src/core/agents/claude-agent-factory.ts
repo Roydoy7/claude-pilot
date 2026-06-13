@@ -8,10 +8,8 @@
 import { ClaudeAgent, type ClaudeAgentConfig } from './claude-agent.js';
 import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { authManager } from '../auth/auth-manager.js';
-import { getRoleSystemPrompt } from '../roles/role-system-prompts.js';
+import { getAgentDefinition } from './agent-loader.js';
 import { getSystemReminders } from '../context/system-reminders.js';
-import { getAvailableTools, getAutoApprovedTools, getAutoApprovedMcpTools, getMcpServers } from '../roles/role-tool-sets.js';
-import { RoleType } from '../roles/role-enum.js';
 import { ClaudeModel, getThinkingConfig } from '../providers/model-list-manager.js';
 import { SkillManager } from '../skills/skill-manager.js';
 
@@ -85,15 +83,14 @@ export function getAgentCacheStats(): {
 }
 
 /**
- * Build combined system prompt for a role
- * Includes role-specific prompt, cwd info, and system reminders
+ * Build combined system prompt for an agent
+ * Includes the agent's system prompt, cwd info, and system reminders
  * Note: Skills are automatically discovered by Claude Agent SDK from {cwd}/.claude/skills/
  */
-function buildSystemPrompt(role: RoleType, cwd?: string): string {
-  const rolePrompt = getRoleSystemPrompt(role);
+function buildSystemPrompt(agentSystemPrompt: string, cwd?: string): string {
   const cwdPrompt = cwd ? `\nYour current working directory is: ${cwd}\n` : '';
   const reminders = getSystemReminders();
-  return [rolePrompt, cwdPrompt, reminders].join('\n');
+  return [agentSystemPrompt, cwdPrompt, reminders].join('\n');
 }
 
 /**
@@ -138,36 +135,26 @@ export async function createAgentFromSessionData(
     throw new Error(`Authentication failed: ${authStatus.error}`);
   }
 
-  // Build system prompt with real paths
-  // For CLAUDE_CODE role, use preset; for others, use custom system prompt
-  const systemPrompt: string | { type: 'preset'; preset: 'claude_code'; append?: string } =
-    session.role === RoleType.CLAUDE_CODE
-      ? { type: 'preset', preset: 'claude_code' }
-      : buildSystemPrompt(session.role, session.cwd);
+  const agentDef = await getAgentDefinition(session.agentId);
 
-  // Get tools for this role:
-  // - availableTools: All tools the agent CAN use (passed as 'tools')
-  // - autoApprovedTools: Safe tools that bypass canUseTool callback (passed as 'allowedTools')
-  // - autoApprovedMcpTools: MCP tools that bypass canUseTool callback
-  // - mcpServers: Custom MCP servers for additional tools (e.g., Python execution)
-  const availableTools = getAvailableTools(session.role);
-  const autoApprovedTools = getAutoApprovedTools(session.role);
-  const autoApprovedMcpTools = getAutoApprovedMcpTools(session.role);
-  const mcpServers = getMcpServers(session.role);
+  // Build system prompt with real paths
+  const systemPrompt: string | { type: 'preset'; preset: 'claude_code'; append?: string } =
+    buildSystemPrompt(agentDef.systemPrompt, session.cwd);
 
   // Build agent config (extends SDK Options)
   // Note: canUseTool is set dynamically in ClaudeAgent.run() when needed
   const agentConfig: ClaudeAgentConfig = {
     // Agent metadata
-    role: session.role,
+    agentId: agentDef.id,
+    agentDisplayName: agentDef.displayName,
     modelName: session.modelName,
 
     // SDK Options
     systemPrompt,
-    tools: [...availableTools], // All tools the agent can use
-    allowedTools: [...autoApprovedTools], // Safe tools auto-approved (bypass canUseTool)
-    autoApprovedMcpTools: [...autoApprovedMcpTools], // MCP tools auto-approved
-    mcpServers, // Custom MCP servers for Python and other tools
+    tools: [...agentDef.tools], // All tools the agent can use
+    allowedTools: [...agentDef.safeTools], // Safe tools auto-approved (bypass canUseTool)
+    autoApprovedMcpTools: [...agentDef.autoApprovedMcpTools], // MCP tools auto-approved
+    mcpServers: agentDef.mcpServers, // Custom MCP servers for Python and other tools
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
     permissionMode: 'default',
@@ -183,19 +170,19 @@ export async function createAgentFromSessionData(
  */
 export async function createNewAgent(
   title: string,
-  role: RoleType,
+  agentId: string,
   modelName: string = ClaudeModel.SONNET_4_6,
   cwd: string
 ): Promise<ClaudeAgent> {
   const sessionManager = SessionManager.getInstance();
 
   // Create new session (provider is always Claude now)
-  const session = sessionManager.createSession(title, role, modelName, cwd);
+  const session = sessionManager.createSession(title, agentId, modelName, cwd);
 
-  // Install default skills for this role
+  // Install default skills for this agent
   const skillManager = SkillManager.getInstance();
   await skillManager.initialize();
-  await skillManager.installDefaultSkillsForRole(role, cwd);
+  await skillManager.installDefaultSkillsForAgent(agentId, cwd);
 
   // Create agent from session
   const agent = await createAgentFromSessionData(session);

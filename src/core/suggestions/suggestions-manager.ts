@@ -10,8 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
-import { getRoleDisplayName, RoleType } from '../roles/role-enum.js';
-import { ROLE_MCP_SERVERS } from '../roles/role-tool-sets.js';
+import { getAgentDefinition } from '../agents/agent-loader.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
 import { buildBaseQueryOptions } from '../agents/sdk-query.js';
 
@@ -29,7 +28,7 @@ export interface PromptSuggestion {
 }
 
 /**
- * Cached suggestions per role
+ * Cached suggestions per agent
  */
 interface SuggestionsCache {
   [key: string]: {
@@ -313,11 +312,11 @@ class SuggestionsManager {
   }
 
   /**
-   * Get available tools for a role
+   * Get available tools for an agent
    */
-  private getToolsForRole(role: RoleType): string[] {
-    const mcpServers = ROLE_MCP_SERVERS[role];
-    return Object.keys(mcpServers);
+  private async getToolsForAgent(agentId: string): Promise<string[]> {
+    const agentDef = await getAgentDefinition(agentId);
+    return Object.keys(agentDef.mcpServers);
   }
 
   /**
@@ -338,12 +337,12 @@ class SuggestionsManager {
 
   /**
    * Generate default tool-based suggestions
-   * @param role - The role to get suggestions for
+   * @param agentId - The agent to get suggestions for
    * @param language - The language for suggestions
    * @param randomize - If true, randomly select from available variants
    */
-  private getDefaultToolSuggestions(role: RoleType, language: Language = 'en', randomize: boolean = false): PromptSuggestion[] {
-    const tools = this.getToolsForRole(role);
+  private async getDefaultToolSuggestions(agentId: string, language: Language = 'en', randomize: boolean = false): Promise<PromptSuggestion[]> {
+    const tools = await this.getToolsForAgent(agentId);
     return tools
       .filter(tool => TOOL_SUGGESTIONS[tool] && DEFAULT_TOOL_PROMPTS[tool])
       .slice(0, 6) // Limit to 6 suggestions
@@ -366,27 +365,27 @@ class SuggestionsManager {
   }
 
   /**
-   * Get suggestions for a role (from cache or defaults)
+   * Get suggestions for an agent (from cache or defaults)
    */
-  getSuggestions(role: RoleType, language: Language = 'en'): PromptSuggestion[] {
+  async getSuggestions(agentId: string, language: Language = 'en'): Promise<PromptSuggestion[]> {
     const templateSuggestions = this.getTemplateSuggestions();
 
     // Check if we have cached LLM suggestions
-    const cached = this.cache[role];
+    const cached = this.cache[agentId];
     if (cached && cached.suggestions.length > 0) {
       return [...templateSuggestions, ...cached.suggestions];
     }
 
     // Return default tool suggestions
-    const toolSuggestions = this.getDefaultToolSuggestions(role, language);
+    const toolSuggestions = await this.getDefaultToolSuggestions(agentId, language);
     return [...templateSuggestions, ...toolSuggestions];
   }
 
   /**
    * Get only cached LLM suggestions (without templates)
    */
-  getCachedSuggestions(role: RoleType): PromptSuggestion[] | null {
-    const cached = this.cache[role];
+  getCachedSuggestions(agentId: string): PromptSuggestion[] | null {
+    const cached = this.cache[agentId];
     if (cached && cached.suggestions.length > 0) {
       return cached.suggestions;
     }
@@ -404,15 +403,15 @@ class SuggestionsManager {
    * Get default tool suggestions (without LLM)
    * @param randomize - If true, randomly select from available variants (used for refresh)
    */
-  getDefaultSuggestions(role: RoleType, language: Language = 'en', randomize: boolean = false): PromptSuggestion[] {
-    return this.getDefaultToolSuggestions(role, language, randomize);
+  async getDefaultSuggestions(agentId: string, language: Language = 'en', randomize: boolean = false): Promise<PromptSuggestion[]> {
+    return this.getDefaultToolSuggestions(agentId, language, randomize);
   }
 
   /**
    * Prepare context for LLM suggestion generation
    */
-  getLLMContext(role: RoleType): { tools: ToolInfo[]; templates: PromptTemplate[] } {
-    const toolNames = this.getToolsForRole(role);
+  async getLLMContext(agentId: string): Promise<{ tools: ToolInfo[]; templates: PromptTemplate[] }> {
+    const toolNames = await this.getToolsForAgent(agentId);
     const tools = toolNames
       .filter(name => TOOL_SUGGESTIONS[name])
       .map(name => TOOL_SUGGESTIONS[name]);
@@ -426,8 +425,8 @@ class SuggestionsManager {
   /**
    * Update cache with LLM-generated suggestions
    */
-  updateCache(role: RoleType, suggestions: PromptSuggestion[]): void {
-    this.cache[role] = {
+  updateCache(agentId: string, suggestions: PromptSuggestion[]): void {
+    this.cache[agentId] = {
       suggestions: suggestions.map(s => ({ ...s, source: 'llm' as const })),
       generatedAt: new Date().toISOString(),
     };
@@ -435,11 +434,11 @@ class SuggestionsManager {
   }
 
   /**
-   * Clear cache for a specific role
+   * Clear cache for a specific agent
    */
-  clearCache(role?: RoleType): void {
-    if (role) {
-      delete this.cache[role];
+  clearCache(agentId?: string): void {
+    if (agentId) {
+      delete this.cache[agentId];
     } else {
       this.cache = {};
     }
@@ -461,9 +460,9 @@ class SuggestionsManager {
    * Generate suggestions using LLM via Claude Agent SDK
    * Uses a separate system directory to avoid polluting user project files
    */
-  async generateWithLLM(role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> {
+  async generateWithLLM(agentId: string, language: Language = 'en'): Promise<PromptSuggestion[]> {
     const systemCwd = this.getSystemCwd();
-    const prompt = this.generateLLMPromptWithLanguage(role, language);
+    const prompt = await this.generateLLMPromptWithLanguage(agentId, language);
 
     const abortController = new AbortController();
 
@@ -497,25 +496,26 @@ class SuggestionsManager {
       // Parse JSON response
       const suggestions = this.parseJSONResponse(responseText);
       if (suggestions.length > 0) {
-        this.updateCache(role, suggestions);
+        this.updateCache(agentId, suggestions);
         return suggestions;
       }
 
       // Fallback to default suggestions if parsing fails
-      return this.getDefaultToolSuggestions(role, language, true);
+      return this.getDefaultToolSuggestions(agentId, language, true);
     } catch (error) {
       console.error('[SuggestionsManager] LLM generation failed:', error);
       // Fallback to randomized default suggestions
-      return this.getDefaultToolSuggestions(role, language, true);
+      return this.getDefaultToolSuggestions(agentId, language, true);
     }
   }
 
   /**
    * Generate LLM prompt with language support
    */
-  private generateLLMPromptWithLanguage(role: RoleType, language: Language): string {
-    const { tools, templates } = this.getLLMContext(role);
-    const roleDisplayName = getRoleDisplayName(role);
+  private async generateLLMPromptWithLanguage(agentId: string, language: Language): Promise<string> {
+    const { tools, templates } = await this.getLLMContext(agentId);
+    const agentDef = await getAgentDefinition(agentId);
+    const agentDisplayName = agentDef.displayName;
 
     const toolsSection = tools.length > 0
       ? tools.map(t => `- ${t.icon} ${t.name}: ${t.description}`).join('\n')
@@ -533,7 +533,7 @@ class SuggestionsManager {
 
     return `You are a task suggestion generator. Generate 6 practical task suggestions based on the following information:
 
-## Role ${roleDisplayName}
+## Role ${agentDisplayName}
 
 ## Available Tools
 ${toolsSection}

@@ -7,7 +7,6 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { RoleType } from '../roles/role-enum.js';
 import { getSessionsDir, getConfigDir } from '../storage/storage.js';
 import { SessionPersistenceError } from '../errors.js';
 
@@ -15,7 +14,7 @@ export interface Session {
   id: string; //This is our local UUID session ID, created by frontend
   claudeSessionId?: string; // Claude SDK's session ID for resuming (from system init message)
   title: string;
-  role: RoleType;
+  agentId: string;
   modelName: string;
   cwd: string; // Current working directory for this session (aligns with SDK Options.cwd)
   additionalDirectories?: string[]; // Additional directories beyond cwd (aligns with SDK Options.additionalDirectories)
@@ -59,14 +58,14 @@ export class SessionManager {
    */
   createSession(
     title: string,
-    role: RoleType,
+    agentId: string,
     modelName: string,
     cwd: string
   ): Session {
     const session: Session = {
       id: this.generateSessionId(),
       title,
-      role,
+      agentId,
       modelName,
       cwd,
       createdAt: Date.now(),

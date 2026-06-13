@@ -25,7 +25,8 @@ import {
 } from '../agents/claude-agent-factory.js';
 import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { workspaceManager } from '../config/workspace-manager.js';
-import { RoleType } from '../roles/role-enum.js';
+import { getAgentDefinitions } from '../agents/agent-loader.js';
+import { settingsManager } from '../settings/settings-manager.js';
 import { ClaudeModel } from '../providers/model-list-manager.js';
 import { authManager, type AuthStatus } from '../auth/auth-manager.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
@@ -33,6 +34,24 @@ import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
 import { deleteTranscript } from '../sessions/transcript-manager.js';
 import { SkillManager } from '../skills/skill-manager.js';
 import { AgentQueryError, SessionPersistenceError, getErrorMessage } from '../errors.js';
+
+/**
+ * Resolve the default agent id from settings, falling back to the first
+ * available agent definition if unset or no longer valid.
+ */
+async function getDefaultAgentId(): Promise<string> {
+  const definitions = await getAgentDefinitions();
+  if (definitions.length === 0) {
+    throw new Error('No agent definitions available');
+  }
+
+  const { defaultAgentId } = settingsManager.getSettings();
+  if (defaultAgentId && definitions.some((def) => def.id === defaultAgentId)) {
+    return defaultAgentId;
+  }
+
+  return definitions[0].id;
+}
 
 /**
  * Extract text content from MessageContent for use as session title
@@ -57,7 +76,7 @@ function extractTextFromMessage(message: MessageContent): string {
 export interface AgentInitConfig {
   sessionId?: string;
   title?: string;
-  role?: RoleType;
+  agentId?: string;
   modelName?: string;
 }
 
@@ -217,17 +236,18 @@ export class ClaudeAgentService {
     const {
       sessionId,
       title,
-      role = RoleType.OFFICE_ASSISTANT,
+      agentId,
       modelName = ClaudeModel.SONNET_4_6,
     } = config;
 
     if (sessionId) {
       this.currentAgent = await switchToSession(sessionId, false);
     } else {
-      const sessionTitle = title || `New ${role} session`;
+      const resolvedAgentId = agentId ?? (await getDefaultAgentId());
+      const sessionTitle = title || `New ${resolvedAgentId} session`;
       // Use last selected cwd or default to user home directory
       const cwd = this.sessionManager.getLastCwd();
-      this.currentAgent = await createNewAgent(sessionTitle, role, modelName, cwd);
+      this.currentAgent = await createNewAgent(sessionTitle, resolvedAgentId, modelName, cwd);
     }
 
     // Apply tool approval handler to new agent
@@ -444,7 +464,7 @@ export class ClaudeAgentService {
    */
   getCurrentAgentInfo(): {
     sessionId: string;
-    role: RoleType;
+    agentId: string;
     modelName: string;
   } | null {
     if (!this.currentAgent) {
@@ -453,7 +473,7 @@ export class ClaudeAgentService {
 
     return {
       sessionId: this.currentAgent.getSessionId(),
-      role: this.currentAgent.getRole(),
+      agentId: this.currentAgent.getAgentId(),
       modelName: this.currentAgent.getModelName(),
     };
   }
@@ -585,12 +605,12 @@ export class ClaudeAgentService {
    */
   async createSession(
     title: string,
-    role: RoleType,
+    agentId: string,
     modelName: string,
     cwd: string
   ): Promise<{ success: boolean; session?: Session; error?: string }> {
     try {
-      this.currentAgent = await createNewAgent(title, role, modelName, cwd);
+      this.currentAgent = await createNewAgent(title, agentId, modelName, cwd);
 
       // Apply tool approval handler
       if (this.toolApprovalRequestHandler) {

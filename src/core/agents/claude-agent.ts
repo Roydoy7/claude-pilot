@@ -21,7 +21,6 @@ import type {
   SettingSource,
   TerminalReason,
 } from '@anthropic-ai/claude-agent-sdk';
-import { RoleType, getRoleDisplayName } from '../roles/role-enum.js';
 import { SessionManager } from '../sessions/session-manager.js';
 import { readTranscript } from '../sessions/transcript-manager.js';
 import { buildBaseQueryOptions } from './sdk-query.js';
@@ -151,7 +150,8 @@ export interface HistoryMessage {
  */
 export interface ClaudeAgentConfig extends Options {
   // Agent metadata (not part of SDK Options)
-  role: RoleType;
+  agentId: string;
+  agentDisplayName: string;
 
   // Override model to make it required via modelName alias
   model?: string;
@@ -1033,7 +1033,7 @@ export class ClaudeAgent {
       const session = sessionManager.loadSession(this.sessionId);
 
       // Build Options from config, excluding agent-specific metadata
-      const { role, modelName, ...sdkOptions } = this.config;
+      const { agentId, agentDisplayName, modelName, ...sdkOptions } = this.config;
 
       const canUseToolCallback = this.toolApprovalRequestHandler
         ? this.createCanUseToolCallback()
@@ -1141,17 +1141,17 @@ export class ClaudeAgent {
   }
 
   /**
-   * Get agent role
+   * Get agent id
    */
-  getRole(): RoleType {
-    return this.config.role;
+  getAgentId(): string {
+    return this.config.agentId;
   }
 
   /**
-   * Get role display name
+   * Get agent display name
    */
-  getRoleDisplayName(): string {
-    return getRoleDisplayName(this.config.role);
+  getAgentDisplayName(): string {
+    return this.config.agentDisplayName;
   }
 
   /**
