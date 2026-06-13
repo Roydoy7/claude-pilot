@@ -20,6 +20,7 @@ import { settingsManager } from '../../core/settings/settings-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
 import { suggestionsManager, type Language } from '../../core/suggestions/suggestions-manager.js';
 import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
+import type { FileTreeNode } from '../preload/preload-types.js';
 import { getErrorMessage } from '../../core/errors.js';
 import fs from 'fs';
 import path from 'path';
@@ -38,6 +39,52 @@ function handleIpc<C extends keyof ChannelMap>(
   ) => ChannelMap[C]['result'] | Promise<ChannelMap[C]['result']>
 ): void {
   ipcMain.handle(channel, handler);
+}
+
+/**
+ * Recursively build a file tree for a directory, skipping hidden entries,
+ * node_modules, and __pycache__. Returns null if the path can't be read.
+ */
+function buildFileTree(dirPath: string): FileTreeNode | null {
+  try {
+    const stat = fs.statSync(dirPath);
+    const name = path.basename(dirPath);
+
+    if (stat.isFile()) {
+      return { name, path: dirPath, type: 'file' };
+    }
+
+    if (stat.isDirectory()) {
+      const children: FileTreeNode[] = [];
+      const entries = fs.readdirSync(dirPath);
+
+      for (const entry of entries) {
+        // Skip hidden files and common ignore patterns
+        if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
+          continue;
+        }
+
+        const childNode = buildFileTree(path.join(dirPath, entry));
+        if (childNode) {
+          children.push(childNode);
+        }
+      }
+
+      // Sort: directories first, then files, alphabetically
+      children.sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'directory' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      return { name, path: dirPath, type: 'directory', children };
+    }
+  } catch (error) {
+    console.error(`Error reading ${dirPath}:`, error);
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -315,68 +362,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       return [];
     }
 
-    interface FileNode {
-      name: string;
-      path: string;
-      type: 'file' | 'directory';
-      children?: FileNode[];
-    }
-
-    const buildTree = (dirPath: string): FileNode | null => {
-      try {
-        const stat = fs.statSync(dirPath);
-        const name = path.basename(dirPath);
-
-        if (stat.isFile()) {
-          return {
-            name,
-            path: dirPath,
-            type: 'file',
-          };
-        } else if (stat.isDirectory()) {
-          const children: FileNode[] = [];
-          const entries = fs.readdirSync(dirPath);
-
-          for (const entry of entries) {
-            // Skip hidden files and common ignore patterns
-            if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
-              continue;
-            }
-
-            const childPath = path.join(dirPath, entry);
-            const childNode = buildTree(childPath);
-            if (childNode) {
-              children.push(childNode);
-            }
-          }
-
-          // Sort: directories first, then files, alphabetically
-          children.sort((a, b) => {
-            if (a.type !== b.type) {
-              return a.type === 'directory' ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-          });
-
-          return {
-            name,
-            path: dirPath,
-            type: 'directory',
-            children,
-          };
-        }
-      } catch (error) {
-        console.error(`Error reading ${dirPath}:`, error);
-        return null;
-      }
-      return null;
-    };
-
     const trees: Array<{
       directoryType: 'cwd' | 'additional';
       directoryPath: string;
       directoryLabel: string;
-      tree: FileNode | null;
+      tree: FileTreeNode | null;
     }> = [];
 
     // Add cwd tree
@@ -385,7 +375,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         directoryType: 'cwd',
         directoryPath: session.cwd,
         directoryLabel: 'Working Directory (cwd)',
-        tree: buildTree(session.cwd),
+        tree: buildFileTree(session.cwd),
       });
     }
 
@@ -396,7 +386,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         directoryType: 'additional',
         directoryPath: dir,
         directoryLabel: `Additional Directory ${index + 1}`,
-        tree: buildTree(dir),
+        tree: buildFileTree(dir),
       });
     });
 
@@ -464,65 +454,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   handleIpc(IpcChannels.workspace.getFileTree, async () => {
     const workspaces = claudeAgentService.getWorkspaces();
 
-    interface FileNode {
-      name: string;
-      path: string;
-      type: 'file' | 'directory';
-      children?: FileNode[];
-    }
-
-    const buildTree = (dirPath: string): FileNode | null => {
-      try {
-        const stat = fs.statSync(dirPath);
-        const name = path.basename(dirPath);
-
-        if (stat.isFile()) {
-          return {
-            name,
-            path: dirPath,
-            type: 'file',
-          };
-        } else if (stat.isDirectory()) {
-          const children: FileNode[] = [];
-          const entries = fs.readdirSync(dirPath);
-
-          for (const entry of entries) {
-            // Skip hidden files and common ignore patterns
-            if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
-              continue;
-            }
-
-            const childPath = path.join(dirPath, entry);
-            const childNode = buildTree(childPath);
-            if (childNode) {
-              children.push(childNode);
-            }
-          }
-
-          // Sort: directories first, then files, alphabetically
-          children.sort((a, b) => {
-            if (a.type !== b.type) {
-              return a.type === 'directory' ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-          });
-
-          return {
-            name,
-            path: dirPath,
-            type: 'directory',
-            children,
-          };
-        }
-      } catch (error) {
-        console.error(`Error reading ${dirPath}:`, error);
-        return null;
-      }
-      return null;
-    };
-
     const trees = workspaces.map((workspace: string, index: number) => {
-      const tree = buildTree(workspace);
+      const tree = buildFileTree(workspace);
       return {
         workspaceIndex: index + 1,
         workspacePath: workspace,
@@ -538,65 +471,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Used by InputArea @ button when session is not yet created
    */
   handleIpc(IpcChannels.workspace.getFileTreeForDirectory, async (_event, directoryPath: string) => {
-    interface FileNode {
-      name: string;
-      path: string;
-      type: 'file' | 'directory';
-      children?: FileNode[];
-    }
-
-    const buildTree = (dirPath: string): FileNode | null => {
-      try {
-        const stat = fs.statSync(dirPath);
-        const name = path.basename(dirPath);
-
-        if (stat.isFile()) {
-          return {
-            name,
-            path: dirPath,
-            type: 'file',
-          };
-        } else if (stat.isDirectory()) {
-          const children: FileNode[] = [];
-          const entries = fs.readdirSync(dirPath);
-
-          for (const entry of entries) {
-            // Skip hidden files and common ignore patterns
-            if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
-              continue;
-            }
-
-            const childPath = path.join(dirPath, entry);
-            const childNode = buildTree(childPath);
-
-            if (childNode) {
-              children.push(childNode);
-            }
-          }
-
-          // Sort: directories first, then files, alphabetically
-          children.sort((a, b) => {
-            if (a.type !== b.type) {
-              return a.type === 'directory' ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-          });
-
-          return {
-            name,
-            path: dirPath,
-            type: 'directory',
-            children,
-          };
-        }
-      } catch (error) {
-        console.error(`Error reading ${dirPath}:`, error);
-        return null;
-      }
-      return null;
-    };
-
-    const tree = buildTree(directoryPath);
+    const tree = buildFileTree(directoryPath);
     return [{
       directoryType: 'cwd' as const,
       directoryPath,
