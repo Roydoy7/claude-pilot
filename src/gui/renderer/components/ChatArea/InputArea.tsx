@@ -5,15 +5,10 @@
  */
 
 import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
-import type { MessageContent, PromptSuggestion, Language } from '../../../preload/preload-types';
+import type { MessageContent, PromptSuggestion, Language, PermissionMode } from '../../../preload/preload-types';
 import type { RoleType } from '../../../../core/roles/role-enum.js';
 import { WorkspaceBrowser } from './WorkspaceBrowser';
 import { useLanguage } from '../../i18n/LanguageContext';
-
-/**
- * Permission mode type - matches SDK PermissionMode
- */
-type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk';
 
 /**
  * Setting source type - matches SDK SettingSource
@@ -82,6 +77,15 @@ const PermissionIcons = {
       <line x1="17" y1="9" x2="23" y2="15"></line>
     </svg>
   ),
+  // Users icon for delegate mode
+  users: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+  ),
 };
 
 /**
@@ -113,12 +117,17 @@ const PERMISSION_MODE_CONFIGS: Record<PermissionMode, PermissionModeConfig> = {
     color: '#9c27b0',
     bgColor: 'rgba(156, 39, 176, 0.12)',
   },
+  delegate: {
+    icon: PermissionIcons.users,
+    color: '#009688',
+    bgColor: 'rgba(0, 150, 136, 0.12)',
+  },
 };
 
 /**
  * All permission modes in order
  */
-const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk'];
+const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk', 'delegate'];
 
 interface AttachedImage {
   id: string;

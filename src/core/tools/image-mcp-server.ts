@@ -261,7 +261,6 @@ async function compressImage(
     // Apply format-specific compression
     switch (format) {
       case 'jpeg':
-      case 'jpg':
         sharpInstance = sharpInstance.jpeg({ quality, mozjpeg: true });
         break;
       case 'png':
@@ -269,9 +268,6 @@ async function compressImage(
         break;
       case 'webp':
         sharpInstance = sharpInstance.webp({ quality });
-        break;
-      case 'avif':
-        sharpInstance = sharpInstance.avif({ quality });
         break;
       default:
         // Default to JPEG for best compression

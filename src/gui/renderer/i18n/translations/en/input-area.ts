@@ -38,6 +38,10 @@ export const inputAreaEn = {
         name: "Don't Ask",
         description: 'Silent mode - skip all confirmation prompts, used for automation scenarios',
       },
+      delegate: {
+        name: 'Delegate',
+        description: 'Team leader mode - restricted to delegating work via Teammate and Task tools only',
+      },
     },
   },
   settingSources: {

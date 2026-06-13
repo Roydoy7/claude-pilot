@@ -140,6 +140,10 @@ export interface Translation {
           name: string;
           description: string;
         };
+        delegate: {
+          name: string;
+          description: string;
+        };
       };
     };
     settingSources?: {
