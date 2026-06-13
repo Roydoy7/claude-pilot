@@ -161,6 +161,11 @@ export async function createAgentFromSessionData(
     thinking: getThinkingConfig(session.modelName),
   };
 
+  // Install skills for this agent
+  const skillManager = SkillManager.getInstance();
+  await skillManager.initialize();
+  await skillManager.installSkillsForAgent(session.agentId, session.cwd);
+
   // Create and return agent
   return new ClaudeAgent(agentConfig, session.id, session.cwd, session.claudeSessionId);
 }
@@ -179,10 +184,10 @@ export async function createNewAgent(
   // Create new session (provider is always Claude now)
   const session = sessionManager.createSession(title, agentId, modelName, cwd);
 
-  // Install default skills for this agent
+  // Install skills for this agent
   const skillManager = SkillManager.getInstance();
   await skillManager.initialize();
-  await skillManager.installDefaultSkillsForAgent(agentId, cwd);
+  await skillManager.installSkillsForAgent(agentId, cwd);
 
   // Create agent from session
   const agent = await createAgentFromSessionData(session);

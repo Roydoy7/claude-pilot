@@ -31,6 +31,7 @@ export interface AgentDefinition {
   safeTools: string[];
   mcpServers: Record<string, McpServer>;
   autoApprovedMcpTools: string[];
+  /** Absolute paths to this agent's default skill directories */
   defaultSkills: string[];
 }
 
@@ -198,7 +199,7 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
 
   const skillsDir = path.join(dir, 'skills');
   const skillDirents = await fs.readdir(skillsDir, { withFileTypes: true }).catch(() => []);
-  const defaultSkills = skillDirents.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const defaultSkills = skillDirents.filter((entry) => entry.isDirectory()).map((entry) => path.join(skillsDir, entry.name));
 
   return {
     id,

@@ -4,6 +4,7 @@
  * Tests for agent-loader: loading file-based agent definitions from agent-defs/
  */
 
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { getAgentDefinitions, getAgentDefinition } from './agent-loader.js';
 
@@ -41,7 +42,7 @@ describe('getAgentDefinitions', () => {
   it('lists default skills from skills/ subdirectories', async () => {
     const officeAssist = await getAgentDefinition('office-assist');
 
-    expect(officeAssist.defaultSkills.sort()).toEqual(
+    expect(officeAssist.defaultSkills.map((p) => path.basename(p)).sort()).toEqual(
       ['docx-processor', 'excel-processor', 'pptx-processor'].sort(),
     );
   });

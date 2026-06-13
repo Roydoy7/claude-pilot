@@ -460,9 +460,9 @@ export class SkillManager {
   /**
    * Install a skill from built-in marketplace (copy local files)
    */
-  private async installBuiltinSkill(skillName: string, cwd: string): Promise<InstalledSkillInfo> {
-    const builtinDir = getBuiltinSkillsPath();
-    const sourceDir = path.join(builtinDir, skillName);
+  private async installAgentSkill(skillPath: string, cwd: string): Promise<InstalledSkillInfo> {
+    const skillName = path.basename(skillPath);
+    const sourceDir = skillPath;
     const targetDir = path.join(cwd, '.claude', 'skills', skillName);
 
     // Check source exists
@@ -502,7 +502,7 @@ export class SkillManager {
   ): Promise<InstalledSkillInfo> {
     // Handle built-in marketplace specially
     if (marketplaceId === BUILTIN_MARKETPLACE_ID) {
-      return this.installBuiltinSkill(skillPath, cwd);
+      return this.installAgentSkill(skillPath, cwd);
     }
 
     const marketplace = this.config.marketplaces.find((m) => m.id === marketplaceId);
@@ -606,15 +606,16 @@ export class SkillManager {
   }
 
   /**
-   * Install default skills for an agent to the session's cwd
+   * Install skills for an agent to the session's cwd
    * Skips skills that are already installed
    */
-  async installDefaultSkillsForAgent(agentId: string, cwd: string): Promise<InstalledSkillInfo[]> {
+  async installSkillsForAgent(agentId: string, cwd: string): Promise<InstalledSkillInfo[]> {
     const agentDef = await getAgentDefinition(agentId);
     const defaultSkills = agentDef.defaultSkills;
     const installed: InstalledSkillInfo[] = [];
 
-    for (const skillName of defaultSkills) {
+    for (const skillPath of defaultSkills) {
+      const skillName = path.basename(skillPath);
       try {
         // Skip if already installed
         if (await this.isSkillInstalled(cwd, skillName)) {
@@ -622,7 +623,7 @@ export class SkillManager {
         }
 
         // Install from built-in marketplace
-        const skillInfo = await this.installBuiltinSkill(skillName, cwd);
+        const skillInfo = await this.installAgentSkill(skillPath, cwd);
         installed.push(skillInfo);
       } catch (error) {
         // Log but don't fail - continue with other skills
