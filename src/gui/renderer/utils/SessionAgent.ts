@@ -5,8 +5,30 @@
  * Manages event filtering, history updates, and streaming for a single session
  */
 
-import type { MessageListItem, UsageMetadata, MessageContent } from '../../preload/preload-types';
-import type { AgentState, StreamEvent } from '../../../core/agents/claude-agent.js';
+import type { MessageListItem, MessageContent } from '../../preload/preload-types';
+import type { AgentState, StreamEvent, HistoryMessage } from '../../../core/agents/claude-agent.js';
+import { SequentialEventQueue } from './session-agent/event-queue.js';
+import {
+  createStreamingTextState,
+  applyTextDelta,
+  createThinkingItem,
+  type StreamingTextState,
+} from './session-agent/streaming.js';
+import { markToolNeedsApproval, applyToolApprovals, applyToolRejections } from './session-agent/approvals.js';
+import {
+  updateStatusItem,
+  addItemKeepingStatusAtEnd,
+  upsertStreamingMessage,
+  applyToolStart,
+  applyToolEnd,
+  applyToolProgress,
+  applyMessageEvent,
+  applyErrorEvent,
+  applyCancelledEvent,
+  applyUsageLimitEvent,
+  applyDone,
+  buildDisplayItemsFromHistory,
+} from './session-agent/display-items.js';
 
 interface SessionAgentCallbacks {
   // Single notification callback - WPF INotifyPropertyChanged/ICollectionChanged pattern
@@ -23,6 +45,10 @@ interface SessionAgentCallbacks {
  * - History-based updates (single source of truth)
  * - Tool approval handling via canUseTool callback
  * - Per-session pending approvals and rejected tools state
+ *
+ * Event handling itself is implemented as pure reducer functions in
+ * ./session-agent/* - this class is a thin orchestration layer that owns
+ * the mutable state and wires events to those reducers.
  */
 export class SessionAgent {
   private sessionId: string;
@@ -36,24 +62,17 @@ export class SessionAgent {
   private pendingApprovals: Map<string, string> = new Map(); // toolCallId -> toolUseId
   private rejectedTools: Set<string> = new Set(); // Set of rejected toolCallIds
 
-  // Streaming message buffer (for real-time text display)
-  private streamingText: string = '';
-  private streamingMessageId: string | null = null;
-  private streamingUsage: UsageMetadata | undefined = undefined; // Store usage from first delta
+  // Streaming text buffer (for real-time text display)
+  private streamingState: StreamingTextState = createStreamingTextState();
 
-  // Streaming tool calls buffer (for tracking in-progress tool calls)
-  private streamingToolCalls: Map<string, MessageListItem> = new Map(); // toolCallId -> MessageListItem
-
-  // Event queue for sequential processing - ALL events to preserve order during debugging
-  private eventQueue: Array<{
-    type: 'streamEvent' | 'historyUpdate';
-    streamEvent?: StreamEvent;
-  }> = [];
-  private isProcessingQueue: boolean = false;
+  // Sequential event queue - preserves event order even if new events
+  // arrive while a previous one is still being handled.
+  private eventQueue: SequentialEventQueue<StreamEvent>;
 
   constructor(sessionId: string, callbacks: SessionAgentCallbacks) {
     this.sessionId = sessionId;
     this.callbacks = callbacks;
+    this.eventQueue = new SequentialEventQueue<StreamEvent>((event) => this.processStreamEvent(event));
     this.setupListeners();
   }
 
@@ -69,11 +88,7 @@ export class SessionAgent {
         return;
       }
 
-      const { event } = data;
-
-      // Add ALL events to queue to preserve order during debugging
-      // When debugging with breakpoints, events can accumulate and arrive out of order
-      this.enqueueEvent({ type: 'streamEvent', streamEvent: event });
+      this.eventQueue.enqueue(data.event);
     });
 
     // Listen for tool approval requests (from canUseTool callback)
@@ -83,36 +98,18 @@ export class SessionAgent {
         return;
       }
 
-      // Find the tool call item and mark it as needing approval
-      const toolItemIndex = this.displayItems.findIndex(
-        (item) => item.type === 'tool_call' && item.toolCall?.id === data.toolUseId
-      );
+      const next = markToolNeedsApproval(this.displayItems, data.toolUseId);
+      this.pendingApprovals.set(data.toolUseId, data.toolUseId);
 
-      if (toolItemIndex !== -1) {
-        // Update existing tool item
-        const existingItem = this.displayItems[toolItemIndex];
-        this.displayItems[toolItemIndex] = {
-          ...existingItem,
-          needsApproval: true,
-        };
-
-        // Add to pending approvals
-        this.pendingApprovals.set(data.toolUseId, data.toolUseId);
-
-        // Notify callbacks
+      if (next !== this.displayItems) {
+        this.displayItems = next;
         this.notifyDisplayItemsChanged();
-        if (this.callbacks.onPendingApprovalsChange) {
-          this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-        }
       } else {
-        // Tool call item not found yet - store for later matching
-        // This can happen if approval request arrives before tool_start event
+        // Tool call item not found yet - approval request arrived before tool_start event
         console.warn('[SessionAgent] Tool approval request for unknown tool:', data.toolUseId);
-        this.pendingApprovals.set(data.toolUseId, data.toolUseId);
-        if (this.callbacks.onPendingApprovalsChange) {
-          this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-        }
       }
+
+      this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
     });
   }
 
@@ -127,62 +124,14 @@ export class SessionAgent {
   }
 
   /**
-   * Update status indicator item in displayItems
-   * Two-layer state system: thinking + tool state can coexist
-   * Status item is always placed at the end of displayItems
-   */
-  private updateStatusItem(state: AgentState) {
-    // Remove any existing status item (filter it out from any position)
-    const itemsWithoutStatus = this.displayItems.filter(item => item.type !== 'status');
-
-    // Add new status item if not idle (thinking, tool state, or queued)
-    const isIdle = !state.thinking && !state.tool && !state.command && !state.queued;
-
-    if (!isIdle) {
-      const statusItem: MessageListItem = {
-        type: 'status',
-        id: `status-${Date.now()}`,
-        timestamp: Date.now(),
-        agentState: state,
-      };
-      // Always append status item at the end
-      this.displayItems = [...itemsWithoutStatus, statusItem];
-    } else {
-      // Just remove status item (idle state)
-      this.displayItems = itemsWithoutStatus;
-    }
-
-    // Notify UI
-    this.notifyDisplayItemsChanged();
-  }
-
-  /**
-   * Add item to displayItems, keeping status item at the end
-   * This ensures "AI is thinking" indicator always appears at the bottom
-   */
-  private addItemKeepingStatusAtEnd(item: MessageListItem) {
-    // Find existing status item
-    const statusIndex = this.displayItems.findIndex(i => i.type === 'status');
-
-    if (statusIndex === -1) {
-      // No status item, just append
-      this.displayItems.push(item);
-    } else {
-      // Insert before status item to keep status at the end
-      this.displayItems.splice(statusIndex, 0, item);
-    }
-  }
-
-  /**
    * Process a single stream event
    * Called sequentially from event queue to guarantee order
    */
   private processStreamEvent(event: StreamEvent) {
-    // Process different event types
     switch (event.type) {
       case 'state':
-        // State change - update status item in displayItems
-        this.updateStatusItem(event.state);
+        this.displayItems = updateStatusItem(this.displayItems, event.state);
+        this.notifyDisplayItemsChanged();
 
         // Also notify callback for backward compatibility
         if (this.callbacks.onStateChange) {
@@ -190,336 +139,87 @@ export class SessionAgent {
         }
         break;
 
-      case 'text_delta':
-        // Real-time text streaming - accumulate text and update displayItems
-        if (!this.streamingMessageId) {
-          // Start new streaming message
-          this.streamingMessageId = `streaming-${this.sessionId}-${Date.now()}`;
-          this.streamingText = '';
-          this.streamingUsage = undefined; // Reset usage storage
-        }
+      case 'text_delta': {
+        const result = applyTextDelta(this.streamingState, event, this.sessionId);
+        this.streamingState = result.state;
 
-        // Accumulate text
-        this.streamingText += event.text;
-
-        // Claude sends usage in first text_delta (with empty text), then text in subsequent deltas
-        // Store the usage until we have text to display
-        if (event.usage) {
-          this.streamingUsage = event.usage;
-        }
-
-        // Create/update streaming item if we have text
-        const hasText = this.streamingText.trim().length > 0;
-
-        if (hasText) {
-          // Always find by ID to handle array changes during streaming
-          const streamingIndex = this.displayItems.findIndex(i => i.id === this.streamingMessageId);
-
-          if (streamingIndex === -1) {
-            // First time we have actual text - create the item with stored usage
-            const newStreamingItem: MessageListItem = {
-              type: 'message',
-              id: this.streamingMessageId,
-              timestamp: Date.now(),
-              role: 'assistant',
-              content: this.streamingText,
-              usage: this.streamingUsage, // Use stored usage from first delta
-            };
-
-            this.addItemKeepingStatusAtEnd(newStreamingItem);
-          } else {
-            // Update existing streaming item with latest text and usage
-            const existingItem = this.displayItems[streamingIndex];
-            this.displayItems[streamingIndex] = {
-              ...existingItem,
-              content: this.streamingText,
-              usage: this.streamingUsage ?? existingItem.usage,
-            };
-          }
-
-          // Notify UI
+        if (result.message) {
+          this.displayItems = upsertStreamingMessage(this.displayItems, result.message, result.isNew);
           this.notifyDisplayItemsChanged();
         }
         break;
+      }
 
       case 'thinking': {
-        // Extended thinking content - create a thinking item
-        const thinkingItem: MessageListItem = {
-          type: 'thinking',
-          id: `thinking-${this.sessionId}-${Date.now()}`,
-          timestamp: Date.now(),
-          thinking: event.thinking,
-        };
-
-        this.addItemKeepingStatusAtEnd(thinkingItem);
+        const thinkingItem = createThinkingItem(this.sessionId, event.thinking);
+        this.displayItems = addItemKeepingStatusAtEnd(this.displayItems, thinkingItem);
         this.notifyDisplayItemsChanged();
         break;
       }
 
-      case 'tool_start': {
-        // Tool execution started - create tool call item and add to displayItems
-        // Args should already be parsed as object by backend (agent.ts)
-        // But handle edge cases for robustness
-        let parsedArgs: Record<string, unknown>;
-        const argsValue = event.args;
-
-        if (argsValue && typeof argsValue === 'object') {
-          // Normal case - args is already an object
-          parsedArgs = argsValue;
-        } else if (typeof argsValue === 'string') {
-          // Fallback: Try to parse if it's somehow still a string
-          const stringArgs: string = argsValue;
-          try {
-            parsedArgs = JSON.parse(stringArgs);
-          } catch {
-            parsedArgs = { _error: 'Invalid arguments format', _raw: stringArgs.substring(0, 100) };
-          }
-        } else {
-          // Unexpected: args is neither object nor string
-          parsedArgs = { _error: 'Invalid argument type' };
-        }
-
-        // Check if this tool already has a pending approval request
-        // (toolApprovalRequest may arrive before tool_start)
-        const hasPendingApproval = this.pendingApprovals.has(event.toolCallId);
-
-        const toolStartItem: MessageListItem = {
-          type: 'tool_call',
-          id: `tool-${event.toolCallId}`,
-          timestamp: Date.now(),
-          toolCall: {
-            id: event.toolCallId,
-            name: event.toolName,
-            args: parsedArgs,
-          },
-          needsApproval: hasPendingApproval, // Set if approval request already received
-        };
-
-        // Add to displayItems immediately (so it's displayed), keeping status at end
-        this.addItemKeepingStatusAtEnd(toolStartItem);
-
-        // Store in streaming tool calls buffer
-        this.streamingToolCalls.set(event.toolCallId, toolStartItem);
-
-        // Notify UI
+      case 'tool_start':
+        this.displayItems = applyToolStart(this.displayItems, event, this.pendingApprovals);
         this.notifyDisplayItemsChanged();
-      }
-      break;
+        break;
 
-      case 'tool_end':
-        // Tool execution completed - update displayItems with response
-        // Find the tool item in displayItems by tool call ID
-        const toolItemIndex = this.displayItems.findIndex(
-          (item: MessageListItem) => item.type === 'tool_call' && item.toolCall?.id === event.toolCallId
-        );
+      case 'tool_end': {
+        const hadPendingApproval = this.pendingApprovals.has(event.toolCallId);
+        const next = applyToolEnd(this.displayItems, event);
 
-        if (toolItemIndex !== -1) {
-          const existingToolItem = this.displayItems[toolItemIndex];
+        if (next !== this.displayItems) {
+          this.displayItems = next;
 
-          // Remove from pending approvals (tool execution completed)
-          if (this.pendingApprovals.has(event.toolCallId)) {
+          if (hadPendingApproval) {
             this.pendingApprovals.delete(event.toolCallId);
-
-            // Notify callback
-            if (this.callbacks.onPendingApprovalsChange) {
-              this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-            }
+            this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
           }
 
-          // Update with response and clear needsApproval flag
-          const updatedToolItem: MessageListItem = {
-            ...existingToolItem,
-            toolResponse: {
-              tool_call_id: event.toolCallId,
-              output: event.output,
-              error: event.error,
-            },
-            needsApproval: false, // No longer needs approval (already executed)
-          };
-
-          // Update displayItems entry
-          this.displayItems[toolItemIndex] = updatedToolItem;
-
-          // Also update streamingToolCalls buffer
-          this.streamingToolCalls.set(event.toolCallId, updatedToolItem);
-
-          // Notify UI
           this.notifyDisplayItemsChanged();
         }
         break;
+      }
 
       case 'tool_progress': {
-        // Tool execution progress update - add to progress array
-        // Find the most recent tool call item matching the tool name (toolCallId may not be available)
-        let progressToolIndex = -1;
-
-        if (event.toolCallId) {
-          // If toolCallId is available, find by exact ID
-          progressToolIndex = this.displayItems.findIndex(
-            (item: MessageListItem) => item.type === 'tool_call' && item.toolCall?.id === event.toolCallId
-          );
-        }
-
-        // If not found by ID, find the most recent tool call with matching name that doesn't have a response yet
-        if (progressToolIndex === -1) {
-          for (let i = this.displayItems.length - 1; i >= 0; i--) {
-            const item = this.displayItems[i];
-            if (item.type === 'tool_call' &&
-                item.toolCall?.name === event.toolName &&
-                !item.toolResponse) {
-              progressToolIndex = i;
-              break;
-            }
-          }
-        }
-
-        if (progressToolIndex !== -1) {
-          const existingItem = this.displayItems[progressToolIndex];
-
-          // Add progress entry
-          const progressEntry = {
-            type: event.progressType as 'stdout' | 'stderr' | 'start' | 'end' | 'error',
-            message: event.message,
-            timestamp: event.timestamp,
-          };
-
-          // Update with new progress
-          const updatedItem: MessageListItem = {
-            ...existingItem,
-            progress: [...(existingItem.progress || []), progressEntry],
-          };
-
-          this.displayItems[progressToolIndex] = updatedItem;
-
-          // Notify UI
+        const next = applyToolProgress(this.displayItems, event);
+        if (next !== this.displayItems) {
+          this.displayItems = next;
           this.notifyDisplayItemsChanged();
         }
         break;
-      }      
-
-      case 'checkpoint':
-        // Checkpoint: current streaming item is complete, finalize it
-        // Streaming item is already in displayItems, just clear buffers
-        // Clear text streaming buffers (ready for next item)
-        this.streamingText = '';
-        this.streamingMessageId = null;
-        this.streamingUsage = undefined;
-
-        // No need to notify UI - item is already in displayItems
-        break;
-
-      case 'message': {
-        // Complete message event (e.g., compact summary)
-        // Create a new message item and add to displayItems
-        const messageItem: MessageListItem = {
-          type: 'message',
-          id: `message-${this.sessionId}-${event.timestamp}`,
-          timestamp: event.timestamp,
-          role: 'assistant',
-          content: event.content,
-          isCompactSummary: event.isCompactSummary,
-        };
-
-        this.addItemKeepingStatusAtEnd(messageItem);
-
-        // Notify UI
-        this.notifyDisplayItemsChanged();
-        break;
       }
 
+      case 'checkpoint':
+        // Checkpoint: current streaming item is complete, reset the buffer
+        // for the next one. Item is already in displayItems - no notify needed.
+        this.streamingState = createStreamingTextState();
+        break;
+
+      case 'message':
+        this.displayItems = applyMessageEvent(this.displayItems, event, this.sessionId);
+        this.notifyDisplayItemsChanged();
+        break;
+
       case 'error':
-        // Error occurred during execution - add error message to displayItems
-        const errorMessageItem: MessageListItem = {
-          type: 'message',
-          id: `error-${Date.now()}`,
-          timestamp: Date.now(),
-          role: 'assistant',
-          content: `❌ Error: ${event.error}${event.details ? '\n\nDetails: ' + event.details : ''}`,
-        };
-
-        this.addItemKeepingStatusAtEnd(errorMessageItem);
-
-        // Clear status item (set to idle)
-        this.updateStatusItem({ thinking: false });
-
-        // Notify UI
+        this.displayItems = applyErrorEvent(this.displayItems, event);
+        this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
         this.notifyDisplayItemsChanged();
         break;
 
       case 'cancelled':
-        // User cancelled the request - show as inline status (not message bubble)
-        const cancelledItem: MessageListItem = {
-          type: 'cancelled',
-          id: `cancelled-${Date.now()}`,
-          timestamp: Date.now(),
-        };
-
-        this.addItemKeepingStatusAtEnd(cancelledItem);
-
-        // Clear status item (set to idle)
-        this.updateStatusItem({ thinking: false });
-
-        // Notify UI
+        this.displayItems = applyCancelledEvent(this.displayItems);
+        this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
         this.notifyDisplayItemsChanged();
         break;
 
-      case 'usage_limit': {
-        // Usage limit reached - show as inline usage limit indicator
-        const usageLimitItem: MessageListItem = {
-          type: 'usage_limit',
-          id: `usage-limit-${Date.now()}`,
-          timestamp: Date.now(),
-          usageLimitMessage: event.message,
-        };
-
-        this.addItemKeepingStatusAtEnd(usageLimitItem);
-
-        // Clear status item (set to idle)
-        this.updateStatusItem({ thinking: false });
-
-        // Notify UI
+      case 'usage_limit':
+        this.displayItems = applyUsageLimitEvent(this.displayItems, event);
+        this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
         this.notifyDisplayItemsChanged();
         break;
-      }
 
-      case 'done': {
-        // Stream completed - clear streaming state
-        // Remove empty assistant messages (messages with no content or only whitespace)
-        // These often appear when LLM decides to call tools without text
-        this.displayItems = this.displayItems.filter(item => {
-          if (item.type === 'message' && item.role === 'assistant') {
-            // Handle both string and ContentBlock[] content formats
-            if (typeof item.content === 'string') {
-              return item.content.trim().length > 0;
-            }
-            // For ContentBlock[], check if any text block has content
-            if (Array.isArray(item.content)) {
-              return item.content.some(block =>
-                block.type === 'text' && 'text' in block && (block.text as string)?.trim().length > 0
-              );
-            }
-            // Keep message if content exists in unknown format
-            return !!item.content;
-          }
-          // Keep all non-assistant messages and tool calls
-          return true;
-        });
-
-        // Update the last assistant message with final usage if available
-        if (event.usage) {
-          for (let i = this.displayItems.length - 1; i >= 0; i--) {
-            const item = this.displayItems[i];
-            if (item.type === 'message' && item.role === 'assistant') {
-              this.displayItems[i] = { ...item, usage: event.usage };
-              break;
-            }
-          }
-        }
-
-        this.streamingText = '';
-        this.streamingMessageId = null;
-        this.streamingUsage = undefined;
-        this.streamingToolCalls.clear();
+      case 'done':
+        this.displayItems = applyDone(this.displayItems, event.usage);
+        this.streamingState = createStreamingTextState();
 
         // Notify UI of the filtered items
         this.notifyDisplayItemsChanged();
@@ -527,59 +227,6 @@ export class SessionAgent {
         // Don't manually set idle here - backend already sends idle state event before done
         // Status will be cleared by the idle state event from backend
         break;
-      }
-    }
-  }
-
-  /**
-   * Add event to queue and start processing
-   */
-  private enqueueEvent(event: { type: 'streamEvent' | 'historyUpdate'; streamEvent?: StreamEvent }) {
-    this.eventQueue.push(event);
-    this.processEventQueue();
-  }
-
-  /**
-   * Process event queue sequentially
-   */
-  private async processEventQueue() {
-    // Prevent concurrent processing
-    if (this.isProcessingQueue) {
-      return;
-    }
-
-    this.isProcessingQueue = true;
-
-    try {
-      while (this.eventQueue.length > 0) {
-        const event = this.eventQueue.shift();
-        if (!event) continue;
-
-        if (event.type === 'streamEvent') {
-          // Process stream event synchronously (no await needed)
-          this.processStreamEvent(event.streamEvent!);
-        } else if (event.type === 'historyUpdate') {
-          await this.fetchAndUpdateHistory();
-        }
-      }
-    } finally {
-      this.isProcessingQueue = false;
-    }
-  }
-
-  /**
-   * Fetch complete history from backend and update cache
-   * Called from event queue, so no need for additional locking
-   */
-  private async fetchAndUpdateHistory() {
-    try {
-      // Fetch complete history from backend (single source of truth)
-      const history = await window.electronAPI.session.getHistory(this.sessionId);
-
-      // Use loadCompleteHistory to process and update cache
-      this.loadCompleteHistory(history);
-    } catch (error) {
-      console.error('[SessionAgent] Failed to fetch and update history:', error);
     }
   }
 
@@ -588,160 +235,9 @@ export class SessionAgent {
    * Splits messages and tool calls into separate MessageListItems
    * @param history - Complete message history from backend
    */
-  private loadCompleteHistory(history: Array<{
-    role: string;
-    content: MessageContent;
-    timestamp?: number;
-    usage?: UsageMetadata;
-    tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
-    tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
-    isCompactSummary?: boolean;
-    isUsageLimitError?: boolean;
-  }>) {
+  private loadCompleteHistory(history: HistoryMessage[]) {
     try {
-      const items: MessageListItem[] = [];
-      let itemIndex = 0;
-
-      // Process each message from history
-      history.forEach((msg, msgIndex) => {
-        // Process content: preserve MessageContent type (string | Array<ContentBlock>)
-        // For messages with tool_calls, extract text only if content is JSON string
-        let displayContent: MessageContent = msg.content;
-        let thinkingContent: string | undefined;
-
-        // Handle array content (ContentBlock[]) - extract thinking and filter content
-        if (Array.isArray(msg.content)) {
-          const blocks = msg.content as Array<{ type: string; text?: string; thinking?: string }>;
-
-          // Extract thinking content
-          const thinkingBlocks = blocks.filter(block => block.type === 'thinking');
-          if (thinkingBlocks.length > 0) {
-            thinkingContent = thinkingBlocks.map(b => b.thinking || '').join('\n');
-          }
-
-          // Filter to text and image blocks for display content (exclude thinking blocks)
-          const displayBlocks = blocks.filter(block => block.type === 'text' || block.type === 'image');
-          if (displayBlocks.length > 0) {
-            displayContent = displayBlocks as MessageContent;
-          } else {
-            displayContent = [];
-          }
-        } else if (msg.tool_calls && msg.tool_calls.length > 0 && typeof msg.content === 'string') {
-          try {
-            const parsed = JSON.parse(msg.content);
-            if (Array.isArray(parsed)) {
-              // Only extract pure text parts, ignore functionCall
-              const textParts = parsed
-                .filter((item: {type?: string; text?: string}) => item.type === 'text')
-                .map((item: {text?: string}) => item.text || '');
-              displayContent = textParts.join('');
-            }
-          } catch {
-            // If not valid JSON or parsing fails, keep original content
-          }
-        }
-
-        // Create thinking item FIRST (before message) if thinking content exists
-        if (thinkingContent && thinkingContent.trim()) {
-          const thinkingItem: MessageListItem = {
-            type: 'thinking',
-            id: `${this.sessionId}-thinking-${msgIndex}`,
-            timestamp: msg.timestamp || Date.now(),
-            thinking: thinkingContent,
-          };
-          items.push(thinkingItem);
-          itemIndex++;
-        }
-
-        // Check if content is empty (for both string and array types)
-        let isEmpty = false;
-        if (typeof displayContent === 'string') {
-          const trimmed = displayContent.trim();
-          isEmpty = trimmed === '[]' || trimmed === '{}' || trimmed === '';
-        } else if (Array.isArray(displayContent)) {
-          // Check if array has any text or image content
-          const hasContent = displayContent.some(
-            (block: { type: string; text?: string }) =>
-              (block.type === 'text' && block.text?.trim()) || block.type === 'image'
-          );
-          isEmpty = !hasContent;
-        }
-
-        // Create message item only if content is not empty (skip empty assistant messages)
-        if (!isEmpty) {
-          // Check if this is a usage limit error message
-          if (msg.isUsageLimitError) {
-            // Extract text from content (can be string or ContentBlock[])
-            let limitMessage: string | undefined;
-            if (typeof displayContent === 'string') {
-              limitMessage = displayContent;
-            } else if (Array.isArray(displayContent)) {
-              // Extract text from ContentBlock array
-              const textParts: string[] = [];
-              for (const block of displayContent) {
-                if (block.type === 'text' && 'text' in block) {
-                  textParts.push(block.text);
-                }
-              }
-              limitMessage = textParts.join('');
-            }
-
-            const usageLimitItem: MessageListItem = {
-              type: 'usage_limit',
-              id: `${this.sessionId}-usage-limit-${msgIndex}`,
-              timestamp: msg.timestamp || Date.now(),
-              usageLimitMessage: limitMessage,
-            };
-            items.push(usageLimitItem);
-            itemIndex++;
-          } else {
-            const messageItem: MessageListItem = {
-              type: 'message',
-              id: `${this.sessionId}-msg-${msgIndex}`,
-              timestamp: msg.timestamp || Date.now(),
-              role: msg.role as 'user' | 'assistant',
-              content: displayContent,
-              usage: msg.usage,
-              isCompactSummary: msg.isCompactSummary,
-            };
-
-            items.push(messageItem);
-            itemIndex++;
-          }
-        }
-
-        // Create separate tool call items if present
-        if (msg.tool_calls && msg.tool_calls.length > 0) {
-          // Build tool response map for quick lookup
-          const responseMap = new Map(
-            (msg.tool_responses || []).map(r => [r.tool_call_id, r])
-          );
-
-          msg.tool_calls.forEach((toolCall, toolIndex) => {
-            const response = responseMap.get(toolCall.id);
-            const needsApproval = this.pendingApprovals.has(toolCall.id);
-            const wasRejected = this.rejectedTools.has(toolCall.id);
-
-            const toolItem: MessageListItem = {
-              type: 'tool_call',
-              id: `${this.sessionId}-tool-${msgIndex}-${toolIndex}`,
-              timestamp: msg.timestamp || Date.now(),
-              toolCall,
-              toolResponse: response,
-              needsApproval,
-              wasRejected,
-            };
-
-            items.push(toolItem);
-            itemIndex++;
-          });
-        }
-      });
-
-      // Update displayItems
-      this.displayItems = items;
-
-      // Notify UI
+      this.displayItems = buildDisplayItemsFromHistory(history, this.sessionId, this.pendingApprovals, this.rejectedTools);
       this.notifyDisplayItemsChanged();
     } catch (error) {
       console.error('[SessionAgent] Failed to load complete history:', error);
@@ -754,25 +250,11 @@ export class SessionAgent {
    */
   async approveTools(toolCallIds: string[]): Promise<void> {
     // Remove from pending approvals
-    toolCallIds.forEach(id => this.pendingApprovals.delete(id));
-
-    // Notify callback
-    if (this.callbacks.onPendingApprovalsChange) {
-      this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-    }
+    toolCallIds.forEach((id) => this.pendingApprovals.delete(id));
+    this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
 
     // Immediately update displayItems to reflect approval - UI should respond instantly
-    this.displayItems = this.displayItems.map(item => {
-      if (item.type === 'tool_call' && item.toolCall && toolCallIds.includes(item.toolCall.id)) {
-        return {
-          ...item,
-          needsApproval: false, // Clear approval flag
-        };
-      }
-      return item;
-    });
-
-    // Notify UI to re-render with updated displayItems
+    this.displayItems = applyToolApprovals(this.displayItems, toolCallIds);
     this.notifyDisplayItemsChanged();
 
     // Call backend for each tool (new canUseTool callback-based API)
@@ -793,32 +275,15 @@ export class SessionAgent {
    */
   async rejectTools(toolCallIds: string[], feedback?: string): Promise<void> {
     // Remove from pending approvals and add to rejected
-    toolCallIds.forEach(id => {
+    toolCallIds.forEach((id) => {
       this.pendingApprovals.delete(id);
       this.rejectedTools.add(id);
     });
-
-    // Notify callbacks
-    if (this.callbacks.onPendingApprovalsChange) {
-      this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-    }
-    if (this.callbacks.onRejectedToolsChange) {
-      this.callbacks.onRejectedToolsChange(new Set(this.rejectedTools));
-    }
+    this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+    this.callbacks.onRejectedToolsChange?.(new Set(this.rejectedTools));
 
     // Immediately update displayItems to reflect rejection - UI should respond instantly
-    this.displayItems = this.displayItems.map(item => {
-      if (item.type === 'tool_call' && item.toolCall && toolCallIds.includes(item.toolCall.id)) {
-        return {
-          ...item,
-          needsApproval: false, // Clear approval flag
-          wasRejected: true,    // Set rejection flag
-        };
-      }
-      return item;
-    });
-
-    // Notify UI to re-render with updated displayItems
+    this.displayItems = applyToolRejections(this.displayItems, toolCallIds);
     this.notifyDisplayItemsChanged();
 
     // Call backend for each tool (new canUseTool callback-based API)
@@ -873,12 +338,8 @@ export class SessionAgent {
     }
 
     // Notify callbacks of current state
-    if (this.callbacks.onPendingApprovalsChange) {
-      this.callbacks.onPendingApprovalsChange(new Map(this.pendingApprovals));
-    }
-    if (this.callbacks.onRejectedToolsChange) {
-      this.callbacks.onRejectedToolsChange(new Set(this.rejectedTools));
-    }
+    this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+    this.callbacks.onRejectedToolsChange?.(new Set(this.rejectedTools));
   }
 
   /**
@@ -916,8 +377,7 @@ export class SessionAgent {
 
     if (commandName) {
       // Slash command: don't show user message, only show command status
-      // Use updateStatusItem to ensure proper status management
-      this.updateStatusItem({
+      this.displayItems = updateStatusItem(this.displayItems, {
         thinking: false,
         command: {
           name: commandName,
@@ -925,12 +385,12 @@ export class SessionAgent {
         },
       });
     } else {
-      // Regular message: add user message before status, then update status
-      this.addItemKeepingStatusAtEnd(userMessage);
-
-      // Update status to thinking (this will properly manage the status item)
-      this.updateStatusItem({ thinking: true });
+      // Regular message: add user message before status, then update status to thinking
+      this.displayItems = addItemKeepingStatusAtEnd(this.displayItems, userMessage);
+      this.displayItems = updateStatusItem(this.displayItems, { thinking: true });
     }
+
+    this.notifyDisplayItemsChanged();
   }
 
   /**
@@ -941,18 +401,14 @@ export class SessionAgent {
     this.isActive = false;
 
     // Clear streaming state when deactivating
-    this.streamingText = '';
-    this.streamingMessageId = null;
-    this.streamingUsage = undefined;
-    this.streamingToolCalls.clear();
+    this.streamingState = createStreamingTextState();
 
     // Clear status item
-    this.updateStatusItem({ thinking: false });
+    this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
+    this.notifyDisplayItemsChanged();
 
     // Also notify callback for backward compatibility
-    if (this.callbacks.onStateChange) {
-      this.callbacks.onStateChange({ thinking: false });
-    }
+    this.callbacks.onStateChange?.({ thinking: false });
   }
 
   /**
@@ -964,18 +420,14 @@ export class SessionAgent {
     this.rejectedTools.clear();
 
     // Clear streaming state
-    this.streamingText = '';
-    this.streamingMessageId = null;
-    this.streamingUsage = undefined;
-    this.streamingToolCalls.clear();
+    this.streamingState = createStreamingTextState();
 
     // Clear status item
-    this.updateStatusItem({ thinking: false });
+    this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
+    this.notifyDisplayItemsChanged();
 
     // Also notify callback for backward compatibility
-    if (this.callbacks.onStateChange) {
-      this.callbacks.onStateChange({ thinking: false });
-    }
+    this.callbacks.onStateChange?.({ thinking: false });
 
     // Event listeners will be cleaned up by removeAllListeners in preload.ts
   }
