@@ -5,17 +5,16 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { RoleType } from '../../../../core/roles/role-enum.js';
 import type { PromptSuggestion, Language } from '../../../preload/preload-types.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
 
 interface PromptSuggestionsProps {
-  role: RoleType;
+  agentId: string;
   onSuggestionClick: (prompt: string) => void;
 }
 
 export function PromptSuggestions({
-  role,
+  agentId,
   onSuggestionClick,
 }: PromptSuggestionsProps): React.ReactElement {
   const { t, language } = useLanguage();
@@ -23,15 +22,15 @@ export function PromptSuggestions({
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load suggestions on mount and when role or language changes
+  // Load suggestions on mount and when agent or language changes
   useEffect(() => {
     loadSuggestions();
-  }, [role, language]);
+  }, [agentId, language]);
 
   const loadSuggestions = async () => {
     setIsLoading(true);
     try {
-      const result = await window.electronAPI.suggestions.get(role, language as Language);
+      const result = await window.electronAPI.suggestions.get(agentId, language as Language);
       setSuggestions(result);
     } catch (error) {
       console.error('Failed to load suggestions:', error);
@@ -43,7 +42,7 @@ export function PromptSuggestions({
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const result = await window.electronAPI.suggestions.refresh(role, language as Language);
+      const result = await window.electronAPI.suggestions.refresh(agentId, language as Language);
       if (result.success && result.suggestions) {
         setSuggestions(result.suggestions);
       }
@@ -52,7 +51,7 @@ export function PromptSuggestions({
     } finally {
       setIsRefreshing(false);
     }
-  }, [role, language]);
+  }, [agentId, language]);
 
   const handleSuggestionClick = useCallback((suggestion: PromptSuggestion) => {
     onSuggestionClick(suggestion.prompt);

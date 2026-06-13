@@ -6,27 +6,28 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { RoleType, ROLE_DISPLAY_NAMES } from '../../../../core/roles/role-enum.js';
+import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
 import { PromptSuggestions } from './PromptSuggestions.js';
 
 interface SessionConfigProps {
-  defaultRole?: RoleType;
+  defaultAgentId?: string;
   defaultModel?: string;
   defaultCwd?: string;
-  onConfigChange?: (config: { role: RoleType; modelName: string; cwd: string }) => void;
+  onConfigChange?: (config: { agentId: string; modelName: string; cwd: string }) => void;
   onSuggestionClick?: (prompt: string) => void;
 }
 
 export function SessionConfig({
-  defaultRole = RoleType.OFFICE_ASSISTANT,
+  defaultAgentId,
   defaultModel,
   defaultCwd,
   onConfigChange,
   onSuggestionClick,
 }: SessionConfigProps): React.ReactElement {
   const { t } = useLanguage();
-  const [selectedRole, setSelectedRole] = useState<RoleType>(defaultRole);
+  const agentDefinitions = useAgentDefinitions();
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(defaultAgentId || '');
   const [selectedCwd, setSelectedCwd] = useState<string>(defaultCwd || '');
   const [modelName, setModelName] = useState<string>(defaultModel || '');
 
@@ -35,14 +36,23 @@ export function SessionConfig({
     loadSettings();
   }, []);
 
+  // Fall back to the first available agent definition once it loads, if
+  // nothing else (props/settings) resolved an agent yet.
+  useEffect(() => {
+    if (selectedAgentId || agentDefinitions.length === 0) {
+      return;
+    }
+    setSelectedAgentId(agentDefinitions[0].id);
+  }, [agentDefinitions, selectedAgentId]);
+
   // Notify parent of config changes
   useEffect(() => {
     onConfigChange?.({
-      role: selectedRole,
+      agentId: selectedAgentId,
       modelName: modelName,
       cwd: selectedCwd,
     });
-  }, [selectedRole, modelName, selectedCwd, onConfigChange]);
+  }, [selectedAgentId, modelName, selectedCwd, onConfigChange]);
 
   const loadSettings = async () => {
     try {
@@ -53,8 +63,8 @@ export function SessionConfig({
       if (!defaultModel && settings.defaultModel) {
         setModelName(settings.defaultModel);
       }
-      if (!defaultRole && settings.defaultRole) {
-        setSelectedRole(settings.defaultRole);
+      if (!defaultAgentId && settings.defaultAgentId) {
+        setSelectedAgentId(settings.defaultAgentId);
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -72,15 +82,13 @@ export function SessionConfig({
     }
   };
 
-  const handleRoleChange = (role: RoleType) => {
-    setSelectedRole(role);
+  const handleAgentChange = (agentId: string) => {
+    setSelectedAgentId(agentId);
   };
 
   const handleSuggestionClick = useCallback((prompt: string) => {
     onSuggestionClick?.(prompt);
   }, [onSuggestionClick]);
-
-  const roles = Object.values(RoleType);
 
   return (
     <div
@@ -149,23 +157,23 @@ export function SessionConfig({
             {t.sessionConfig.chooseRole}
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {roles.map((role) => (
+            {agentDefinitions.map((agent) => (
               <button
-                key={role}
-                onClick={() => handleRoleChange(role)}
+                key={agent.id}
+                onClick={() => handleAgentChange(agent.id)}
                 style={{
                   padding: '0.5rem 1rem',
                   fontSize: '0.875rem',
                   fontWeight: 500,
                   border: '1px solid var(--border)',
                   borderRadius: '6px',
-                  backgroundColor: selectedRole === role ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color: selectedRole === role ? '#ffffff' : 'var(--text-primary)',
+                  backgroundColor: selectedAgentId === agent.id ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color: selectedAgentId === agent.id ? '#ffffff' : 'var(--text-primary)',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
               >
-                {ROLE_DISPLAY_NAMES[role]}
+                {agent.displayName}
               </button>
             ))}
           </div>
@@ -281,10 +289,12 @@ export function SessionConfig({
       </div>
 
       {/* Prompt Suggestions */}
-      <PromptSuggestions
-        role={selectedRole}
-        onSuggestionClick={handleSuggestionClick}
-      />
+      {selectedAgentId && (
+        <PromptSuggestions
+          agentId={selectedAgentId}
+          onSuggestionClick={handleSuggestionClick}
+        />
+      )}
     </div>
   );
 }

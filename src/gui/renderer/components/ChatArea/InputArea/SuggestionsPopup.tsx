@@ -5,17 +5,16 @@
  * prompt templates and role-based smart suggestions.
  */
 
-import type { RoleType } from '../../../../../core/roles/role-enum.js';
 import { useLanguage } from '../../../i18n/LanguageContext';
 import { useSuggestions } from './useSuggestions';
 
 interface SuggestionsPopupProps {
-  role?: RoleType;
+  agentId?: string;
   onSelect: (content: string) => void;
   disabled?: boolean;
 }
 
-export function SuggestionsPopup({ role, onSelect, disabled = false }: SuggestionsPopupProps) {
+export function SuggestionsPopup({ agentId, onSelect, disabled = false }: SuggestionsPopupProps) {
   const { t, language } = useLanguage();
   const {
     showPromptsMenu,
@@ -25,7 +24,7 @@ export function SuggestionsPopup({ role, onSelect, disabled = false }: Suggestio
     smartSuggestions,
     isRefreshingSuggestions,
     refreshSmartSuggestions,
-  } = useSuggestions(role, language);
+  } = useSuggestions(agentId, language);
 
   return (
     <div ref={promptsMenuRef} style={{ position: 'relative' }}>
@@ -103,7 +102,7 @@ export function SuggestionsPopup({ role, onSelect, disabled = false }: Suggestio
           )}
 
           {/* Smart Suggestions Section */}
-          {role && (
+          {agentId && (
             <>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

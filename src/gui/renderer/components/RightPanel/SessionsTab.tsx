@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '../../../../core/sessions/session-manager';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { getRoleDisplayName, RoleType } from '../../../../core/roles/role-enum.js';
+import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 
 interface SessionsTabProps {
   currentSessionId?: string;
@@ -16,6 +16,7 @@ interface SessionsTabProps {
 
 export function SessionsTab({ currentSessionId, onSessionSelect }: SessionsTabProps) {
   const { t } = useLanguage();
+  const agentDefinitions = useAgentDefinitions();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -290,7 +291,7 @@ export function SessionsTab({ currentSessionId, onSessionSelect }: SessionsTabPr
                 </button>
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                {getRoleDisplayName(session.role as RoleType)} · {session.modelName}
+                {agentDefinitions.find((agent) => agent.id === session.agentId)?.displayName ?? session.agentId} · {session.modelName}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
                 {formatDate(session.createdAt)}

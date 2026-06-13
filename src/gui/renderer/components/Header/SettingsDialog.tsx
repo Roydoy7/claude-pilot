@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { RoleType, ROLE_DISPLAY_NAMES } from '../../../../core/roles/role-enum.js';
+import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import type { AuthStatus } from '../../../../core/types/auth-types.js';
 import type { ModelInfo } from '../../../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../../../core/settings/settings-manager.js';
@@ -30,13 +30,14 @@ export function SettingsDialog({
 }: SettingsDialogProps): React.ReactElement | null {
   const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
+  const agentDefinitions = useAgentDefinitions();
 
   // Active category
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('account');
 
   // Settings state
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [selectedRole, setSelectedRole] = useState<RoleType>(RoleType.OFFICE_ASSISTANT);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedCwd, setSelectedCwd] = useState<string>('');
 
@@ -60,13 +61,22 @@ export function SettingsDialog({
     }
   }, [isOpen, showWelcomeMessage]);
 
+  // Fall back to the first available agent definition once it loads, if
+  // nothing else (settings) resolved an agent yet.
+  useEffect(() => {
+    if (selectedAgentId || agentDefinitions.length === 0) {
+      return;
+    }
+    setSelectedAgentId(agentDefinitions[0].id);
+  }, [agentDefinitions, selectedAgentId]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
       // Load settings
       const appSettings = await window.electronAPI.settings.get();
       setSettings(appSettings);
-      setSelectedRole(appSettings.defaultRole);
+      setSelectedAgentId(appSettings.defaultAgentId ?? '');
       setSelectedModel(appSettings.defaultModel);
       setSelectedCwd(appSettings.defaultCwd);
 
@@ -100,9 +110,9 @@ export function SettingsDialog({
     }
   }, []);
 
-  const handleRoleChange = (role: RoleType) => {
-    setSelectedRole(role);
-    handleSaveSettings({ defaultRole: role });
+  const handleAgentChange = (agentId: string) => {
+    setSelectedAgentId(agentId);
+    handleSaveSettings({ defaultAgentId: agentId });
   };
 
   const handleModelChange = (model: string) => {
@@ -181,8 +191,6 @@ export function SettingsDialog({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
-
-  const roles = Object.values(RoleType);
 
   // Category definitions with icons and labels
   const categories: Array<{ id: SettingsCategory; icon: string; label: string }> = [
@@ -354,22 +362,22 @@ export function SettingsDialog({
           {t.settings?.defaults?.roleDescription || 'Role used when creating new sessions'}
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {roles.map((role) => (
+          {agentDefinitions.map((agent) => (
             <button
-              key={role}
-              onClick={() => handleRoleChange(role)}
+              key={agent.id}
+              onClick={() => handleAgentChange(agent.id)}
               style={{
                 padding: '0.5rem 1rem',
                 fontSize: '0.875rem',
                 fontWeight: 500,
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
-                backgroundColor: selectedRole === role ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: selectedRole === role ? '#ffffff' : 'var(--text-primary)',
+                backgroundColor: selectedAgentId === agent.id ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: selectedAgentId === agent.id ? '#ffffff' : 'var(--text-primary)',
                 cursor: 'pointer',
               }}
             >
-              {ROLE_DISPLAY_NAMES[role]}
+              {agent.displayName}
             </button>
           ))}
         </div>

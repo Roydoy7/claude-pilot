@@ -10,7 +10,7 @@ import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { SessionConfig } from './SessionConfig';
 import type { MessageListItem, MessageContent, PermissionMode, SettingSource, UsageMetadata } from '../../../preload/preload-types';
-import { RoleType } from '../../../../core/roles/role-enum.js';
+import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import { DEFAULT_MODEL, getModelContextWindow } from '../../../../core/providers/model-list-manager.js';
 import { getErrorMessage } from '../../../../core/errors.js';
 import { SessionAgent, SessionAgentCache } from '../../utils/SessionAgent.js';
@@ -44,14 +44,15 @@ function calculateInputTokens(usage: UsageMetadata): number {
 
 interface ChatAreaProps {
   sessionId?: string | null;
-  defaultRole?: RoleType;
+  defaultAgentId?: string;
   defaultModel?: string;
   onSessionUpdate?: (session: import('../../../../core/sessions/session-manager.js').Session) => void;
   templateContent?: string;
   onTemplateApplied?: () => void;
 }
 
-export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate, templateContent, onTemplateApplied }: ChatAreaProps) {
+export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpdate, templateContent, onTemplateApplied }: ChatAreaProps) {
+  const agentDefinitions = useAgentDefinitions();
   const [items, setItems] = useState<MessageListItem[]>([]); // Display items from SessionAgent
   const [sessionStarted, setSessionStarted] = useState<boolean>(!!sessionId);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(sessionId || null);
@@ -65,11 +66,11 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
 
   // Session configuration state (for new sessions)
   const [sessionConfig, setSessionConfig] = useState<{
-    role: RoleType;
+    agentId: string;
     modelName: string;
     cwd: string;
   }>({
-    role: defaultRole || RoleType.OFFICE_ASSISTANT,
+    agentId: defaultAgentId || '',
     modelName: defaultModel || DEFAULT_MODEL,
     cwd: '', // Will be loaded from settings or getLastCwd
   });
@@ -81,7 +82,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         const settings = await window.electronAPI.settings.get();
         // Only use settings if no defaults were provided via props
         setSessionConfig(prev => ({
-          role: defaultRole || settings.defaultRole || prev.role,
+          agentId: defaultAgentId || settings.defaultAgentId || prev.agentId,
           modelName: defaultModel || settings.defaultModel || prev.modelName,
           cwd: settings.defaultCwd || prev.cwd,
         }));
@@ -90,7 +91,16 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
       }
     }
     loadDefaultConfig();
-  }, [defaultRole, defaultModel]);
+  }, [defaultAgentId, defaultModel]);
+
+  // Fall back to the first available agent definition once it loads, if
+  // nothing else (props/settings) resolved an agent yet.
+  useEffect(() => {
+    if (sessionConfig.agentId || agentDefinitions.length === 0) {
+      return;
+    }
+    setSessionConfig(prev => ({ ...prev, agentId: agentDefinitions[0].id }));
+  }, [agentDefinitions, sessionConfig.agentId]);
 
   // SessionAgent cache - persists across session switches
   const sessionAgentCacheRef = useRef<SessionAgentCache>(new SessionAgentCache());
@@ -257,7 +267,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
 
         const result = await window.electronAPI.session.create({
           title,
-          role: sessionConfig.role,
+          agentId: sessionConfig.agentId,
           modelName: sessionConfig.modelName,
           cwd: sessionConfig.cwd,
         });
@@ -405,7 +415,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         />
       ) : (
         <SessionConfig
-          defaultRole={sessionConfig.role}
+          defaultAgentId={sessionConfig.agentId}
           defaultModel={sessionConfig.modelName}
           defaultCwd={sessionConfig.cwd}
           onConfigChange={setSessionConfig}
@@ -415,7 +425,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
       <InputArea
         sessionId={sessionId || undefined}
         cwd={sessionConfig.cwd || undefined}
-        role={sessionConfig.role}
+        agentId={sessionConfig.agentId}
         onSend={handleSendMessage}
         onCancel={handleCancelRequest}
         isProcessing={isProcessing}

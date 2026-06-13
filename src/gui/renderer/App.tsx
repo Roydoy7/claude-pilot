@@ -10,7 +10,7 @@ import { LanguageProvider } from './i18n/LanguageContext';
 import { Header } from './components/Header';
 import { ChatArea } from './components/ChatArea';
 import { RightPanel } from './components/RightPanel';
-import { RoleType } from '../../core/roles/role-enum.js';
+import { useAgentDefinitions } from './hooks/useAgentDefinitions.js';
 import { DEFAULT_MODEL } from '../../core/providers/model-list-manager.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 
@@ -20,6 +20,7 @@ const MIN_PANEL_WIDTH = 280;
 const MAX_PANEL_WIDTH = 800;
 
 function App() {
+  const agentDefinitions = useAgentDefinitions();
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -170,7 +171,7 @@ function App() {
           <div className="main-layout">
             <ChatArea
               sessionId={currentSession?.id}
-              defaultRole={(currentSession?.role as RoleType) || RoleType.OFFICE_ASSISTANT}
+              defaultAgentId={currentSession?.agentId || agentDefinitions[0]?.id}
               defaultModel={currentSession?.modelName || DEFAULT_MODEL}
               onSessionUpdate={handleSessionUpdate}
               templateContent={templateContent}

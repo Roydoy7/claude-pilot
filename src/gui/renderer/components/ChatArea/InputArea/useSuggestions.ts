@@ -7,9 +7,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Language, PromptSuggestion } from '../../../../preload/preload-types';
-import type { RoleType } from '../../../../../core/roles/role-enum.js';
 
-export function useSuggestions(role: RoleType | undefined, language: Language) {
+export function useSuggestions(agentId: string | undefined, language: Language) {
   const [showPromptsMenu, setShowPromptsMenu] = useState(false);
   const [promptTemplates, setPromptTemplates] = useState<{ id: string; name: string; content: string }[]>([]);
   const [smartSuggestions, setSmartSuggestions] = useState<PromptSuggestion[]>([]);
@@ -29,22 +28,22 @@ export function useSuggestions(role: RoleType | undefined, language: Language) {
 
   // Load smart suggestions
   const loadSmartSuggestions = useCallback(async () => {
-    if (!role) return;
+    if (!agentId) return;
     try {
-      const suggestions = await window.electronAPI.suggestions.getDefaults(role, language);
+      const suggestions = await window.electronAPI.suggestions.getDefaults(agentId, language);
       // Filter out template suggestions (only show tool/llm based ones)
       setSmartSuggestions(suggestions.filter(s => s.source !== 'template'));
     } catch (error) {
       console.error('Failed to load smart suggestions:', error);
     }
-  }, [role, language]);
+  }, [agentId, language]);
 
   // Refresh smart suggestions with LLM
   const refreshSmartSuggestions = useCallback(async () => {
-    if (!role) return;
+    if (!agentId) return;
     setIsRefreshingSuggestions(true);
     try {
-      const result = await window.electronAPI.suggestions.refresh(role, language);
+      const result = await window.electronAPI.suggestions.refresh(agentId, language);
       if (result.success && result.suggestions) {
         // Filter out template suggestions
         setSmartSuggestions(result.suggestions.filter(s => s.source !== 'template'));
@@ -54,7 +53,7 @@ export function useSuggestions(role: RoleType | undefined, language: Language) {
     } finally {
       setIsRefreshingSuggestions(false);
     }
-  }, [role, language]);
+  }, [agentId, language]);
 
   // Load templates and suggestions when menu opens
   useEffect(() => {

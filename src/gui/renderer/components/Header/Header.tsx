@@ -7,8 +7,8 @@
 import { useState, useEffect } from 'react';
 import { SettingsDialog } from './SettingsDialog';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import type { Session } from '../../../../core/sessions/session-manager';
-import { getRoleDisplayName, RoleType } from '../../../../core/roles/role-enum.js';
 
 interface HeaderProps {
   onTogglePanel?: () => void;
@@ -32,6 +32,7 @@ export function Header({
   showSettingsOnMount = false,
 }: HeaderProps) {
   const { t } = useLanguage();
+  const agentDefinitions = useAgentDefinitions();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Auto-open settings on mount if requested
@@ -61,6 +62,11 @@ export function Header({
     // Handle both Windows and Unix paths
     const parts = fullPath.split(/[/\\]/);
     return parts[parts.length - 1] || parts[parts.length - 2] || fullPath;
+  };
+
+  // Get the display name for an agent id from the loaded agent definitions
+  const getAgentDisplayName = (agentId: string) => {
+    return agentDefinitions.find((agent) => agent.id === agentId)?.displayName ?? agentId;
   };
 
   // Format model display name
@@ -95,9 +101,9 @@ export function Header({
 
       {currentSession && (
         <div className="header-session-info">
-          <span className="session-role" title={`${t.header.sessionInfo.role}: ${getRoleDisplayName(currentSession.role as RoleType)}`}>
+          <span className="session-role" title={`${t.header.sessionInfo.role}: ${getAgentDisplayName(currentSession.agentId)}`}>
             <span className="session-label">{t.header.sessionInfo.role}</span>
-            {getRoleDisplayName(currentSession.role as RoleType)}
+            {getAgentDisplayName(currentSession.agentId)}
           </span>
           <span className="session-separator">•</span>
           <span className="session-model" title={`${t.header.sessionInfo.model}: ${currentSession.modelName}`}>
