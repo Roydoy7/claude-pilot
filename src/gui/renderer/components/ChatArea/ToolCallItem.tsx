@@ -32,6 +32,10 @@ import {
   webSearchRenderer,
   taskRenderer,
   todoWriteRenderer,
+  taskCreateRenderer,
+  taskGetRenderer,
+  taskUpdateRenderer,
+  taskListRenderer,
   multiEditRenderer,
   notebookEditRenderer,
   skillRenderer,
@@ -79,7 +83,11 @@ const TOOL_CONFIGS: Record<string, ToolConfig> = {
 
   // Task/Agent tools
   Task: taskRenderer,
-  TodoWrite: todoWriteRenderer,
+  TodoWrite: todoWriteRenderer, // Legacy renderer kept for compatibility with historical sessions
+  TaskCreate: taskCreateRenderer,
+  TaskGet: taskGetRenderer,
+  TaskUpdate: taskUpdateRenderer,
+  TaskList: taskListRenderer,
 
   // Notebook tools
   MultiEdit: multiEditRenderer,

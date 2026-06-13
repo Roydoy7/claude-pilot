@@ -71,6 +71,10 @@ export {
 export {
   taskRenderer,
   todoWriteRenderer,
+  taskCreateRenderer,
+  taskGetRenderer,
+  taskUpdateRenderer,
+  taskListRenderer,
 } from './task-renderer';
 
 // Skill tool renderer

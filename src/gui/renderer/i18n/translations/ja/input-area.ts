@@ -38,9 +38,9 @@ export const inputAreaJa = {
         name: "Don't Ask",
         description: 'サイレントモード - すべての確認プロンプトをスキップ、自動化シナリオ用',
       },
-      delegate: {
-        name: 'Delegate',
-        description: 'チームリーダーモード - TeammateツールとTaskツールでのみ作業を委任',
+      auto: {
+        name: 'オート',
+        description: 'モデル分類器を使用して権限プロンプトを自動的に承認または拒否',
       },
     },
   },

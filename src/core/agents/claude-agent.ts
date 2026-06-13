@@ -11,25 +11,20 @@ import type {
   Query,
   SDKAssistantMessage,
   SDKUserMessage,
-  SDKUserMessageReplay,
   SDKResultMessage,
-  SDKSystemMessage,
   SDKPartialAssistantMessage,
-  SDKCompactBoundaryMessage,
-  SDKStatusMessage,
-  SDKHookResponseMessage,
   SDKToolProgressMessage,
   SDKAuthStatusMessage,
   Options,
   PermissionMode,
   CanUseTool,
   SettingSource,
+  TerminalReason,
 } from '@anthropic-ai/claude-agent-sdk';
 import { RoleType, getRoleDisplayName } from '../roles/role-enum.js';
 import { SessionManager } from '../sessions/session-manager.js';
 import { readTranscript } from '../sessions/transcript-manager.js';
 import { createRequire } from 'module';
-import path from 'path';
 import type { ContentBlock, MessageContent } from '../types/message-types.js';
 
 /**
@@ -48,22 +43,24 @@ export type { PermissionMode, SettingSource };
 export const ALL_SETTING_SOURCES: SettingSource[] = ['user', 'project', 'local'];
 
 /**
- * Get the path to Claude Agent SDK's cli.js
- * This is needed because when running from compiled dist/, import.meta.url
- * points to the wrong location.
- * In Electron asar environment, the path needs to be adjusted to use unpacked version.
+ * Get the path to the native Claude CLI binary shipped in the platform-specific
+ * @anthropic-ai/claude-agent-sdk-{platform}-{arch} optional dependency.
+ * In Electron asar environment, the path needs to be adjusted to use the unpacked version
+ * because spawn() cannot execute a binary that lives inside an asar archive.
  */
 function getClaudeCodeExecutablePath(): string {
   const require = createRequire(import.meta.url);
-  let sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const packageName = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`;
+  let binaryPath = require.resolve(`${packageName}/claude${ext}`);
 
   // In Electron asar environment, replace app.asar with app.asar.unpacked
-  // because the SDK contains native modules and CLI that can't run from inside asar
-  if (sdkPath.includes('app.asar')) {
-    sdkPath = sdkPath.replace('app.asar', 'app.asar.unpacked');
+  // because the native binary can't run from inside asar
+  if (binaryPath.includes('app.asar')) {
+    binaryPath = binaryPath.replace('app.asar', 'app.asar.unpacked');
   }
 
-  return path.join(path.dirname(sdkPath), 'cli.js');
+  return binaryPath;
 }
 
 /**
@@ -152,7 +149,7 @@ export type StreamEvent =
   | { type: 'checkpoint' }
   | { type: 'slashCommands'; commands: string[] }
   | { type: 'message'; content: string; timestamp: number; isCompactSummary?: boolean }
-  | { type: 'done'; usage?: UsageMetadata };
+  | { type: 'done'; usage?: UsageMetadata; terminalReason?: TerminalReason };
 
 /**
  * History message for conversation
@@ -464,6 +461,7 @@ export class ClaudeAgent {
 
     let accumulatedText = '';
     let finalUsage: UsageMetadata | undefined;
+    let terminalReason: TerminalReason | undefined;
 
     try {
       for await (const chunk of queryInstance) {
@@ -514,9 +512,9 @@ export class ClaudeAgent {
                 input_tokens: msgUsage.input_tokens || 0,
                 output_tokens: msgUsage.output_tokens || 0,
                 total_tokens: (msgUsage.input_tokens || 0) + (msgUsage.output_tokens || 0),
-                cache_read_input_tokens: msgUsage.cache_read_input_tokens,
-                cache_creation_input_tokens: msgUsage.cache_creation_input_tokens,
-                cache_creation: msgUsage.cache_creation,
+                cache_read_input_tokens: msgUsage.cache_read_input_tokens ?? undefined,
+                cache_creation_input_tokens: msgUsage.cache_creation_input_tokens ?? undefined,
+                cache_creation: msgUsage.cache_creation ?? undefined,
                 service_tier: msgUsage.service_tier,
               };
               finalUsage = currentUsage;
@@ -603,6 +601,18 @@ export class ClaudeAgent {
                   }
                 }
               }
+            }
+
+            // Refusal: safety classifier declined the request (HTTP 200, stop_reason: 'refusal').
+            // A pre-output refusal carries empty content; a mid-stream refusal bills the
+            // already-streamed partial output, which we keep and mark as refused.
+            if (assistantMessage.message?.stop_reason === 'refusal') {
+              const stopDetails = assistantMessage.message.stop_details;
+              const detail = [stopDetails?.category, stopDetails?.explanation].filter(Boolean).join(': ');
+              yield {
+                type: 'error',
+                error: detail ? `Response refused (${detail})` : 'Response refused by safety classifier',
+              };
             }
             break;
           }
@@ -700,6 +710,7 @@ export class ClaudeAgent {
 
           case 'result': {
             const resultMessage = chunk as SDKResultMessage;
+            terminalReason = resultMessage.terminal_reason;
 
             // Signal the input stream generator to end
             // This allows SDK to properly close stdin after conversation ends
@@ -739,51 +750,167 @@ export class ClaudeAgent {
           }
 
           case 'system': {
-            // Handle system messages (init, compact_boundary, status, hook_response)
-            const systemMessage = chunk as SDKSystemMessage | SDKCompactBoundaryMessage | SDKStatusMessage | SDKHookResponseMessage;
+            switch (chunk.subtype) {
+              case 'init': {
+                // System initialization - store session_id for resume
+                this.claudeSessionId = chunk.session_id;
 
-            if (systemMessage.subtype === 'init') {
-              // System initialization - store session_id for resume
-              this.claudeSessionId = systemMessage.session_id;
+                // Save Claude session ID to SessionManager for persistence
+                if (chunk.session_id) {
+                  const sessionManager = SessionManager.getInstance();
+                  sessionManager.updateClaudeSessionId(this.sessionId, chunk.session_id);
+                }
 
-              // Save Claude session ID to SessionManager for persistence
-              if (systemMessage.session_id) {
-                const sessionManager = SessionManager.getInstance();
-                sessionManager.updateClaudeSessionId(this.sessionId, systemMessage.session_id);
+                // Capture available slash commands
+                if (chunk.slash_commands) {
+                  this.slashCommands = chunk.slash_commands;
+                  yield { type: 'slashCommands', commands: this.slashCommands };
+                }
+                break;
               }
 
-              // Capture available slash commands
-              if (systemMessage.slash_commands) {
-                this.slashCommands = systemMessage.slash_commands;
+              case 'compact_boundary': {
+                // Conversation compaction boundary - checkpoint event
+                yield { type: 'checkpoint' };
+                break;
+              }
+
+              case 'status': {
+                if (chunk.status === 'compacting') {
+                  // Compacting started - show command running state
+                  yield {
+                    type: 'state',
+                    state: {
+                      thinking: true,
+                      command: { name: 'compact', status: 'running' },
+                    },
+                  };
+                } else if (chunk.status === null) {
+                  // Status cleared (e.g., compacting finished) - clear command state
+                  yield {
+                    type: 'state',
+                    state: {
+                      thinking: false,
+                      command: { name: 'compact', status: 'completed' },
+                    },
+                  };
+                  if (chunk.compact_result === 'failed') {
+                    yield { type: 'error', error: chunk.compact_error ?? 'Compaction failed' };
+                  }
+                }
+                // 'requesting' status is a transient sub-state of the existing 'thinking' state - no separate UI
+                break;
+              }
+
+              case 'commands_changed': {
+                // Mid-session slash command list change - replace cached list (per SDK docs)
+                this.slashCommands = chunk.commands.map((command) => command.name);
                 yield { type: 'slashCommands', commands: this.slashCommands };
+                break;
               }
-            } else if (systemMessage.subtype === 'compact_boundary') {
-              // Conversation compaction boundary - checkpoint event
-              yield { type: 'checkpoint' };
-            } else if (systemMessage.subtype === 'status') {
-              // Status update (e.g., 'compacting', null)
-              const statusMsg = systemMessage as SDKStatusMessage;
-              if (statusMsg.status === 'compacting') {
-                // Compacting started - show command running state
+
+              case 'local_command_output': {
+                // Output from a local slash command (e.g. /usage) - display as assistant text
+                yield { type: 'message', content: chunk.content, timestamp: Date.now() };
+                break;
+              }
+
+              case 'plugin_install': {
+                if (chunk.status === 'failed') {
+                  yield {
+                    type: 'error',
+                    error: `Plugin install failed${chunk.name ? ` (${chunk.name})` : ''}: ${chunk.error ?? 'unknown error'}`,
+                  };
+                }
+                // started/installed/completed: progress only, no UI surface
+                break;
+              }
+
+              case 'permission_denied': {
+                // Tool call auto-denied without an interactive prompt (e.g. dontAsk/auto mode rule)
                 yield {
-                  type: 'state',
-                  state: {
-                    thinking: true,
-                    command: { name: 'compact', status: 'running' },
-                  },
+                  type: 'tool_end',
+                  toolName: chunk.tool_name,
+                  toolCallId: chunk.tool_use_id,
+                  output: '',
+                  error: chunk.message,
                 };
-              } else if (statusMsg.status === null) {
-                // Status cleared (e.g., compacting finished) - clear command state
-                yield {
-                  type: 'state',
-                  state: {
-                    thinking: false,
-                    command: { name: 'compact', status: 'completed' },
-                  },
-                };
+                break;
+              }
+
+              case 'files_persisted': {
+                if (chunk.failed.length > 0) {
+                  yield {
+                    type: 'error',
+                    error: `Failed to persist files: ${chunk.failed.map((file) => `${file.filename} (${file.error})`).join(', ')}`,
+                  };
+                }
+                break;
+              }
+
+              case 'mirror_error': {
+                // Transcript-mirror batch dropped after retries - surface data-loss risk
+                yield { type: 'error', error: `Session transcript mirror failed: ${chunk.error}` };
+                break;
+              }
+
+              case 'model_refusal_fallback': {
+                // The original refusal is already surfaced from the 'assistant' case;
+                // the SDK automatically retries and emits a fresh 'assistant' message
+                // with the fallback model's content, handled normally.
+                break;
+              }
+
+              case 'api_retry': {
+                // Automatic retry of a failed API request - 'thinking' state already covers this
+                break;
+              }
+
+              case 'hook_started':
+              case 'hook_progress':
+              case 'hook_response': {
+                // Hook execution lifecycle is internal, no need to yield to frontend
+                break;
+              }
+
+              case 'task_notification':
+              case 'task_started':
+              case 'task_updated':
+              case 'task_progress': {
+                // Task tool UI rendering is handled separately (TodoWrite -> Task migration)
+                break;
+              }
+
+              case 'thinking_tokens': {
+                // Approximate live thinking-token estimate for spinners - not authoritative usage
+                break;
+              }
+
+              case 'session_state_changed': {
+                // Authoritative turn-over signal; thinking state is currently derived from the message stream
+                break;
+              }
+
+              case 'notification': {
+                // Loop-side REPL notification queue mirror - no SDK host UI surface yet
+                break;
+              }
+
+              case 'memory_recall': {
+                // "Recalled from memory" inline display - no UI surface yet
+                break;
+              }
+
+              case 'elicitation_complete': {
+                // MCP server confirms a URL-mode elicitation finished - informational only
+                break;
+              }
+
+              default: {
+                const _exhaustive: never = chunk;
+                break;
               }
             }
-            // hook_response: Hook responses are internal, no need to yield to frontend
             break;
           }
 
@@ -799,8 +926,36 @@ export class ClaudeAgent {
             break;
           }
 
+          case 'rate_limit_event': {
+            if (chunk.rate_limit_info.status === 'rejected') {
+              const resetsAt = chunk.rate_limit_info.resetsAt;
+              yield {
+                type: 'usage_limit',
+                message: resetsAt
+                  ? `Usage limit reached. Resets at ${new Date(resetsAt).toLocaleString()}`
+                  : 'Usage limit reached',
+              };
+            }
+            break;
+          }
+
+          case 'prompt_suggestion': {
+            // Predicted next-prompt suggestions are produced by the separate suggestions-manager query
+            break;
+          }
+
+          case 'tool_use_summary': {
+            // Summary of tool uses for compacted transcripts - no UI surface yet
+            break;
+          }
+
           // user message replay is same structure as user, handled by 'user' case
           // The SDK sends it with type: 'user' and isReplay: true flag
+
+          default: {
+            const _exhaustive: never = chunk;
+            break;
+          }
         }
       }
     } catch (error) {
@@ -833,7 +988,7 @@ export class ClaudeAgent {
       }
     } finally {
       yield { type: 'state', state: { thinking: false } };
-      yield { type: 'done', usage: finalUsage };
+      yield { type: 'done', usage: finalUsage, terminalReason };
     }
   }
 
@@ -971,10 +1126,6 @@ export class ClaudeAgent {
               return {};
             }],
           }],
-          // Empty hook to work around SDK bug: without hooks, SDK closes stdin before CLI can send
-          // can_use_tool requests, causing "Stream closed" error. This hook triggers the wait logic.
-          // See: sdk.mjs streamInput() - only waits for firstResultReceivedPromise when hasHooks is true
-          Notification: [{ hooks: [async () => ({})] }],
         },
         stderr: (message: string) => {
           console.error('[Claude SDK stderr]', message);

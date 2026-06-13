@@ -24,7 +24,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.60",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.176",
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@mohtasham/md-to-docx": "^2.4.0",
     "@tanstack/react-virtual": "^3.13.12",
     "@types/xml2js": "^0.4.14",
@@ -50,7 +52,7 @@
     "remark-gfm": "^4.0.1",
     "sharp": "^0.35.1",
     "xml2js": "^0.6.2",
-    "zod": "^3.24.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
@@ -87,6 +89,7 @@
     ],
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk/**/*",
+      "node_modules/@anthropic-ai/claude-agent-sdk-*/**/*",
       "node_modules/@napi-rs/**/*",
       "node_modules/@img/**/*",
       "node_modules/sharp/**/*"

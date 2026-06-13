@@ -140,7 +140,7 @@ export interface Translation {
           name: string;
           description: string;
         };
-        delegate: {
+        auto: {
           name: string;
           description: string;
         };

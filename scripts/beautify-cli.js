@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 /**
- * Beautify Claude Agent SDK's cli.js for easier debugging
- * This script runs after npm install to make the minified cli.js readable
+ * Beautify Claude Agent SDK's sdk.mjs for easier debugging
+ * This script runs after npm install to make the minified sdk.mjs readable
  */
 
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const CLI_PATH = path.join(__dirname, '../node_modules/@anthropic-ai/claude-agent-sdk/cli.js');
-const BEAUTIFIED_PATH = path.join(__dirname, '../node_modules/@anthropic-ai/claude-agent-sdk/cli.beautified.js');
+const CLI_PATH = path.join(__dirname, '../node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs');
+const BEAUTIFIED_PATH = path.join(__dirname, '../node_modules/@anthropic-ai/claude-agent-sdk/sdk.beautified.mjs');
 
-console.log('🎨 Beautifying Claude Agent SDK cli.js for debugging...');
+console.log('🎨 Beautifying Claude Agent SDK sdk.mjs for debugging...');
 
 try {
-  // Check if cli.js exists
+  // Check if sdk.mjs exists
   if (!fs.existsSync(CLI_PATH)) {
-    console.log('⚠️  CLI file not found at:', CLI_PATH);
+    console.log('⚠️  SDK bundle not found at:', CLI_PATH);
     console.log('   This is expected if @anthropic-ai/claude-agent-sdk is not installed yet.');
     process.exit(0);
   }
@@ -28,7 +28,7 @@ try {
 
     // If beautified file is newer than original, skip
     if (beautifiedStats.mtimeMs > cliStats.mtimeMs) {
-      console.log('✅ cli.beautified.js is already up to date');
+      console.log('✅ sdk.beautified.mjs is already up to date');
       process.exit(0);
     }
   }
@@ -45,15 +45,15 @@ try {
   const originalSize = fs.statSync(CLI_PATH).size;
   const beautifiedSize = fs.statSync(BEAUTIFIED_PATH).size;
 
-  console.log('✅ Successfully beautified cli.js');
+  console.log('✅ Successfully beautified sdk.mjs');
   console.log(`   Original size:   ${(originalSize / 1024 / 1024).toFixed(2)} MB`);
   console.log(`   Beautified size: ${(beautifiedSize / 1024 / 1024).toFixed(2)} MB`);
   console.log('');
   console.log('💡 Tip: You can now search the beautified file for debugging:');
-  console.log('   grep -n "pattern" node_modules/@anthropic-ai/claude-agent-sdk/cli.beautified.js');
+  console.log('   grep -n "pattern" node_modules/@anthropic-ai/claude-agent-sdk/sdk.beautified.mjs');
 
 } catch (error) {
-  console.error('❌ Failed to beautify cli.js:', error.message);
+  console.error('❌ Failed to beautify sdk.mjs:', error.message);
   // Don't fail the install process
   process.exit(0);
 }

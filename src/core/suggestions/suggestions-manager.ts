@@ -16,18 +16,24 @@ import { ROLE_MCP_SERVERS } from '../roles/role-tool-sets.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
 
 /**
- * Get the path to Claude Agent SDK's cli.js
+ * Get the path to the native Claude CLI binary shipped in the platform-specific
+ * @anthropic-ai/claude-agent-sdk-{platform}-{arch} optional dependency.
+ * In Electron asar environment, the path needs to be adjusted to use the unpacked version
+ * because spawn() cannot execute a binary that lives inside an asar archive.
  */
 function getClaudeCodeExecutablePath(): string {
   const require = createRequire(import.meta.url);
-  let sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const packageName = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`;
+  let binaryPath = require.resolve(`${packageName}/claude${ext}`);
 
   // In Electron asar environment, replace app.asar with app.asar.unpacked
-  if (sdkPath.includes('app.asar')) {
-    sdkPath = sdkPath.replace('app.asar', 'app.asar.unpacked');
+  // because the native binary can't run from inside asar
+  if (binaryPath.includes('app.asar')) {
+    binaryPath = binaryPath.replace('app.asar', 'app.asar.unpacked');
   }
 
-  return path.join(path.dirname(sdkPath), 'cli.js');
+  return binaryPath;
 }
 
 /**

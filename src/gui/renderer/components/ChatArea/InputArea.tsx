@@ -77,13 +77,19 @@ const PermissionIcons = {
       <line x1="17" y1="9" x2="23" y2="15"></line>
     </svg>
   ),
-  // Users icon for delegate mode
-  users: (
+  // Cpu icon for auto (model classifier) mode
+  cpu: (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-      <circle cx="9" cy="7" r="4"></circle>
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+      <rect x="9" y="9" width="6" height="6"></rect>
+      <line x1="9" y1="1" x2="9" y2="4"></line>
+      <line x1="15" y1="1" x2="15" y2="4"></line>
+      <line x1="9" y1="20" x2="9" y2="23"></line>
+      <line x1="15" y1="20" x2="15" y2="23"></line>
+      <line x1="20" y1="9" x2="23" y2="9"></line>
+      <line x1="20" y1="14" x2="23" y2="14"></line>
+      <line x1="1" y1="9" x2="4" y2="9"></line>
+      <line x1="1" y1="14" x2="4" y2="14"></line>
     </svg>
   ),
 };
@@ -117,8 +123,8 @@ const PERMISSION_MODE_CONFIGS: Record<PermissionMode, PermissionModeConfig> = {
     color: '#9c27b0',
     bgColor: 'rgba(156, 39, 176, 0.12)',
   },
-  delegate: {
-    icon: PermissionIcons.users,
+  auto: {
+    icon: PermissionIcons.cpu,
     color: '#009688',
     bgColor: 'rgba(0, 150, 136, 0.12)',
   },
@@ -127,7 +133,7 @@ const PERMISSION_MODE_CONFIGS: Record<PermissionMode, PermissionModeConfig> = {
 /**
  * All permission modes in order
  */
-const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk', 'delegate'];
+const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk', 'auto'];
 
 interface AttachedImage {
   id: string;

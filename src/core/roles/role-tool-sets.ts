@@ -34,7 +34,10 @@ export const ALL_SDK_TOOLS = [
   'Bash',
   'WebFetch',
   'WebSearch',
-  'TodoWrite',
+  'TaskCreate',
+  'TaskGet',
+  'TaskUpdate',
+  'TaskList',
 ] as const;
 
 /**
@@ -52,9 +55,9 @@ const SAFE_WEB_TOOLS = ['WebFetch', 'WebSearch'] as const;
  * Dangerous tools that require user approval
  * - Write/Edit: Modify files
  * - Bash: Execute arbitrary commands
- * - TodoWrite: Modify todo state (less dangerous but still modifying)
+ * - TaskCreate/TaskUpdate: Modify task state (less dangerous but still modifying)
  */
-const DANGEROUS_TOOLS = ['Write', 'Edit', 'Bash', 'TodoWrite'] as const;
+const DANGEROUS_TOOLS = ['Write', 'Edit', 'Bash', 'TaskCreate', 'TaskUpdate'] as const;
 
 /**
  * Full file operation tools (read + write)

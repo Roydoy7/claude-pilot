@@ -38,9 +38,9 @@ export const inputAreaZh = {
         name: "Don't Ask",
         description: '静默模式 - 跳过所有确认提示，用于自动化场景',
       },
-      delegate: {
-        name: 'Delegate',
-        description: '团队负责人模式 - 仅限通过 Teammate 和 Task 工具委派任务',
+      auto: {
+        name: '自动',
+        description: '使用模型分类器自动批准或拒绝权限请求',
       },
     },
   },
