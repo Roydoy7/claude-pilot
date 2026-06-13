@@ -20,6 +20,7 @@ import { settingsManager } from '../../core/settings/settings-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
 import { suggestionsManager, type Language } from '../../core/suggestions/suggestions-manager.js';
 import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
+import { getErrorMessage } from '../../core/errors.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -158,7 +159,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       return { success: true };
     } catch (error) {
       console.error('[IPC] setPermissionMode error:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return { success: false, error: getErrorMessage(error) };
     }
   });
 
@@ -179,7 +180,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       return { success: true };
     } catch (error) {
       console.error('[IPC] setSettingSources error:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return { success: false, error: getErrorMessage(error) };
     }
   });
 
@@ -882,7 +883,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       console.error('[IPC] suggestions:refresh error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   });

@@ -26,6 +26,7 @@ import { SessionManager } from '../sessions/session-manager.js';
 import { readTranscript } from '../sessions/transcript-manager.js';
 import { buildBaseQueryOptions } from './sdk-query.js';
 import type { ContentBlock, MessageContent } from '../types/message-types.js';
+import { getErrorMessage } from '../errors.js';
 
 /**
  * Re-export message types for backward compatibility
@@ -928,7 +929,7 @@ export class ClaudeAgent {
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
 
       // Check if this is a user-initiated cancellation (from SDK abort)
       const isUserCancellation =
@@ -1072,8 +1073,11 @@ export class ClaudeAgent {
                         },
                       };
                     }
-                  } catch {
-                    // File doesn't exist or can't be accessed - let the tool handle the error
+                  } catch (error) {
+                    // File doesn't exist or can't be accessed - let the Read tool
+                    // produce its own error, but surface the stat failure so it's
+                    // not silently invisible.
+                    console.warn(`[PreToolUse] fs.stat failed for ${filePath}:`, getErrorMessage(error));
                   }
                 }
 
@@ -1107,7 +1111,7 @@ export class ClaudeAgent {
 
       yield* this.processQueryMessages(this.currentQuery);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       yield { type: 'error', error: errorMessage };
       yield { type: 'state', state: { thinking: false } };
       yield { type: 'done' };

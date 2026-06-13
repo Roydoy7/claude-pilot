@@ -9,10 +9,42 @@ import { parseStringPromise } from 'xml2js';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 
+/**
+ * Text content as parsed by xml2js: a plain string for simple text nodes,
+ * or an object with `_` for nodes that also carry XML attributes.
+ */
+export interface XmlTextNode {
+  _: string;
+}
+
+export type XmlText = string | XmlTextNode;
+
+interface XmlCell {
+  $: { r: string };
+  f?: XmlText[];
+  v?: XmlText[];
+}
+
+interface XmlRow {
+  c?: XmlCell[];
+}
+
+interface XmlWorksheet {
+  worksheet?: {
+    sheetData?: Array<{ row?: XmlRow[] }>;
+  };
+}
+
+interface XmlWorkbook {
+  workbook?: {
+    sheets?: Array<{ sheet?: Array<{ $: { name: string } }> }>;
+  };
+}
+
 export interface ExcelSheet {
   name: string;
   formulas: Map<string, string>;
-  values: Map<string, any>;
+  values: Map<string, XmlText>;
 }
 
 export interface ExcelParseResult {
@@ -42,7 +74,7 @@ export class ExcelParser {
 
       // Read workbook.xml to get sheet names
       const workbookXml = zip.readAsText('xl/workbook.xml');
-      const workbook = await parseStringPromise(workbookXml);
+      const workbook = await parseStringPromise(workbookXml) as XmlWorkbook;
       const sheetNames = this.extractSheetNames(workbook);
 
       // Compute content hash first (directly from XML files - much faster!)
@@ -75,8 +107,9 @@ export class ExcelParser {
       const fd = await fs.open(filePath, 'r+');
       await fd.close();
       return false;
-    } catch (error: any) {
-      if (error.code === 'EBUSY' || error.code === 'EPERM') {
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EBUSY' || code === 'EPERM') {
         return true;
       }
       return false;
@@ -87,9 +120,9 @@ export class ExcelParser {
    * Parse single sheet
    */
   private async parseSheet(xml: string, name: string): Promise<ExcelSheet> {
-    const data = await parseStringPromise(xml);
+    const data = await parseStringPromise(xml) as XmlWorksheet;
     const formulas = new Map<string, string>();
-    const values = new Map<string, any>();
+    const values = new Map<string, XmlText>();
 
     // Extract worksheet -> sheetData -> row -> c (cells)
     const rows = data?.worksheet?.sheetData?.[0]?.row || [];
@@ -147,9 +180,9 @@ export class ExcelParser {
   /**
    * Extract sheet names from workbook
    */
-  private extractSheetNames(workbook: any): string[] {
+  private extractSheetNames(workbook: XmlWorkbook): string[] {
     const sheets = workbook?.workbook?.sheets?.[0]?.sheet || [];
-    return sheets.map((s: any) => s.$.name);
+    return sheets.map((s) => s.$.name);
   }
 
   /**

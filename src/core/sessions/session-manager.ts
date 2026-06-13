@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 import { RoleType } from '../roles/role-enum.js';
 import { getSessionsDir, getConfigDir } from '../storage/storage.js';
+import { SessionPersistenceError } from '../errors.js';
 
 export interface Session {
   id: string; //This is our local UUID session ID, created by frontend
@@ -118,7 +119,7 @@ export class SessionManager {
       fs.writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8');
     } catch (error) {
       console.error(`Failed to save session ${session.id}:`, error);
-      throw error;
+      throw new SessionPersistenceError(`Failed to save session ${session.id}`, 'SESSION_SAVE_FAILED', error);
     }
   }
 
@@ -178,7 +179,7 @@ export class SessionManager {
     try {
       const session = this.loadSession(sessionId);
       if (!session) {
-        throw new Error(`Session ${sessionId} not found`);
+        throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
       }
 
       // Mark as deleted
@@ -222,7 +223,7 @@ export class SessionManager {
   updateSessionTitle(sessionId: string, newTitle: string): void {
     const session = this.loadSession(sessionId);
     if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
     }
 
     session.title = newTitle;
@@ -264,7 +265,7 @@ export class SessionManager {
   switchSession(sessionId: string): Session {
     const session = this.loadSession(sessionId);
     if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
     }
     this.currentSessionId = sessionId;
     return session;
@@ -310,7 +311,7 @@ export class SessionManager {
     try {
       const session = this.loadSession(sessionId);
       if (!session) {
-        throw new Error(`Session ${sessionId} not found`);
+        throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
       }
 
       session.lastCheckpointId = checkpointId;
@@ -392,7 +393,7 @@ export class SessionManager {
   addAdditionalDirectory(sessionId: string, directory: string): void {
     const session = this.loadSession(sessionId);
     if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
     }
 
     if (!session.additionalDirectories) {
@@ -413,7 +414,7 @@ export class SessionManager {
   removeAdditionalDirectory(sessionId: string, directory: string): void {
     const session = this.loadSession(sessionId);
     if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
     }
 
     if (session.additionalDirectories) {
@@ -441,7 +442,7 @@ export class SessionManager {
   clearAdditionalDirectories(sessionId: string): void {
     const session = this.loadSession(sessionId);
     if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
     }
 
     session.additionalDirectories = [];

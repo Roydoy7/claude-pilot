@@ -12,6 +12,7 @@ import { SessionConfig } from './SessionConfig';
 import type { MessageListItem, MessageContent, PermissionMode, SettingSource, UsageMetadata } from '../../../preload/preload-types';
 import { RoleType } from '../../../../core/roles/role-enum.js';
 import { DEFAULT_MODEL, getModelContextWindow } from '../../../../core/providers/model-list-manager.js';
+import { getErrorMessage } from '../../../../core/errors.js';
 import { SessionAgent, SessionAgentCache } from '../../utils/SessionAgent.js';
 
 /**
@@ -362,7 +363,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
         id: `error-${Date.now()}`,
         timestamp: Date.now(),
         role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `Error: ${getErrorMessage(error)}`,
       };
       setItems((prev) => [...prev, errorMessageItem]);
     } finally {

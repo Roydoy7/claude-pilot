@@ -32,6 +32,7 @@ import { templateManager, type PromptTemplate } from '../templates/template-mana
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
 import { deleteTranscript } from '../sessions/transcript-manager.js';
 import { SkillManager } from '../skills/skill-manager.js';
+import { AgentQueryError, SessionPersistenceError, getErrorMessage } from '../errors.js';
 
 /**
  * Extract text content from MessageContent for use as session title
@@ -197,7 +198,7 @@ export class ClaudeAgentService {
         success: false,
         sessions: [],
         templates: [],
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }
@@ -330,7 +331,7 @@ export class ClaudeAgentService {
       }
 
       if (!this.currentAgent) {
-        throw new Error('Agent not initialized');
+        throw new AgentQueryError('Agent not initialized', 'AGENT_NOT_INITIALIZED');
       }
 
       const agentSessionId = this.currentAgent.getSessionId();
@@ -370,7 +371,7 @@ export class ClaudeAgentService {
       console.error('Chat error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }
@@ -403,7 +404,7 @@ export class ClaudeAgentService {
       console.error('Cancel request error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }
@@ -504,7 +505,7 @@ export class ClaudeAgentService {
       this.sessionManager.updateSessionTitle(sessionId, newTitle);
       const session = this.sessionManager.loadSession(sessionId);
       if (!session) {
-        throw new Error(`Session ${sessionId} not found after update`);
+        throw new SessionPersistenceError(`Session ${sessionId} not found after update`, 'SESSION_NOT_FOUND');
       }
       return {
         success: true,
@@ -574,7 +575,7 @@ export class ClaudeAgentService {
       console.error('Switch session error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }
@@ -598,7 +599,7 @@ export class ClaudeAgentService {
 
       const session = this.sessionManager.loadSession(this.currentAgent.getSessionId());
       if (!session) {
-        throw new Error('Failed to load created session');
+        throw new SessionPersistenceError('Failed to load created session', 'SESSION_LOAD_FAILED');
       }
 
       return {
@@ -609,7 +610,7 @@ export class ClaudeAgentService {
       console.error('Create session error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }
@@ -651,7 +652,7 @@ export class ClaudeAgentService {
 
       const session = this.sessionManager.loadSession(sessionId);
       if (!session) {
-        throw new Error(`Session ${sessionId} not found`);
+        throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
       }
 
       this.currentAgent = await createAgentFromSession(sessionId, true);
@@ -669,7 +670,7 @@ export class ClaudeAgentService {
       console.error('Update workspaces error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }

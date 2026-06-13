@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { existsSync } from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
+import { getErrorMessage } from '../errors.js';
 
 /**
  * Sheet info
@@ -224,7 +225,7 @@ function getInfo(xlsxFile: string): XLSXAnalysisResult {
       success: false,
       operation: 'get-info',
       filePath: xlsxFile,
-      error: `Failed to analyze Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to analyze Excel file: ${getErrorMessage(error)}`,
     };
   }
 }

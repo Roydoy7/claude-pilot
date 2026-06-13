@@ -20,6 +20,7 @@ import {
   type PDFObject,
 } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
+import { getErrorMessage } from '../errors.js';
 
 // Configure pdf-parse worker for Node.js/Electron environment
 // pdf-parse v2.x uses pdfjs-dist which requires a worker file
@@ -256,7 +257,7 @@ async function createPDF(file: string, content: string): Promise<PDFExecutionRes
       success: false,
       operation: 'create',
       file,
-      error: `Failed to create PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to create PDF: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }
@@ -715,7 +716,7 @@ async function getPDFInfo(file: string): Promise<PDFExecutionResult> {
       success: false,
       operation: 'get-info',
       file,
-      error: `Failed to get PDF info: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to get PDF info: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }
@@ -801,7 +802,7 @@ async function extractText(
       success: false,
       operation: 'extracttext',
       file,
-      error: `Failed to extract text: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to extract text: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }
@@ -908,7 +909,7 @@ async function searchText(
       success: false,
       operation: 'search',
       file,
-      error: `Failed to search PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to search PDF: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }
@@ -958,7 +959,7 @@ async function mergePDFs(sources: string[], output: string): Promise<PDFExecutio
       success: false,
       operation: 'merge',
       file: output,
-      error: `Failed to merge PDFs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to merge PDFs: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }
@@ -1036,7 +1037,7 @@ async function splitPDF(
       success: false,
       operation: 'split',
       file,
-      error: `Failed to split PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to split PDF: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }

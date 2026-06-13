@@ -30,18 +30,16 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
     loadTemplates();
 
     // Expose refresh method globally
-    (window as any).__promptsTabRefresh = loadTemplates;
+    window.__promptsTabRefresh = loadTemplates;
     return () => {
-      delete (window as any).__promptsTabRefresh;
+      delete window.__promptsTabRefresh;
     };
   }, []);
 
   const loadTemplates = async () => {
     try {
       const result = await window.electronAPI.templates.list();
-      // Handle both direct array and wrapped response
-      const templates = Array.isArray(result) ? result : (result as any).templates || [];
-      setTemplates(templates);
+      setTemplates(result);
     } catch (error) {
       console.error('Failed to load templates:', error);
     }

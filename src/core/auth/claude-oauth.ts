@@ -18,6 +18,7 @@ import type {
   ClaudeCredentials,
   OAuthResult,
 } from '../types/auth-types.js';
+import { AuthError, getErrorMessage } from '../errors.js';
 
 /**
  * Re-export types for backward compatibility
@@ -216,7 +217,7 @@ export class ClaudeOAuth {
    */
   private async exchangeCodeForToken(code: string, state: string): Promise<OAuthTokenResponse> {
     if (!this.codeVerifier || !this.port) {
-      throw new Error('OAuth flow not initialized');
+      throw new AuthError('OAuth flow not initialized', 'OAUTH_NOT_INITIALIZED');
     }
 
     const response = await fetch(OAUTH_CONFIG.TOKEN_URL, {
@@ -234,7 +235,7 @@ export class ClaudeOAuth {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
+      throw new AuthError(`Token exchange failed: ${response.status} ${errorText}`, 'OAUTH_TOKEN_EXCHANGE_FAILED');
     }
 
     return await response.json();
@@ -256,7 +257,7 @@ export class ClaudeOAuth {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
+      throw new AuthError(`Token refresh failed: ${response.status} ${errorText}`, 'OAUTH_TOKEN_REFRESH_FAILED');
     }
 
     return await response.json();
@@ -403,7 +404,7 @@ export class ClaudeOAuth {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       };
     }
   }

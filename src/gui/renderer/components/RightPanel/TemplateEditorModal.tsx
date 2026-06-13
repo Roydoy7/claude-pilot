@@ -4,8 +4,8 @@
  * Template Editor Modal - Rich Markdown editor for prompt templates
  */
 
-import { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, useEffect, useRef, type JSX } from 'react';
+import ReactMarkdown, { type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 
@@ -412,7 +412,7 @@ Supports Markdown:
                 rehypePlugins={[rehypeHighlight]}
                 components={{
                   p: ({ children }) => <p style={{ margin: '0.5em 0' }}>{children}</p>,
-                  code: ({ node, className, children, ...props }: any) => {
+                  code: ({ node, className, children, ...props }: JSX.IntrinsicElements['code'] & ExtraProps) => {
                     const inline = !className;
                     return !inline ? (
                       <pre

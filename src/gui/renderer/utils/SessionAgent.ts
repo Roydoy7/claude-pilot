@@ -260,12 +260,12 @@ export class SessionAgent {
         // Tool execution started - create tool call item and add to displayItems
         // Args should already be parsed as object by backend (agent.ts)
         // But handle edge cases for robustness
-        let parsedArgs: Record<string, any>;
+        let parsedArgs: Record<string, unknown>;
         const argsValue = event.args;
 
         if (argsValue && typeof argsValue === 'object') {
           // Normal case - args is already an object
-          parsedArgs = argsValue as Record<string, any>;
+          parsedArgs = argsValue;
         } else if (typeof argsValue === 'string') {
           // Fallback: Try to parse if it's somehow still a string
           const stringArgs: string = argsValue;
@@ -593,7 +593,7 @@ export class SessionAgent {
     content: MessageContent;
     timestamp?: number;
     usage?: UsageMetadata;
-    tool_calls?: Array<{ id: string; name: string; args: Record<string, any> }>;
+    tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
     tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
     isCompactSummary?: boolean;
     isUsageLimitError?: boolean;

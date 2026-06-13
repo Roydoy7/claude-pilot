@@ -12,6 +12,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
+import { getErrorMessage } from '../errors.js';
 
 /**
  * Progress entry for tracking execution history
@@ -397,13 +398,13 @@ async function executeTypeScriptCode(
 
     addProgress({
       type: 'error',
-      message: `Setup error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: `Setup error: ${getErrorMessage(error)}`,
       timestamp: Date.now(),
     });
 
     return {
       success: false,
-      error: `Failed to setup TypeScript execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to setup TypeScript execution: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
       progressHistory,
     };

@@ -28,11 +28,11 @@ export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplat
 
   // Expose switchToWorkspace method globally
   useEffect(() => {
-    (window as any).__rightPanelSwitchToWorkspace = () => {
+    window.__rightPanelSwitchToWorkspace = () => {
       setActiveTab('workspace');
     };
     return () => {
-      delete (window as any).__rightPanelSwitchToWorkspace;
+      delete window.__rightPanelSwitchToWorkspace;
     };
   }, []);
 

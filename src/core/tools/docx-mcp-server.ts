@@ -11,6 +11,7 @@ import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { existsSync, statSync } from 'fs';
 import AdmZip from 'adm-zip';
+import { getErrorMessage } from '../errors.js';
 
 /**
  * Document metadata
@@ -248,7 +249,7 @@ function getInfo(docxFile: string): DocxAnalysisResult {
       success: false,
       operation: 'get-info',
       filePath: docxFile,
-      error: `Failed to analyze DOCX file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to analyze DOCX file: ${getErrorMessage(error)}`,
       executionTime: Date.now() - startTime,
     };
   }

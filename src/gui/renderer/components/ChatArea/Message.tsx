@@ -4,9 +4,9 @@
  * Message Component - Displays a single chat message with Markdown support
  */
 
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo, type JSX } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { MessageContent, UsageMetadata } from '../../../preload/preload-types';
@@ -107,8 +107,8 @@ export const Message = memo(function Message({ message }: MessageProps) {
       });
 
       // Refresh templates list if PromptsTab is open
-      if ((window as any).__promptsTabRefresh) {
-        (window as any).__promptsTabRefresh();
+      if (window.__promptsTabRefresh) {
+        window.__promptsTabRefresh();
       }
 
       // Show success feedback briefly
@@ -155,7 +155,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
               components={{
                 // Custom renderers for better styling
                 p: ({ children }) => <p style={{ margin: '0.5em 0' }}>{children}</p>,
-                code: ({ node, className, children, ...props }: any) => {
+                code: ({ node, className, children, ...props }: JSX.IntrinsicElements['code'] & ExtraProps) => {
                   const inline = !className;
                   // For block code, ReactMarkdown automatically wraps in <pre><code>
                   // We just need to style the code tag
