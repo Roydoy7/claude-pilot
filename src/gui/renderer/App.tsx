@@ -11,7 +11,7 @@ import { Header } from './components/Header';
 import { ChatArea } from './components/ChatArea';
 import { RightPanel } from './components/RightPanel';
 import { RoleType } from '../../core/roles/role-enum.js';
-import { ClaudeModel } from '../../core/providers/model-list-manager.js';
+import { DEFAULT_MODEL } from '../../core/providers/model-list-manager.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 
 const PANEL_WIDTH_KEY = 'rightPanelWidth';
@@ -171,7 +171,7 @@ function App() {
             <ChatArea
               sessionId={currentSession?.id}
               defaultRole={(currentSession?.role as RoleType) || RoleType.OFFICE_ASSISTANT}
-              defaultModel={currentSession?.modelName || ClaudeModel.SONNET_4}
+              defaultModel={currentSession?.modelName || DEFAULT_MODEL}
               onSessionUpdate={handleSessionUpdate}
               templateContent={templateContent}
               onTemplateApplied={handleTemplateApplied}

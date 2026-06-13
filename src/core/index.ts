@@ -67,9 +67,9 @@ export {
   MODEL_DISPLAY_NAMES,
   getModelDisplayName,
   getDefaultModel,
-  supportsExtendedThinking,
+  getThinkingConfig,
+  getModelContextWindow,
   ProviderType,
-  type ModelConfig,
   type ModelInfo,
 } from './providers/model-list-manager.js';
 

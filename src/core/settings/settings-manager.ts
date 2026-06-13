@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { RoleType } from '../roles/role-enum.js';
+import { DEFAULT_MODEL } from '../providers/model-list-manager.js';
 
 /**
  * Application settings structure
@@ -31,7 +32,7 @@ export interface AppSettings {
  */
 const DEFAULT_SETTINGS: AppSettings = {
   defaultRole: RoleType.OFFICE_ASSISTANT,
-  defaultModel: 'claude-opus-4-5-20251101',
+  defaultModel: DEFAULT_MODEL,
   defaultCwd: os.homedir(),
   theme: 'light',
   language: 'en',

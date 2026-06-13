@@ -11,15 +11,20 @@ import { InputArea } from './InputArea';
 import { SessionConfig } from './SessionConfig';
 import type { MessageListItem, MessageContent, PermissionMode, SettingSource, UsageMetadata } from '../../../preload/preload-types';
 import { RoleType } from '../../../../core/roles/role-enum.js';
+import { DEFAULT_MODEL, getModelContextWindow } from '../../../../core/providers/model-list-manager.js';
 import { SessionAgent, SessionAgentCache } from '../../utils/SessionAgent.js';
 
 /**
- * Get context window size based on model name
- * Based on SDK's cm() function logic
+ * Get context window size based on model name.
+ * Falls back to the legacy `[1m]`-suffix heuristic for models retired
+ * from the supported set (e.g. historical sessions).
  */
 function getContextWindowSize(modelName: string): number {
-  if (modelName.includes('[1m]')) return 1000000; // 1M context models
-  return 200000; // Default 200K
+  try {
+    return getModelContextWindow(modelName);
+  } catch {
+    return modelName.includes('[1m]') ? 1000000 : 200000;
+  }
 }
 
 /**
@@ -64,7 +69,7 @@ export function ChatArea({ sessionId, defaultRole, defaultModel, onSessionUpdate
     cwd: string;
   }>({
     role: defaultRole || RoleType.OFFICE_ASSISTANT,
-    modelName: defaultModel || 'claude-sonnet-4-20250514',
+    modelName: defaultModel || DEFAULT_MODEL,
     cwd: '', // Will be loaded from settings or getLastCwd
   });
 

@@ -317,16 +317,6 @@ export class ClaudeAgent {
   }
 
   /**
-   * Set max thinking tokens for the current query
-   * Only available when a query is running
-   */
-  async setMaxThinkingTokens(maxThinkingTokens: number | null): Promise<void> {
-    if (this.currentQuery) {
-      await this.currentQuery.setMaxThinkingTokens(maxThinkingTokens);
-    }
-  }
-
-  /**
    * Set handler for tool approval requests
    * This handler is called when SDK needs user approval for a tool
    */

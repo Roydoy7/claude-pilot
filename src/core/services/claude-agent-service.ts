@@ -217,7 +217,7 @@ export class ClaudeAgentService {
       sessionId,
       title,
       role = RoleType.OFFICE_ASSISTANT,
-      modelName = ClaudeModel.SONNET_4,
+      modelName = ClaudeModel.SONNET_4_6,
     } = config;
 
     if (sessionId) {

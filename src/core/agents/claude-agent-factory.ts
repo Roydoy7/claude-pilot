@@ -12,7 +12,7 @@ import { getRoleSystemPrompt } from '../roles/role-system-prompts.js';
 import { getSystemReminders } from '../context/system-reminders.js';
 import { getAvailableTools, getAutoApprovedTools, getAutoApprovedMcpTools, getMcpServers } from '../roles/role-tool-sets.js';
 import { RoleType } from '../roles/role-enum.js';
-import { ClaudeModel, supportsExtendedThinking } from '../providers/model-list-manager.js';
+import { ClaudeModel, getThinkingConfig } from '../providers/model-list-manager.js';
 import { SkillManager } from '../skills/skill-manager.js';
 
 /**
@@ -171,8 +171,7 @@ export async function createAgentFromSessionData(
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
     permissionMode: 'default',
-    // Enable extended thinking only for supported models
-    maxThinkingTokens: supportsExtendedThinking(session.modelName) ? 10000 : undefined,
+    thinking: getThinkingConfig(session.modelName),
   };
 
   // Create and return agent
@@ -185,7 +184,7 @@ export async function createAgentFromSessionData(
 export async function createNewAgent(
   title: string,
   role: RoleType,
-  modelName: string = ClaudeModel.SONNET_4,
+  modelName: string = ClaudeModel.SONNET_4_6,
   cwd: string
 ): Promise<ClaudeAgent> {
   const sessionManager = SessionManager.getInstance();
