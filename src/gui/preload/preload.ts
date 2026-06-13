@@ -13,7 +13,6 @@ import type {
   ServiceInitRequest,
   ServiceInitResponse,
   TemplateCreateRequest,
-  UsageMetadata,
   StreamEventData,
   SessionCreateRequest,
   SessionSwitchRequest,
@@ -27,6 +26,18 @@ import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/type
 import type { AppSettings } from '../../core/settings/settings-manager.js';
 import type { PromptSuggestion, Language } from '../../core/suggestions/suggestions-manager.js';
 import type { RoleType } from '../../core/roles/role-enum.js';
+import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
+
+/**
+ * Type-safe wrapper around `ipcRenderer.invoke`. The channel name constrains
+ * both the argument tuple and the resolved result type via `ChannelMap`.
+ */
+function invokeChannel<C extends keyof ChannelMap>(
+  channel: C,
+  ...args: ChannelMap[C]['args']
+): Promise<ChannelMap[C]['result']> {
+  return ipcRenderer.invoke(channel, ...args);
+}
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -35,239 +46,205 @@ contextBridge.exposeInMainWorld('electronAPI', {
   invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
 
   // Utility
-  ping: () => ipcRenderer.invoke('ping'),
+  ping: () => invokeChannel(IpcChannels.ping),
 
   // Service initialization
   service: {
     initialize: (request?: ServiceInitRequest): Promise<ServiceInitResponse> =>
-      ipcRenderer.invoke('service:initialize', request || {}),
+      invokeChannel(IpcChannels.service.initialize, request || {}),
 
     isInitialized: (): Promise<boolean> =>
-      ipcRenderer.invoke('service:isInitialized'),
+      invokeChannel(IpcChannels.service.isInitialized),
   },
 
   // Agent operations
   agent: {
     chat: (request: ChatRequest): Promise<ChatResponse> =>
-      ipcRenderer.invoke('agent:chat', request),
+      invokeChannel(IpcChannels.agent.chat, request),
 
     getCurrentInfo: () =>
-      ipcRenderer.invoke('agent:getCurrentInfo'),
+      invokeChannel(IpcChannels.agent.getCurrentInfo),
 
     // Unified streaming event listener
     onStreamEvent: (callback: (data: StreamEventData) => void) => {
-      ipcRenderer.on('agent:streamEvent', (_event, data: StreamEventData) => {
+      ipcRenderer.on(IpcChannels.agent.streamEvent, (_event, data: StreamEventData) => {
         callback(data);
       });
     },
 
     cancelRequest: (sessionId?: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:cancelRequest', sessionId),
+      invokeChannel(IpcChannels.agent.cancelRequest, sessionId),
 
     // Tool approval via canUseTool callback
     onToolApprovalRequest: (callback: (data: { sessionId: string; toolUseId: string; toolName: string; toolInput: Record<string, unknown> }) => void) => {
-      ipcRenderer.on('agent:toolApprovalRequest', (_event, data) => {
+      ipcRenderer.on(IpcChannels.agent.toolApprovalRequest, (_event, data) => {
         callback(data);
       });
     },
 
     approveTool: (toolUseId: string, updatedInput?: Record<string, unknown>): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:approveTool', toolUseId, updatedInput),
+      invokeChannel(IpcChannels.agent.approveTool, toolUseId, updatedInput),
 
     rejectTool: (toolUseId: string, message?: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:rejectTool', toolUseId, message),
+      invokeChannel(IpcChannels.agent.rejectTool, toolUseId, message),
 
     getPermissionMode: (): Promise<{ success: boolean; mode: PermissionMode }> =>
-      ipcRenderer.invoke('agent:getPermissionMode'),
+      invokeChannel(IpcChannels.agent.getPermissionMode),
 
     setPermissionMode: (mode: PermissionMode): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:setPermissionMode', mode),
+      invokeChannel(IpcChannels.agent.setPermissionMode, mode),
 
     getSettingSources: (): Promise<{ success: boolean; sources: SettingSource[] }> =>
-      ipcRenderer.invoke('agent:getSettingSources'),
+      invokeChannel(IpcChannels.agent.getSettingSources),
 
     setSettingSources: (sources: SettingSource[]): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('agent:setSettingSources', sources),
+      invokeChannel(IpcChannels.agent.setSettingSources, sources),
   },
 
   // Session management
   session: {
     list: (): Promise<Session[]> =>
-      ipcRenderer.invoke('session:list'),
+      invokeChannel(IpcChannels.session.list),
 
-    getHistory: (sessionId: string): Promise<Array<{ role: string; content: string; timestamp?: number; usage?: UsageMetadata }>> =>
-      ipcRenderer.invoke('session:getHistory', sessionId),
+    getHistory: (sessionId: string) =>
+      invokeChannel(IpcChannels.session.getHistory, sessionId),
 
     create: (request: SessionCreateRequest): Promise<ChatResponse> =>
-      ipcRenderer.invoke('session:create', request),
+      invokeChannel(IpcChannels.session.create, request),
 
     switch: (request: SessionSwitchRequest): Promise<ChatResponse> =>
-      ipcRenderer.invoke('session:switch', request),
+      invokeChannel(IpcChannels.session.switch, request),
 
     delete: (sessionId: string): Promise<{ success: boolean; sessionId: string }> =>
-      ipcRenderer.invoke('session:delete', sessionId),
+      invokeChannel(IpcChannels.session.delete, sessionId),
 
     updateTitle: (sessionId: string, newTitle: string) =>
-      ipcRenderer.invoke('session:updateTitle', sessionId, newTitle),
+      invokeChannel(IpcChannels.session.updateTitle, sessionId, newTitle),
 
     getLastCwd: (): Promise<string> =>
-      ipcRenderer.invoke('session:getLastCwd'),
+      invokeChannel(IpcChannels.session.getLastCwd),
 
     addAdditionalDirectory: (sessionId: string, directory: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('session:addAdditionalDirectory', sessionId, directory),
+      invokeChannel(IpcChannels.session.addAdditionalDirectory, sessionId, directory),
 
     removeAdditionalDirectory: (sessionId: string, directory: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('session:removeAdditionalDirectory', sessionId, directory),
+      invokeChannel(IpcChannels.session.removeAdditionalDirectory, sessionId, directory),
 
     getAdditionalDirectories: (sessionId: string): Promise<string[]> =>
-      ipcRenderer.invoke('session:getAdditionalDirectories', sessionId),
+      invokeChannel(IpcChannels.session.getAdditionalDirectories, sessionId),
 
     clearAdditionalDirectories: (sessionId: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('session:clearAdditionalDirectories', sessionId),
+      invokeChannel(IpcChannels.session.clearAdditionalDirectories, sessionId),
 
-    getFileTree: (sessionId: string): Promise<Array<{
-      directoryType: 'cwd' | 'additional';
-      directoryPath: string;
-      directoryLabel: string;
-      tree: {
-        name: string;
-        path: string;
-        type: 'file' | 'directory';
-        children?: unknown[];
-      } | null;
-    }>> =>
-      ipcRenderer.invoke('session:getFileTree', sessionId),
+    getFileTree: (sessionId: string) =>
+      invokeChannel(IpcChannels.session.getFileTree, sessionId),
   },
 
   // Workspace management
   workspace: {
     selectDirectory: (): Promise<string | null> =>
-      ipcRenderer.invoke('workspace:selectDirectory'),
+      invokeChannel(IpcChannels.workspace.selectDirectory),
 
     list: (): Promise<string[]> =>
-      ipcRenderer.invoke('workspace:list'),
+      invokeChannel(IpcChannels.workspace.list),
 
     add: (dir: string): Promise<boolean> =>
-      ipcRenderer.invoke('workspace:add', dir),
+      invokeChannel(IpcChannels.workspace.add, dir),
 
     remove: (dir: string): Promise<boolean> =>
-      ipcRenderer.invoke('workspace:remove', dir),
+      invokeChannel(IpcChannels.workspace.remove, dir),
 
     clear: (): Promise<boolean> =>
-      ipcRenderer.invoke('workspace:clear'),
+      invokeChannel(IpcChannels.workspace.clear),
 
     update: (sessionId: string): Promise<ChatResponse> =>
-      ipcRenderer.invoke('workspace:update', sessionId),
+      invokeChannel(IpcChannels.workspace.update, sessionId),
 
-    getFileTree: (): Promise<Array<{
-      workspaceIndex: number;
-      workspacePath: string;
-      tree: {
-        name: string;
-        path: string;
-        type: 'file' | 'directory';
-        children?: unknown[];
-      } | null;
-    }>> =>
-      ipcRenderer.invoke('workspace:getFileTree'),
+    getFileTree: () =>
+      invokeChannel(IpcChannels.workspace.getFileTree),
 
-    getFileTreeForDirectory: (directoryPath: string): Promise<Array<{
-      directoryType: 'cwd' | 'additional';
-      directoryPath: string;
-      directoryLabel: string;
-      tree: {
-        name: string;
-        path: string;
-        type: 'file' | 'directory';
-        children?: unknown[];
-      } | null;
-    }>> =>
-      ipcRenderer.invoke('workspace:getFileTreeForDirectory', directoryPath),
+    getFileTreeForDirectory: (directoryPath: string) =>
+      invokeChannel(IpcChannels.workspace.getFileTreeForDirectory, directoryPath),
   },
 
   // Cache management
   cache: {
     getStats: (): Promise<CacheStats> =>
-      ipcRenderer.invoke('cache:stats'),
+      invokeChannel(IpcChannels.cache.stats),
   },
 
   // Template management
   templates: {
     list: (): Promise<PromptTemplate[]> =>
-      ipcRenderer.invoke('template:list'),
+      invokeChannel(IpcChannels.template.list),
 
     get: (id: string): Promise<PromptTemplate | undefined> =>
-      ipcRenderer.invoke('template:get', id),
+      invokeChannel(IpcChannels.template.get, id),
 
     create: (request: TemplateCreateRequest): Promise<PromptTemplate> =>
-      ipcRenderer.invoke('template:create', request),
+      invokeChannel(IpcChannels.template.create, request),
 
     update: (id: string, updates: { name?: string; content?: string }): Promise<PromptTemplate> =>
-      ipcRenderer.invoke('template:update', { id, updates }),
+      invokeChannel(IpcChannels.template.update, { id, updates }),
 
     delete: (id: string): Promise<boolean> =>
-      ipcRenderer.invoke('template:delete', id),
+      invokeChannel(IpcChannels.template.delete, id),
   },
 
   // Model management - Claude only
   models: {
-    list: (options?: { apiKey?: string; forceRefresh?: boolean }): Promise<ModelInfo[]> =>
-      ipcRenderer.invoke('models:list', options),
+    list: (options?: { forceRefresh?: boolean }): Promise<ModelInfo[]> =>
+      invokeChannel(IpcChannels.models.list, options),
 
     getDefault: (): Promise<string> =>
-      ipcRenderer.invoke('models:getDefault'),
+      invokeChannel(IpcChannels.models.getDefault),
   },
 
   // Authentication - Claude only
   auth: {
     isAuthenticated: (): Promise<AuthStatus> =>
-      ipcRenderer.invoke('auth:isAuthenticated'),
+      invokeChannel(IpcChannels.auth.isAuthenticated),
 
     loginWithOAuth: (options: OAuthLoginOptions): Promise<OAuthResult> =>
-      ipcRenderer.invoke('auth:loginWithOAuth', options),
+      invokeChannel(IpcChannels.auth.loginWithOAuth, options),
 
     logout: (): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('auth:logout'),
+      invokeChannel(IpcChannels.auth.logout),
 
-    getOAuthInfo: (): Promise<{
-      authenticated: boolean;
-      subscriptionType?: string | null;
-      expiresAt?: number;
-      scopes?: string[];
-    }> =>
-      ipcRenderer.invoke('auth:getOAuthInfo'),
+    getOAuthInfo: () =>
+      invokeChannel(IpcChannels.auth.getOAuthInfo),
   },
 
   // Settings management
   settings: {
     get: (): Promise<AppSettings> =>
-      ipcRenderer.invoke('settings:get'),
+      invokeChannel(IpcChannels.settings.get),
 
     update: (updates: Partial<AppSettings>): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('settings:update', updates),
+      invokeChannel(IpcChannels.settings.update, updates),
 
     hasSettings: (): Promise<boolean> =>
-      ipcRenderer.invoke('settings:hasSettings'),
+      invokeChannel(IpcChannels.settings.hasSettings),
 
     reset: (): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('settings:reset'),
+      invokeChannel(IpcChannels.settings.reset),
   },
 
   // Suggestions management
   suggestions: {
     get: (role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> =>
-      ipcRenderer.invoke('suggestions:get', role, language),
+      invokeChannel(IpcChannels.suggestions.get, role, language),
 
     getTemplates: (): Promise<PromptSuggestion[]> =>
-      ipcRenderer.invoke('suggestions:getTemplates'),
+      invokeChannel(IpcChannels.suggestions.getTemplates),
 
     getDefaults: (role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> =>
-      ipcRenderer.invoke('suggestions:getDefaults', role, language),
+      invokeChannel(IpcChannels.suggestions.getDefaults, role, language),
 
     refresh: (role: RoleType, language: Language = 'en'): Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }> =>
-      ipcRenderer.invoke('suggestions:refresh', role, language),
+      invokeChannel(IpcChannels.suggestions.refresh, role, language),
 
     clearCache: (role?: RoleType): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('suggestions:clearCache', role),
+      invokeChannel(IpcChannels.suggestions.clearCache, role),
   },
 });

@@ -5,6 +5,7 @@
  */
 
 import { ipcMain, BrowserWindow, dialog } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import { claudeAgentService } from '../../core/services/claude-agent-service.js';
 import type { ChatRequest, StreamEventCallback } from '../../core/services/claude-agent-service.js';
 import type { StreamEvent, ToolApprovalRequestHandler } from '../../core/agents/claude-agent.js';
@@ -18,8 +19,25 @@ import { SkillManager } from '../../core/skills/skill-manager.js';
 import { settingsManager } from '../../core/settings/settings-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
 import { suggestionsManager, type Language } from '../../core/suggestions/suggestions-manager.js';
+import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
 import fs from 'fs';
 import path from 'path';
+
+/**
+ * Type-safe wrapper around `ipcMain.handle`. The channel name and handler's
+ * argument/result types are both constrained by `ChannelMap`, so renaming or
+ * retyping a channel in `shared/ipc-channels.ts` surfaces every call site
+ * that needs updating.
+ */
+function handleIpc<C extends keyof ChannelMap>(
+  channel: C,
+  handler: (
+    event: IpcMainInvokeEvent,
+    ...args: ChannelMap[C]['args']
+  ) => ChannelMap[C]['result'] | Promise<ChannelMap[C]['result']>
+): void {
+  ipcMain.handle(channel, handler);
+}
 
 /**
  * Register all IPC handlers
@@ -35,7 +53,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     console.log('[IPC] toolApprovalRequestHandler invoked:', { toolUseId, toolName });
     const sessionId = claudeAgentService.getCurrentSessionId();
     if (sessionId) {
-      mainWindow.webContents.send('agent:toolApprovalRequest', {
+      mainWindow.webContents.send(IpcChannels.agent.toolApprovalRequest, {
         sessionId,
         toolUseId,
         toolName,
@@ -50,24 +68,24 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Initialize service - load sessions and last used agent
    */
-  ipcMain.handle('service:initialize', async () => {
+  handleIpc(IpcChannels.service.initialize, async () => {
     return await claudeAgentService.initialize();
   });
 
   /**
    * Check if service is initialized
    */
-  ipcMain.handle('service:isInitialized', async () => {
+  handleIpc(IpcChannels.service.isInitialized, async () => {
     return claudeAgentService.isInitialized();
   });
 
   /**
    * Chat with agent - streaming mode
    */
-  ipcMain.handle('agent:chat', async (_event, request: ChatRequest) => {
+  handleIpc(IpcChannels.agent.chat, async (_event, request: ChatRequest) => {
     // Create stream event callback that sends all events to frontend
     const streamEventCallback: StreamEventCallback = (sessionId: string, event: StreamEvent) => {
-      mainWindow.webContents.send('agent:streamEvent', {
+      mainWindow.webContents.send(IpcChannels.agent.streamEvent, {
         sessionId,
         event,
       });
@@ -84,22 +102,22 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current agent info
    */
-  ipcMain.handle('agent:getCurrentInfo', async () => {
+  handleIpc(IpcChannels.agent.getCurrentInfo, async () => {
     return claudeAgentService.getCurrentAgentInfo();
   });
 
   /**
    * Cancel ongoing request
    */
-  ipcMain.handle('agent:cancelRequest', async (_event, sessionId?: string) => {
+  handleIpc(IpcChannels.agent.cancelRequest, async (_event, sessionId?: string) => {
     return claudeAgentService.cancelRequest(sessionId);
   });
 
   /**
    * Approve a tool call
    */
-  ipcMain.handle(
-    'agent:approveTool',
+  handleIpc(
+    IpcChannels.agent.approveTool,
     async (
       _event,
       toolUseId: string,
@@ -112,8 +130,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Reject a tool call
    */
-  ipcMain.handle(
-    'agent:rejectTool',
+  handleIpc(
+    IpcChannels.agent.rejectTool,
     async (
       _event,
       toolUseId: string,
@@ -126,7 +144,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current permission mode
    */
-  ipcMain.handle('agent:getPermissionMode', async () => {
+  handleIpc(IpcChannels.agent.getPermissionMode, async () => {
     const mode = claudeAgentService.getPermissionMode();
     return { success: true, mode };
   });
@@ -134,7 +152,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Set permission mode
    */
-  ipcMain.handle('agent:setPermissionMode', async (_event, mode: string) => {
+  handleIpc(IpcChannels.agent.setPermissionMode, async (_event, mode: string) => {
     try {
       await claudeAgentService.setPermissionMode(mode as import('../../core/agents/claude-agent.js').PermissionMode);
       return { success: true };
@@ -147,7 +165,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current setting sources
    */
-  ipcMain.handle('agent:getSettingSources', async () => {
+  handleIpc(IpcChannels.agent.getSettingSources, async () => {
     const sources = claudeAgentService.getSettingSources();
     return { success: true, sources };
   });
@@ -155,7 +173,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Set setting sources
    */
-  ipcMain.handle('agent:setSettingSources', async (_event, sources: string[]) => {
+  handleIpc(IpcChannels.agent.setSettingSources, async (_event, sources: string[]) => {
     try {
       claudeAgentService.setSettingSources(sources as import('../../core/agents/claude-agent.js').SettingSource[]);
       return { success: true };
@@ -172,22 +190,22 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * List all sessions
    */
-  ipcMain.handle('session:list', async () => {
+  handleIpc(IpcChannels.session.list, async () => {
     return claudeAgentService.listSessions();
   });
 
   /**
    * Get session history
    */
-  ipcMain.handle('session:getHistory', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.session.getHistory, async (_event, sessionId: string) => {
     return await claudeAgentService.getSessionHistory(sessionId);
   });
 
   /**
    * Create new session
    */
-  ipcMain.handle(
-    'session:create',
+  handleIpc(
+    IpcChannels.session.create,
     async (
       _event,
       {
@@ -214,8 +232,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Switch to existing session
    */
-  ipcMain.handle(
-    'session:switch',
+  handleIpc(
+    IpcChannels.session.switch,
     async (
       _event,
       {
@@ -231,21 +249,21 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Delete session
    */
-  ipcMain.handle('session:delete', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.session.delete, async (_event, sessionId: string) => {
     return claudeAgentService.deleteSession(sessionId);
   });
 
   /**
    * Update session title
    */
-  ipcMain.handle('session:updateTitle', async (_event, sessionId: string, newTitle: string) => {
+  handleIpc(IpcChannels.session.updateTitle, async (_event, sessionId: string, newTitle: string) => {
     return claudeAgentService.updateSessionTitle(sessionId, newTitle);
   });
 
   /**
    * Get last used cwd
    */
-  ipcMain.handle('session:getLastCwd', async () => {
+  handleIpc(IpcChannels.session.getLastCwd, async () => {
     const sessionManager = SessionManager.getInstance();
     return sessionManager.getLastCwd();
   });
@@ -253,7 +271,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Add additional directory to session
    */
-  ipcMain.handle('session:addAdditionalDirectory', async (_event, sessionId: string, directory: string) => {
+  handleIpc(IpcChannels.session.addAdditionalDirectory, async (_event, sessionId: string, directory: string) => {
     const sessionManager = SessionManager.getInstance();
     sessionManager.addAdditionalDirectory(sessionId, directory);
     return { success: true };
@@ -262,7 +280,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Remove additional directory from session
    */
-  ipcMain.handle('session:removeAdditionalDirectory', async (_event, sessionId: string, directory: string) => {
+  handleIpc(IpcChannels.session.removeAdditionalDirectory, async (_event, sessionId: string, directory: string) => {
     const sessionManager = SessionManager.getInstance();
     sessionManager.removeAdditionalDirectory(sessionId, directory);
     return { success: true };
@@ -271,7 +289,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get additional directories for session
    */
-  ipcMain.handle('session:getAdditionalDirectories', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.session.getAdditionalDirectories, async (_event, sessionId: string) => {
     const sessionManager = SessionManager.getInstance();
     return sessionManager.getAdditionalDirectories(sessionId);
   });
@@ -279,7 +297,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Clear all additional directories for session
    */
-  ipcMain.handle('session:clearAdditionalDirectories', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.session.clearAdditionalDirectories, async (_event, sessionId: string) => {
     const sessionManager = SessionManager.getInstance();
     sessionManager.clearAdditionalDirectories(sessionId);
     return { success: true };
@@ -288,7 +306,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get file tree for session directories (cwd + additionalDirectories)
    */
-  ipcMain.handle('session:getFileTree', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.session.getFileTree, async (_event, sessionId: string) => {
     const sessionManager = SessionManager.getInstance();
     const session = sessionManager.loadSession(sessionId);
 
@@ -391,7 +409,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Open directory selection dialog
    */
-  ipcMain.handle('workspace:selectDirectory', async () => {
+  handleIpc(IpcChannels.workspace.selectDirectory, async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory']
     });
@@ -406,28 +424,28 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get all workspaces
    */
-  ipcMain.handle('workspace:list', async () => {
+  handleIpc(IpcChannels.workspace.list, async () => {
     return claudeAgentService.getWorkspaces();
   });
 
   /**
    * Add workspace
    */
-  ipcMain.handle('workspace:add', async (_event, dir: string) => {
+  handleIpc(IpcChannels.workspace.add, async (_event, dir: string) => {
     return claudeAgentService.addWorkspace(dir);
   });
 
   /**
    * Remove workspace
    */
-  ipcMain.handle('workspace:remove', async (_event, dir: string) => {
+  handleIpc(IpcChannels.workspace.remove, async (_event, dir: string) => {
     return claudeAgentService.removeWorkspace(dir);
   });
 
   /**
    * Clear all workspaces
    */
-  ipcMain.handle('workspace:clear', async () => {
+  handleIpc(IpcChannels.workspace.clear, async () => {
     claudeAgentService.clearWorkspaces();
     return true;
   });
@@ -435,14 +453,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Update workspace configuration and recreate agent
    */
-  ipcMain.handle('workspace:update', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.workspace.update, async (_event, sessionId: string) => {
     return await claudeAgentService.updateWorkspaces(sessionId);
   });
 
   /**
    * Get file tree for workspace directories
    */
-  ipcMain.handle('workspace:getFileTree', async () => {
+  handleIpc(IpcChannels.workspace.getFileTree, async () => {
     const workspaces = claudeAgentService.getWorkspaces();
 
     interface FileNode {
@@ -518,7 +536,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Get file tree for a specific directory (no session required)
    * Used by InputArea @ button when session is not yet created
    */
-  ipcMain.handle('workspace:getFileTreeForDirectory', async (_event, directoryPath: string) => {
+  handleIpc(IpcChannels.workspace.getFileTreeForDirectory, async (_event, directoryPath: string) => {
     interface FileNode {
       name: string;
       path: string;
@@ -593,7 +611,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get cache statistics
    */
-  ipcMain.handle('cache:stats', async () => {
+  handleIpc(IpcChannels.cache.stats, async () => {
     return claudeAgentService.getCacheStats();
   });
 
@@ -604,29 +622,29 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get all templates
    */
-  ipcMain.handle('template:list', async () => {
+  handleIpc(IpcChannels.template.list, async () => {
     return templateManager.getAllTemplates();
   });
 
   /**
    * Get template by ID
    */
-  ipcMain.handle('template:get', async (_event, id: string) => {
+  handleIpc(IpcChannels.template.get, async (_event, id: string) => {
     return templateManager.getTemplate(id);
   });
 
   /**
    * Create new template
    */
-  ipcMain.handle('template:create', async (_event, { name, content }: { name: string; content: string }) => {
+  handleIpc(IpcChannels.template.create, async (_event, { name, content }: { name: string; content: string }) => {
     return templateManager.createTemplate(name, content);
   });
 
   /**
    * Update template
    */
-  ipcMain.handle(
-    'template:update',
+  handleIpc(
+    IpcChannels.template.update,
     async (_event, { id, updates }: { id: string; updates: { name?: string; content?: string } }) => {
       return templateManager.updateTemplate(id, updates);
     }
@@ -635,7 +653,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Delete template
    */
-  ipcMain.handle('template:delete', async (_event, id: string) => {
+  handleIpc(IpcChannels.template.delete, async (_event, id: string) => {
     return templateManager.deleteTemplate(id);
   });
 
@@ -646,14 +664,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get available Claude models from Anthropic API
    */
-  ipcMain.handle('models:list', async (_event, options?: { forceRefresh?: boolean }) => {
+  handleIpc(IpcChannels.models.list, async (_event, options?: { forceRefresh?: boolean }) => {
     return modelListManager.fetchModels(options);
   });
 
   /**
    * Get default model
    */
-  ipcMain.handle('models:getDefault', async () => {
+  handleIpc(IpcChannels.models.getDefault, async () => {
     return modelListManager.getDefaultModel();
   });
 
@@ -664,15 +682,15 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Check if authenticated
    */
-  ipcMain.handle('auth:isAuthenticated', async () => {
+  handleIpc(IpcChannels.auth.isAuthenticated, async () => {
     return authManager.isAuthenticated();
   });
 
   /**
    * Start OAuth login flow
    */
-  ipcMain.handle(
-    'auth:loginWithOAuth',
+  handleIpc(
+    IpcChannels.auth.loginWithOAuth,
     async (_event, options: OAuthLoginOptions) => {
       return await authManager.loginWithOAuth(options);
     }
@@ -681,7 +699,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Logout - clear OAuth credentials
    */
-  ipcMain.handle('auth:logout', async () => {
+  handleIpc(IpcChannels.auth.logout, async () => {
     authManager.logout();
     return { success: true };
   });
@@ -689,7 +707,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get OAuth info for UI display
    */
-  ipcMain.handle('auth:getOAuthInfo', async () => {
+  handleIpc(IpcChannels.auth.getOAuthInfo, async () => {
     return authManager.getOAuthInfo();
   });
 
@@ -700,7 +718,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Ping handler for testing
    */
-  ipcMain.handle('ping', async () => {
+  handleIpc(IpcChannels.ping, async () => {
     return 'pong';
   });
 
@@ -713,7 +731,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get skills data for a session (marketplaces, installed skills, enabled state)
    */
-  ipcMain.handle('skills:getData', async (_event, sessionId: string) => {
+  handleIpc(IpcChannels.skills.getData, async (_event, sessionId: string) => {
     const skillManager = SkillManager.getInstance();
     await skillManager.initialize();
 
@@ -732,7 +750,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Fetch available skills from a marketplace
    */
-  ipcMain.handle('skills:fetchMarketplace', async (_event, marketplaceId: string, sessionId: string) => {
+  handleIpc(IpcChannels.skills.fetchMarketplace, async (_event, marketplaceId: string, sessionId: string) => {
     const skillManager = SkillManager.getInstance();
 
     // Get cwd from session to check which skills are installed
@@ -746,7 +764,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Install a skill from a marketplace to session's cwd
    */
-  ipcMain.handle('skills:install', async (_event, marketplaceId: string, skillPath: string, sessionId: string) => {
+  handleIpc(IpcChannels.skills.install, async (_event, marketplaceId: string, skillPath: string, sessionId: string) => {
     const sessionManager = SessionManager.getInstance();
     const session = sessionManager.loadSession(sessionId);
 
@@ -761,7 +779,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Uninstall a skill from session's cwd
    */
-  ipcMain.handle('skills:uninstall', async (_event, skillName: string, sessionId: string) => {
+  handleIpc(IpcChannels.skills.uninstall, async (_event, skillName: string, sessionId: string) => {
     const sessionManager = SessionManager.getInstance();
     const session = sessionManager.loadSession(sessionId);
 
@@ -777,7 +795,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Set global skills enabled/disabled
    */
-  ipcMain.handle('skills:setGlobalEnabled', async (_event, enabled: boolean) => {
+  handleIpc(IpcChannels.skills.setGlobalEnabled, async (_event, enabled: boolean) => {
     const skillManager = SkillManager.getInstance();
     await skillManager.setGlobalEnabled(enabled);
     return { success: true };
@@ -790,14 +808,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get application settings
    */
-  ipcMain.handle('settings:get', async () => {
+  handleIpc(IpcChannels.settings.get, async () => {
     return settingsManager.getSettings();
   });
 
   /**
    * Update application settings
    */
-  ipcMain.handle('settings:update', async (_event, updates: Partial<AppSettings>) => {
+  handleIpc(IpcChannels.settings.update, async (_event, updates: Partial<AppSettings>) => {
     settingsManager.updateSettings(updates);
     return { success: true };
   });
@@ -805,14 +823,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Check if settings exist (first-time use detection)
    */
-  ipcMain.handle('settings:hasSettings', async () => {
+  handleIpc(IpcChannels.settings.hasSettings, async () => {
     return settingsManager.hasSettings();
   });
 
   /**
    * Reset settings to defaults
    */
-  ipcMain.handle('settings:reset', async () => {
+  handleIpc(IpcChannels.settings.reset, async () => {
     settingsManager.resetSettings();
     return { success: true };
   });
@@ -824,21 +842,21 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get suggestions for a role (templates + cached LLM or defaults)
    */
-  ipcMain.handle('suggestions:get', async (_event, role: RoleType, language: Language = 'en') => {
+  handleIpc(IpcChannels.suggestions.get, async (_event, role: RoleType, language: Language = 'en') => {
     return suggestionsManager.getSuggestions(role, language);
   });
 
   /**
    * Get only template suggestions
    */
-  ipcMain.handle('suggestions:getTemplates', async () => {
+  handleIpc(IpcChannels.suggestions.getTemplates, async () => {
     return suggestionsManager.getTemplates();
   });
 
   /**
    * Get default tool suggestions (without LLM)
    */
-  ipcMain.handle('suggestions:getDefaults', async (_event, role: RoleType, language: Language = 'en') => {
+  handleIpc(IpcChannels.suggestions.getDefaults, async (_event, role: RoleType, language: Language = 'en') => {
     return suggestionsManager.getDefaultSuggestions(role, language);
   });
 
@@ -846,7 +864,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Refresh suggestions
    * Generates new suggestions using LLM via Claude Agent SDK
    */
-  ipcMain.handle('suggestions:refresh', async (_event, role: RoleType, language: Language = 'en') => {
+  handleIpc(IpcChannels.suggestions.refresh, async (_event, role: RoleType, language: Language = 'en') => {
     try {
       // Get template suggestions
       const templateSuggestions = suggestionsManager.getTemplates();
@@ -872,7 +890,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Clear suggestions cache
    */
-  ipcMain.handle('suggestions:clearCache', async (_event, role?: RoleType) => {
+  handleIpc(IpcChannels.suggestions.clearCache, async (_event, role?: RoleType) => {
     suggestionsManager.clearCache(role);
     return { success: true };
   });

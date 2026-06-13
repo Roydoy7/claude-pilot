@@ -9,7 +9,7 @@ import type { RoleType } from '../../core/roles/role-enum.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
-import type { AgentState, StreamEvent, PermissionMode, SettingSource } from '../../core/agents/claude-agent.js';
+import type { AgentState, StreamEvent, PermissionMode, SettingSource, HistoryMessage } from '../../core/agents/claude-agent.js';
 import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo } from '../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
@@ -284,7 +284,7 @@ export interface ElectronAPI {
   // Agent operations
   agent: {
     chat: (request: ChatRequest) => Promise<ChatResponse>;
-    getCurrentInfo: () => Promise<{ success: boolean; data?: CurrentAgentInfo }>;
+    getCurrentInfo: () => Promise<CurrentAgentInfo | null>;
     onStreamEvent: (callback: (data: StreamEventData) => void) => void;
     cancelRequest: (sessionId?: string) => Promise<{ success: boolean; error?: string }>;
     // Tool approval via canUseTool callback
@@ -300,16 +300,9 @@ export interface ElectronAPI {
   // Session management
   session: {
     list: () => Promise<Session[]>;
-    getHistory: (sessionId: string) => Promise<Array<{
-      role: string;
-      content: MessageContent;
-      usage?: UsageMetadata;
-      tool_calls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
-      tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
-      isUsageLimitError?: boolean;
-    }>>;
+    getHistory: (sessionId: string) => Promise<HistoryMessage[]>;
     create: (request: SessionCreateRequest) => Promise<{ success: boolean; session?: Session; error?: string }>;
-    switch: (request: SessionSwitchRequest) => Promise<{ success: boolean; error?: string }>;
+    switch: (request: SessionSwitchRequest) => Promise<ChatResponse>;
     delete: (sessionId: string) => Promise<{ success: boolean; sessionId: string }>;
     updateTitle: (sessionId: string, newTitle: string) => Promise<{ success: boolean; session: Session }>;
     getLastCwd: () => Promise<string>;
@@ -332,7 +325,7 @@ export interface ElectronAPI {
     add: (dir: string) => Promise<boolean>;
     remove: (dir: string) => Promise<boolean>;
     clear: () => Promise<boolean>;
-    update: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    update: (sessionId: string) => Promise<ChatResponse>;
     getFileTree: () => Promise<Array<{
       workspaceIndex: number;
       workspacePath: string;
@@ -353,11 +346,11 @@ export interface ElectronAPI {
 
   // Template management
   templates: {
-    list: () => Promise<{ success: boolean; templates?: PromptTemplate[] }>;
-    get: (id: string) => Promise<{ success: boolean; template?: PromptTemplate }>;
-    create: (request: TemplateCreateRequest) => Promise<{ success: boolean; template?: PromptTemplate }>;
-    update: (id: string, updates: { name?: string; content?: string }) => Promise<{ success: boolean }>;
-    delete: (id: string) => Promise<{ success: boolean }>;
+    list: () => Promise<PromptTemplate[]>;
+    get: (id: string) => Promise<PromptTemplate | undefined>;
+    create: (request: TemplateCreateRequest) => Promise<PromptTemplate>;
+    update: (id: string, updates: { name?: string; content?: string }) => Promise<PromptTemplate>;
+    delete: (id: string) => Promise<boolean>;
   };
 
   // Model management - Claude only
