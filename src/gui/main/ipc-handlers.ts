@@ -9,7 +9,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { claudeAgentService } from '../../core/services/claude-agent-service.js';
 import type { ChatRequest, StreamEventCallback } from '../../core/services/claude-agent-service.js';
 import type { StreamEvent, ToolApprovalRequestHandler } from '../../core/agents/claude-agent.js';
-import { RoleType } from '../../core/roles/role-enum.js';
+import { getAgentDefinitions } from '../../core/agents/agent-loader.js';
 import { SessionManager } from '../../core/sessions/session-manager.js';
 import { modelListManager } from '../../core/providers/model-list-manager.js';
 import { templateManager } from '../../core/templates/template-manager.js';
@@ -258,19 +258,19 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       _event,
       {
         title,
-        role,
+        agentId,
         modelName,
         cwd,
       }: {
         title: string;
-        role: RoleType;
+        agentId: string;
         modelName: string;
         cwd: string;
       }
     ) => {
       return await claudeAgentService.createSession(
         title,
-        role,
+        agentId,
         modelName,
         cwd
       );
@@ -716,10 +716,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    */
 
   /**
-   * Get suggestions for a role (templates + cached LLM or defaults)
+   * Get suggestions for an agent (templates + cached LLM or defaults)
    */
-  handleIpc(IpcChannels.suggestions.get, async (_event, role: RoleType, language: Language = 'en') => {
-    return suggestionsManager.getSuggestions(role, language);
+  handleIpc(IpcChannels.suggestions.get, async (_event, agentId: string, language: Language = 'en') => {
+    return suggestionsManager.getSuggestions(agentId, language);
   });
 
   /**
@@ -732,21 +732,21 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get default tool suggestions (without LLM)
    */
-  handleIpc(IpcChannels.suggestions.getDefaults, async (_event, role: RoleType, language: Language = 'en') => {
-    return suggestionsManager.getDefaultSuggestions(role, language);
+  handleIpc(IpcChannels.suggestions.getDefaults, async (_event, agentId: string, language: Language = 'en') => {
+    return suggestionsManager.getDefaultSuggestions(agentId, language);
   });
 
   /**
    * Refresh suggestions
    * Generates new suggestions using LLM via Claude Agent SDK
    */
-  handleIpc(IpcChannels.suggestions.refresh, async (_event, role: RoleType, language: Language = 'en') => {
+  handleIpc(IpcChannels.suggestions.refresh, async (_event, agentId: string, language: Language = 'en') => {
     try {
       // Get template suggestions
       const templateSuggestions = suggestionsManager.getTemplates();
 
       // Generate new suggestions using LLM
-      const llmSuggestions = await suggestionsManager.generateWithLLM(role, language);
+      const llmSuggestions = await suggestionsManager.generateWithLLM(agentId, language);
 
       const suggestions = [...templateSuggestions, ...llmSuggestions];
 
@@ -766,8 +766,16 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Clear suggestions cache
    */
-  handleIpc(IpcChannels.suggestions.clearCache, async (_event, role?: RoleType) => {
-    suggestionsManager.clearCache(role);
+  handleIpc(IpcChannels.suggestions.clearCache, async (_event, agentId?: string) => {
+    suggestionsManager.clearCache(agentId);
     return { success: true };
+  });
+
+  /**
+   * List available agent definitions
+   */
+  handleIpc(IpcChannels.agents.list, async () => {
+    const definitions = await getAgentDefinitions();
+    return definitions.map(({ id, displayName, description }) => ({ id, displayName, description }));
   });
 }

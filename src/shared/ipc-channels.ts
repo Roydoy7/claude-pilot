@@ -24,6 +24,7 @@ import type {
   StreamEventData,
   FileTreeNode,
   CurrentAgentInfo,
+  AgentSummary,
   PermissionMode,
   SettingSource,
 } from '../gui/preload/preload-types.js';
@@ -34,7 +35,6 @@ import type { ModelInfo } from '../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../core/types/auth-types.js';
 import type { AppSettings } from '../core/settings/settings-manager.js';
 import type { PromptSuggestion, Language } from '../core/suggestions/suggestions-manager.js';
-import type { RoleType } from '../core/roles/role-enum.js';
 import type { SkillMarketplace, AvailableSkill, InstalledSkillInfo } from '../core/skills/skill-types.js';
 
 /**
@@ -144,6 +144,9 @@ export const IpcChannels = {
     refresh: 'suggestions:refresh',
     clearCache: 'suggestions:clearCache',
   },
+  agents: {
+    list: 'agents:list',
+  },
 } as const;
 
 /**
@@ -241,9 +244,12 @@ export interface ChannelMap {
   'settings:reset': { args: []; result: { success: boolean } };
 
   // Suggestions
-  'suggestions:get': { args: [role: RoleType, language?: Language]; result: PromptSuggestion[] };
+  'suggestions:get': { args: [agentId: string, language?: Language]; result: PromptSuggestion[] };
   'suggestions:getTemplates': { args: []; result: PromptSuggestion[] };
-  'suggestions:getDefaults': { args: [role: RoleType, language?: Language]; result: PromptSuggestion[] };
-  'suggestions:refresh': { args: [role: RoleType, language?: Language]; result: { success: boolean; suggestions?: PromptSuggestion[]; error?: string } };
-  'suggestions:clearCache': { args: [role?: RoleType]; result: { success: boolean } };
+  'suggestions:getDefaults': { args: [agentId: string, language?: Language]; result: PromptSuggestion[] };
+  'suggestions:refresh': { args: [agentId: string, language?: Language]; result: { success: boolean; suggestions?: PromptSuggestion[]; error?: string } };
+  'suggestions:clearCache': { args: [agentId?: string]; result: { success: boolean } };
+
+  // Agents
+  'agents:list': { args: []; result: AgentSummary[] };
 }

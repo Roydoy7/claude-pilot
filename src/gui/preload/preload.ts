@@ -18,6 +18,7 @@ import type {
   SessionSwitchRequest,
   PermissionMode,
   SettingSource,
+  AgentSummary,
 } from './preload-types.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
@@ -25,7 +26,6 @@ import type { ModelInfo } from '../../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
 import type { PromptSuggestion, Language } from '../../core/suggestions/suggestions-manager.js';
-import type { RoleType } from '../../core/roles/role-enum.js';
 import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
 
 /**
@@ -232,19 +232,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Suggestions management
   suggestions: {
-    get: (role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> =>
-      invokeChannel(IpcChannels.suggestions.get, role, language),
+    get: (agentId: string, language: Language = 'en'): Promise<PromptSuggestion[]> =>
+      invokeChannel(IpcChannels.suggestions.get, agentId, language),
 
     getTemplates: (): Promise<PromptSuggestion[]> =>
       invokeChannel(IpcChannels.suggestions.getTemplates),
 
-    getDefaults: (role: RoleType, language: Language = 'en'): Promise<PromptSuggestion[]> =>
-      invokeChannel(IpcChannels.suggestions.getDefaults, role, language),
+    getDefaults: (agentId: string, language: Language = 'en'): Promise<PromptSuggestion[]> =>
+      invokeChannel(IpcChannels.suggestions.getDefaults, agentId, language),
 
-    refresh: (role: RoleType, language: Language = 'en'): Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }> =>
-      invokeChannel(IpcChannels.suggestions.refresh, role, language),
+    refresh: (agentId: string, language: Language = 'en'): Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }> =>
+      invokeChannel(IpcChannels.suggestions.refresh, agentId, language),
 
-    clearCache: (role?: RoleType): Promise<{ success: boolean }> =>
-      invokeChannel(IpcChannels.suggestions.clearCache, role),
+    clearCache: (agentId?: string): Promise<{ success: boolean }> =>
+      invokeChannel(IpcChannels.suggestions.clearCache, agentId),
+  },
+
+  // Agent definitions
+  agents: {
+    list: (): Promise<AgentSummary[]> =>
+      invokeChannel(IpcChannels.agents.list),
   },
 });

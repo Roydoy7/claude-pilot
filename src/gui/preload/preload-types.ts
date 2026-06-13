@@ -5,7 +5,6 @@
  * Updated for Claude-only architecture (no multi-provider support)
  */
 
-import type { RoleType } from '../../core/roles/role-enum.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
@@ -209,7 +208,7 @@ export interface StreamEventData {
  */
 export interface AgentInitRequest {
   sessionId?: string;
-  role?: RoleType;
+  agentId?: string;
   modelName?: string;
   apiKey?: string;
 }
@@ -219,7 +218,7 @@ export interface AgentInitRequest {
  */
 export interface CurrentAgentInfo {
   sessionId: string;
-  role: RoleType;
+  agentId: string;
   modelName: string;
 }
 
@@ -228,9 +227,18 @@ export interface CurrentAgentInfo {
  */
 export interface SessionCreateRequest {
   title: string;
-  role: RoleType;
+  agentId: string;
   modelName: string;
   cwd: string;
+}
+
+/**
+ * Summary of an agent definition, for agent selection UIs
+ */
+export interface AgentSummary {
+  id: string;
+  displayName: string;
+  description: string;
 }
 
 /**
@@ -382,11 +390,16 @@ export interface ElectronAPI {
 
   // Suggestions management
   suggestions: {
-    get: (role: RoleType, language?: Language) => Promise<PromptSuggestion[]>;
+    get: (agentId: string, language?: Language) => Promise<PromptSuggestion[]>;
     getTemplates: () => Promise<PromptSuggestion[]>;
-    getDefaults: (role: RoleType, language?: Language) => Promise<PromptSuggestion[]>;
-    refresh: (role: RoleType, language?: Language) => Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }>;
-    clearCache: (role?: RoleType) => Promise<{ success: boolean }>;
+    getDefaults: (agentId: string, language?: Language) => Promise<PromptSuggestion[]>;
+    refresh: (agentId: string, language?: Language) => Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }>;
+    clearCache: (agentId?: string) => Promise<{ success: boolean }>;
+  };
+
+  // Agent definitions
+  agents: {
+    list: () => Promise<AgentSummary[]>;
   };
 
   // Utility
