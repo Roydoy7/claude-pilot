@@ -24,7 +24,7 @@ import type {
 import { RoleType, getRoleDisplayName } from '../roles/role-enum.js';
 import { SessionManager } from '../sessions/session-manager.js';
 import { readTranscript } from '../sessions/transcript-manager.js';
-import { createRequire } from 'module';
+import { buildBaseQueryOptions } from './sdk-query.js';
 import type { ContentBlock, MessageContent } from '../types/message-types.js';
 
 /**
@@ -41,27 +41,6 @@ export type { PermissionMode, SettingSource };
  * All available setting sources
  */
 export const ALL_SETTING_SOURCES: SettingSource[] = ['user', 'project', 'local'];
-
-/**
- * Get the path to the native Claude CLI binary shipped in the platform-specific
- * @anthropic-ai/claude-agent-sdk-{platform}-{arch} optional dependency.
- * In Electron asar environment, the path needs to be adjusted to use the unpacked version
- * because spawn() cannot execute a binary that lives inside an asar archive.
- */
-function getClaudeCodeExecutablePath(): string {
-  const require = createRequire(import.meta.url);
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  const packageName = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`;
-  let binaryPath = require.resolve(`${packageName}/claude${ext}`);
-
-  // In Electron asar environment, replace app.asar with app.asar.unpacked
-  // because the native binary can't run from inside asar
-  if (binaryPath.includes('app.asar')) {
-    binaryPath = binaryPath.replace('app.asar', 'app.asar.unpacked');
-  }
-
-  return binaryPath;
-}
 
 /**
  * Cache creation breakdown by TTL
@@ -1061,14 +1040,12 @@ export class ClaudeAgent {
 
       const options: Options = {
         ...sdkOptions,
+        ...buildBaseQueryOptions(this.cwd, this.abortController),
         model: modelName,
-        cwd: this.cwd, // Set current working directory from session
         additionalDirectories: session?.additionalDirectories, // Set additional directories from session
-        abortController: this.abortController,
         // No maxTurns limit - allow unlimited turns like Claude Code interactive mode
         resume: this.claudeSessionId,
         permissionMode: this.permissionMode, // Use instance variable (may be updated via setPermissionMode)
-        pathToClaudeCodeExecutable: getClaudeCodeExecutablePath(),
         settingSources: this.settingSources, // Use instance variable (may be updated via setSettingSources)
         canUseTool: canUseToolCallback,
         hooks: {

@@ -10,31 +10,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
-import { createRequire } from 'module';
 import { getRoleDisplayName, RoleType } from '../roles/role-enum.js';
 import { ROLE_MCP_SERVERS } from '../roles/role-tool-sets.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
-
-/**
- * Get the path to the native Claude CLI binary shipped in the platform-specific
- * @anthropic-ai/claude-agent-sdk-{platform}-{arch} optional dependency.
- * In Electron asar environment, the path needs to be adjusted to use the unpacked version
- * because spawn() cannot execute a binary that lives inside an asar archive.
- */
-function getClaudeCodeExecutablePath(): string {
-  const require = createRequire(import.meta.url);
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  const packageName = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`;
-  let binaryPath = require.resolve(`${packageName}/claude${ext}`);
-
-  // In Electron asar environment, replace app.asar with app.asar.unpacked
-  // because the native binary can't run from inside asar
-  if (binaryPath.includes('app.asar')) {
-    binaryPath = binaryPath.replace('app.asar', 'app.asar.unpacked');
-  }
-
-  return binaryPath;
-}
+import { buildBaseQueryOptions } from '../agents/sdk-query.js';
 
 /**
  * Prompt suggestion structure
@@ -489,10 +468,8 @@ class SuggestionsManager {
     const abortController = new AbortController();
 
     const options: Options = {
-      cwd: systemCwd,
-      abortController,
+      ...buildBaseQueryOptions(systemCwd, abortController),
       permissionMode: 'default',
-      pathToClaudeCodeExecutable: getClaudeCodeExecutablePath(),
       maxTurns: 1, // Only need one turn for suggestion generation
     };
 
