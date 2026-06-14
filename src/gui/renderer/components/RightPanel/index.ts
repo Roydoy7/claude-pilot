@@ -5,6 +5,5 @@
  */
 
 export { RightPanel } from './RightPanel';
-export { SessionsTab } from './SessionsTab';
 export { WorkspaceTab } from './WorkspaceTab';
 export { PromptsTab } from './PromptsTab';

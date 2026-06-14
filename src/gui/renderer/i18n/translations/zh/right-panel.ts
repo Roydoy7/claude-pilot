@@ -6,24 +6,10 @@
 
 export const rightPanelZh = {
   // Tab labels
-  sessions: '会话',
   workspace: '工作区',
   prompts: '提示词',
   skills: '技能',
   closePanel: '关闭面板',
-
-  // Sessions Tab
-  sessionsTab: {
-    loading: '正在加载会话...',
-    newSession: '+ 新建会话',
-    noSessions: '还没有会话。创建一个开始吧！',
-    newSessionFallback: '新会话',
-    deleteAllTooltip: (count: number) => `删除全部 ${count} 个会话`,
-    noSessionsToDelete: '没有可删除的会话',
-    deleteAllConfirm: (count: number) =>
-      `确定要删除全部 ${count} 个会话吗？此操作无法撤销。`,
-    deleteSessionConfirm: '确定要删除此会话吗？',
-  },
 
   // Prompts Tab
   promptsTab: {

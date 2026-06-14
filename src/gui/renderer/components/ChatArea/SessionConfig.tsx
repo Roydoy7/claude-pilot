@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
-import { PromptSuggestions } from './PromptSuggestions.js';
+import { SamplePrompts } from './SamplePrompts.js';
 
 interface SessionConfigProps {
   defaultAgentId?: string;
@@ -29,7 +29,7 @@ export function SessionConfig({
   const agentDefinitions = useAgentDefinitions();
   const [selectedAgentId, setSelectedAgentId] = useState<string>(defaultAgentId || '');
   const [selectedCwd, setSelectedCwd] = useState<string>(defaultCwd || '');
-  const [modelName, setModelName] = useState<string>(defaultModel || '');
+  const modelName = defaultModel || '';
 
   // Load settings on mount
   useEffect(() => {
@@ -59,9 +59,6 @@ export function SessionConfig({
       const settings = await window.electronAPI.settings.get();
       if (!defaultCwd && settings.defaultCwd) {
         setSelectedCwd(settings.defaultCwd);
-      }
-      if (!defaultModel && settings.defaultModel) {
-        setModelName(settings.defaultModel);
       }
       if (!defaultAgentId && settings.defaultAgentId) {
         setSelectedAgentId(settings.defaultAgentId);
@@ -151,29 +148,51 @@ export function SessionConfig({
               fontSize: '0.875rem',
               fontWeight: 500,
               color: 'var(--text-primary)',
-              marginBottom: '0.5rem',
+              marginBottom: '0.125rem',
             }}
           >
             {t.sessionConfig.chooseRole}
           </label>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--text-secondary)',
+              margin: '0 0 0.75rem 0',
+            }}
+          >
+            {t.sessionConfig.chooseRoleDescription}
+          </p>
+          <div className="role-card-list">
             {agentDefinitions.map((agent) => (
               <button
                 key={agent.id}
+                type="button"
+                className="role-card"
+                data-selected={selectedAgentId === agent.id}
                 onClick={() => handleAgentChange(agent.id)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  border: '1px solid var(--border)',
-                  borderRadius: '6px',
-                  backgroundColor: selectedAgentId === agent.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color: selectedAgentId === agent.id ? '#ffffff' : 'var(--text-primary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
               >
-                {agent.displayName}
+                <div className="role-card-content">
+                  <div className="role-card-name">{agent.displayName}</div>
+                  {agent.description && (
+                    <div className="role-card-description">{agent.description}</div>
+                  )}
+                  {selectedAgentId === agent.id && agent.prompts.length > 0 && (
+                    <SamplePrompts prompts={agent.prompts} onPromptClick={handleSuggestionClick} />
+                  )}
+                </div>
+                {selectedAgentId === agent.id && (
+                  <svg
+                    className="role-card-check"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                )}
               </button>
             ))}
           </div>
@@ -287,14 +306,6 @@ export function SessionConfig({
           </style>
         </div>
       </div>
-
-      {/* Prompt Suggestions */}
-      {selectedAgentId && (
-        <PromptSuggestions
-          agentId={selectedAgentId}
-          onSuggestionClick={handleSuggestionClick}
-        />
-      )}
     </div>
   );
 }

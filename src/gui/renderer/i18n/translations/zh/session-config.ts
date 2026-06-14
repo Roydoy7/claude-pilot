@@ -13,6 +13,7 @@ export const sessionConfigZh = {
   workspaceInstruction: '若要让 AI 访问本地文件，请添加文件夹到',
   workspaceLink: '工作区',
   startConversationInstruction: '在下方发送您的第一条消息以开始对话',
+  tryAsking: '试试问问',
   loadingConfiguration: '正在加载配置...',
   authMethod: '认证方式',
   oauth: 'OAuth',

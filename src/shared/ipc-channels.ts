@@ -31,10 +31,9 @@ import type {
 import type { HistoryMessage } from '../core/agents/claude-agent.js';
 import type { Session } from '../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../core/templates/template-manager.js';
-import type { ModelInfo } from '../core/providers/model-list-manager.js';
+import type { ModelInfo, EffortLevel } from '../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../core/types/auth-types.js';
 import type { AppSettings } from '../core/settings/settings-manager.js';
-import type { PromptSuggestion, Language } from '../core/suggestions/suggestions-manager.js';
 import type { SkillMarketplace, AvailableSkill, InstalledSkillInfo } from '../core/skills/skill-types.js';
 
 /**
@@ -79,6 +78,10 @@ export const IpcChannels = {
     setPermissionMode: 'agent:setPermissionMode',
     getSettingSources: 'agent:getSettingSources',
     setSettingSources: 'agent:setSettingSources',
+    getModelName: 'agent:getModelName',
+    setModel: 'agent:setModel',
+    getEffortLevel: 'agent:getEffortLevel',
+    setEffortLevel: 'agent:setEffortLevel',
   },
   session: {
     list: 'session:list',
@@ -137,13 +140,6 @@ export const IpcChannels = {
     hasSettings: 'settings:hasSettings',
     reset: 'settings:reset',
   },
-  suggestions: {
-    get: 'suggestions:get',
-    getTemplates: 'suggestions:getTemplates',
-    getDefaults: 'suggestions:getDefaults',
-    refresh: 'suggestions:refresh',
-    clearCache: 'suggestions:clearCache',
-  },
   agents: {
     list: 'agents:list',
   },
@@ -174,6 +170,10 @@ export interface ChannelMap {
   'agent:setPermissionMode': { args: [mode: PermissionMode]; result: { success: boolean; error?: string } };
   'agent:getSettingSources': { args: []; result: { success: boolean; sources: SettingSource[] } };
   'agent:setSettingSources': { args: [sources: SettingSource[]]; result: { success: boolean; error?: string } };
+  'agent:getModelName': { args: []; result: { success: boolean; modelName: string } };
+  'agent:setModel': { args: [model: string]; result: { success: boolean; error?: string } };
+  'agent:getEffortLevel': { args: []; result: { success: boolean; effortLevel?: EffortLevel } };
+  'agent:setEffortLevel': { args: [level: EffortLevel]; result: { success: boolean; error?: string } };
 
   // Session
   'session:list': { args: []; result: Session[] };
@@ -242,13 +242,6 @@ export interface ChannelMap {
   'settings:update': { args: [updates: Partial<AppSettings>]; result: { success: boolean } };
   'settings:hasSettings': { args: []; result: boolean };
   'settings:reset': { args: []; result: { success: boolean } };
-
-  // Suggestions
-  'suggestions:get': { args: [agentId: string, language?: Language]; result: PromptSuggestion[] };
-  'suggestions:getTemplates': { args: []; result: PromptSuggestion[] };
-  'suggestions:getDefaults': { args: [agentId: string, language?: Language]; result: PromptSuggestion[] };
-  'suggestions:refresh': { args: [agentId: string, language?: Language]; result: { success: boolean; suggestions?: PromptSuggestion[]; error?: string } };
-  'suggestions:clearCache': { args: [agentId?: string]; result: { success: boolean } };
 
   // Agents
   'agents:list': { args: []; result: AgentSummary[] };

@@ -11,14 +11,13 @@ import type { ChatRequest, StreamEventCallback } from '../../core/services/claud
 import type { StreamEvent, ToolApprovalRequestHandler } from '../../core/agents/claude-agent.js';
 import { getAgentDefinitions } from '../../core/agents/agent-loader.js';
 import { SessionManager } from '../../core/sessions/session-manager.js';
-import { modelListManager } from '../../core/providers/model-list-manager.js';
+import { modelListManager, type EffortLevel } from '../../core/providers/model-list-manager.js';
 import { templateManager } from '../../core/templates/template-manager.js';
 import { authManager } from '../../core/auth/auth-manager.js';
 import type { OAuthLoginOptions } from '../../core/auth/auth-manager.js';
 import { SkillManager } from '../../core/skills/skill-manager.js';
 import { settingsManager } from '../../core/settings/settings-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
-import { suggestionsManager, type Language } from '../../core/suggestions/suggestions-manager.js';
 import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
 import type { FileTreeNode } from '../preload/preload-types.js';
 import { getErrorMessage } from '../../core/errors.js';
@@ -232,6 +231,48 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   });
 
   /**
+   * Get current model name
+   */
+  handleIpc(IpcChannels.agent.getModelName, async () => {
+    const modelName = claudeAgentService.getModelName();
+    return { success: true, modelName };
+  });
+
+  /**
+   * Set model
+   */
+  handleIpc(IpcChannels.agent.setModel, async (_event, model: string) => {
+    try {
+      await claudeAgentService.setModel(model);
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] setModel error:', error);
+      return { success: false, error: getErrorMessage(error) };
+    }
+  });
+
+  /**
+   * Get current thinking effort level
+   */
+  handleIpc(IpcChannels.agent.getEffortLevel, async () => {
+    const effortLevel = claudeAgentService.getEffortLevel();
+    return { success: true, effortLevel };
+  });
+
+  /**
+   * Set thinking effort level
+   */
+  handleIpc(IpcChannels.agent.setEffortLevel, async (_event, level: EffortLevel) => {
+    try {
+      await claudeAgentService.setEffortLevel(level);
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] setEffortLevel error:', error);
+      return { success: false, error: getErrorMessage(error) };
+    }
+  });
+
+  /**
    * Session Management
    */
 
@@ -260,11 +301,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         title,
         agentId,
         modelName,
+        effortLevel,
         cwd,
       }: {
         title: string;
         agentId: string;
         modelName: string;
+        effortLevel?: EffortLevel;
         cwd: string;
       }
     ) => {
@@ -272,7 +315,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         title,
         agentId,
         modelName,
-        cwd
+        cwd,
+        effortLevel
       );
     }
   );
@@ -712,70 +756,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   });
 
   /**
-   * Suggestions Management
-   */
-
-  /**
-   * Get suggestions for an agent (templates + cached LLM or defaults)
-   */
-  handleIpc(IpcChannels.suggestions.get, async (_event, agentId: string, language: Language = 'en') => {
-    return suggestionsManager.getSuggestions(agentId, language);
-  });
-
-  /**
-   * Get only template suggestions
-   */
-  handleIpc(IpcChannels.suggestions.getTemplates, async () => {
-    return suggestionsManager.getTemplates();
-  });
-
-  /**
-   * Get default tool suggestions (without LLM)
-   */
-  handleIpc(IpcChannels.suggestions.getDefaults, async (_event, agentId: string, language: Language = 'en') => {
-    return suggestionsManager.getDefaultSuggestions(agentId, language);
-  });
-
-  /**
-   * Refresh suggestions
-   * Generates new suggestions using LLM via Claude Agent SDK
-   */
-  handleIpc(IpcChannels.suggestions.refresh, async (_event, agentId: string, language: Language = 'en') => {
-    try {
-      // Get template suggestions
-      const templateSuggestions = suggestionsManager.getTemplates();
-
-      // Generate new suggestions using LLM
-      const llmSuggestions = await suggestionsManager.generateWithLLM(agentId, language);
-
-      const suggestions = [...templateSuggestions, ...llmSuggestions];
-
-      return {
-        success: true,
-        suggestions,
-      };
-    } catch (error) {
-      console.error('[IPC] suggestions:refresh error:', error);
-      return {
-        success: false,
-        error: getErrorMessage(error),
-      };
-    }
-  });
-
-  /**
-   * Clear suggestions cache
-   */
-  handleIpc(IpcChannels.suggestions.clearCache, async (_event, agentId?: string) => {
-    suggestionsManager.clearCache(agentId);
-    return { success: true };
-  });
-
-  /**
    * List available agent definitions
    */
   handleIpc(IpcChannels.agents.list, async () => {
     const definitions = await getAgentDefinitions();
-    return definitions.map(({ id, displayName, description }) => ({ id, displayName, description }));
+    return definitions.map(({ id, displayName, description, prompts }) => ({ id, displayName, description, prompts }));
   });
 }

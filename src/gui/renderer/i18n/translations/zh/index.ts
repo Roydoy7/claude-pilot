@@ -9,6 +9,7 @@ import { commonZh } from './common';
 import { headerZh } from './header';
 import { sessionConfigZh } from './session-config';
 import { inputAreaZh } from './input-area';
+import { leftSidebarZh } from './left-sidebar';
 import { rightPanelZh } from './right-panel';
 import { workspaceBrowserZh } from './workspace-browser';
 import { settingsZh } from './settings';
@@ -79,6 +80,7 @@ export const zhTranslations: Translation = {
   // Status
   status: {
     aiThinking: 'AI 正在思考...',
+    aiThinkingWithTokens: (tokens: number) => `AI 正在思考...（约 ${tokens} tokens）`,
     executingTool: (toolName: string) => `正在执行 ${toolName}...`,
     waitingForApproval: '等待工具审批',
     messageQueued: '消息已排队，请等待...',
@@ -99,14 +101,15 @@ export const zhTranslations: Translation = {
   // Workspace Browser
   workspaceBrowser: workspaceBrowserZh,
 
+  // Left Sidebar
+  leftSidebar: leftSidebarZh,
+
   // Right Panel - Including all tab translations
   rightPanel: {
-    sessions: rightPanelZh.sessions,
     workspace: rightPanelZh.workspace,
     prompts: rightPanelZh.prompts,
     skills: rightPanelZh.skills,
     closePanel: rightPanelZh.closePanel,
-    sessionsTab: rightPanelZh.sessionsTab,
     promptsTab: rightPanelZh.promptsTab,
     workspaceTab: rightPanelZh.workspaceTab,
     skillsTab: rightPanelZh.skillsTab,

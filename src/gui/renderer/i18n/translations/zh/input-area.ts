@@ -69,4 +69,17 @@ export const inputAreaZh = {
     title: '提示模板',
     noTemplates: '暂无模板',
   },
+  modelSelector: {
+    label: '模型',
+  },
+  effortLevelSelector: {
+    label: '思考强度',
+    levels: {
+      low: '低',
+      medium: '中',
+      high: '高',
+      xhigh: '极高',
+      max: '最大',
+    },
+  },
 };

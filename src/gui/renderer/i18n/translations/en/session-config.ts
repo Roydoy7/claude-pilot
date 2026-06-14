@@ -13,6 +13,7 @@ export const sessionConfigEn = {
   workspaceInstruction: 'To let AI access local files, add folders to',
   workspaceLink: 'Workspace',
   startConversationInstruction: 'Send your first message below to start the conversation',
+  tryAsking: 'Try asking',
   loadingConfiguration: 'Loading configuration...',
   authMethod: 'Authentication Method',
   oauth: 'OAuth',

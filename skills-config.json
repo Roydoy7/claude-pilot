@@ -1,0 +1,15 @@
+{
+  "marketplaces": [
+    {
+      "id": "anthropics/skills",
+      "name": "Anthropic Skills",
+      "owner": "anthropics",
+      "repo": "skills",
+      "branch": "main",
+      "skillsPath": "skills",
+      "description": "Official Anthropic Agent Skills collection",
+      "lastFetched": 1767493979859
+    }
+  ],
+  "enabled": true
+}

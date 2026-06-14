@@ -5,26 +5,23 @@
  */
 
 import { useState, useEffect } from 'react';
-import { SessionsTab } from './SessionsTab';
 import { WorkspaceTab } from './WorkspaceTab';
 import { PromptsTab } from './PromptsTab';
 import { SkillsTab } from './SkillsTab';
 import { useLanguage } from '../../i18n/LanguageContext';
-import type { Session } from '../../../../core/sessions/session-manager';
 
-type TabType = 'sessions' | 'workspace' | 'prompts' | 'skills';
+type TabType = 'workspace' | 'prompts' | 'skills';
 
 interface RightPanelProps {
   sessionId?: string;
   onClose?: () => void;
-  onSessionSelect?: (session: Session) => void;
   onApplyTemplate?: (content: string) => void;
   width?: number;
 }
 
-export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplate, width }: RightPanelProps) {
+export function RightPanel({ sessionId, onClose, onApplyTemplate, width }: RightPanelProps) {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<TabType>('sessions');
+  const [activeTab, setActiveTab] = useState<TabType>('workspace');
 
   // Expose switchToWorkspace method globally
   useEffect(() => {
@@ -40,15 +37,6 @@ export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplat
     <div className="right-panel" style={width ? { width: `${width}px` } : undefined}>
       {/* Tab Bar */}
       <div className="tab-bar">
-        <button
-          className="tab-button"
-          data-active={activeTab === 'sessions'}
-          onClick={() => setActiveTab('sessions')}
-          title={t.rightPanel.sessions}
-        >
-          <span>💬</span>
-          <span>{t.rightPanel.sessions}</span>
-        </button>
         <button
           className="tab-button"
           data-active={activeTab === 'workspace'}
@@ -93,9 +81,6 @@ export function RightPanel({ sessionId, onClose, onSessionSelect, onApplyTemplat
 
       {/* Tab Content */}
       <div className="tab-content">
-        <div style={{ display: activeTab === 'sessions' ? 'block' : 'none' }}>
-          <SessionsTab currentSessionId={sessionId} onSessionSelect={onSessionSelect} />
-        </div>
         <div style={{ display: activeTab === 'workspace' ? 'block' : 'none' }}>
           <WorkspaceTab sessionId={sessionId} />
         </div>

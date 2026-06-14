@@ -7,10 +7,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import type { MessageContent, PermissionMode } from '../../../../preload/preload-types';
+import type { ModelInfo, EffortLevel } from '../../../../../core/providers/model-list-manager';
 import { MarkdownEditor, type AttachedImage } from './MarkdownEditor';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { SettingSourcesToggle, type SettingSource, ALL_SETTING_SOURCES } from './SettingSourcesToggle';
 import { SlashCommandMenu } from './SlashCommandMenu';
+import { ModelSelector } from './ModelSelector';
+import { EffortLevelSelector } from './EffortLevelSelector';
 import { SuggestionsPopup } from './SuggestionsPopup';
 import { WorkspaceBrowserModal } from './WorkspaceBrowserModal';
 import { useWorkspaceBrowser } from './useWorkspaceBrowser';
@@ -27,7 +30,6 @@ interface ContextUsage {
 interface InputAreaProps {
   sessionId?: string;
   cwd?: string; // Working directory - used for @ button when sessionId is not available
-  agentId?: string; // Current agent - used for smart suggestions
   onSend: (message: MessageContent) => void;
   onCancel?: () => void;
   disabled?: boolean;
@@ -42,12 +44,17 @@ interface InputAreaProps {
   contextUsage?: ContextUsage;
   slashCommands?: string[];
   onSlashCommandSelect?: (command: string) => void;
+  modelName?: string;
+  models?: ModelInfo[];
+  onModelChange?: (model: string) => void;
+  effortLevel?: EffortLevel;
+  supportedEffortLevels?: EffortLevel[];
+  onEffortLevelChange?: (level: EffortLevel) => void;
 }
 
 export function InputArea({
   sessionId,
   cwd,
-  agentId,
   onSend,
   onCancel,
   disabled = false,
@@ -62,6 +69,12 @@ export function InputArea({
   contextUsage,
   slashCommands = [],
   onSlashCommandSelect,
+  modelName = '',
+  models = [],
+  onModelChange,
+  effortLevel,
+  supportedEffortLevels = [],
+  onEffortLevelChange,
 }: InputAreaProps) {
   const [message, setMessage] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
@@ -375,7 +388,7 @@ export function InputArea({
                 <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
               </svg>
             </button>
-            <SuggestionsPopup agentId={agentId} onSelect={handlePromptSelect} disabled={disabled} />
+            <SuggestionsPopup onSelect={handlePromptSelect} disabled={disabled} />
           </>
         }
       >
@@ -397,6 +410,20 @@ export function InputArea({
             <SlashCommandMenu
               slashCommands={slashCommands}
               onSlashCommandSelect={onSlashCommandSelect}
+              disabled={disabled}
+            />
+
+            <ModelSelector
+              modelName={modelName}
+              models={models}
+              onModelChange={onModelChange}
+              disabled={disabled}
+            />
+
+            <EffortLevelSelector
+              effortLevel={effortLevel}
+              supportedLevels={supportedEffortLevels}
+              onEffortLevelChange={onEffortLevelChange}
               disabled={disabled}
             />
 

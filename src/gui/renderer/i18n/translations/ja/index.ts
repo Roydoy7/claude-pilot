@@ -9,6 +9,7 @@ import { commonJa } from './common.js';
 import { headerJa } from './header.js';
 import { sessionConfigJa } from './session-config.js';
 import { inputAreaJa } from './input-area.js';
+import { leftSidebarJa } from './left-sidebar.js';
 import { rightPanelJa } from './right-panel.js';
 import { workspaceBrowserJa } from './workspace-browser.js';
 import { settingsJa } from './settings.js';
@@ -79,6 +80,7 @@ export const jaTranslations: Translation = {
   // Status
   status: {
     aiThinking: 'AIが考え中...',
+    aiThinkingWithTokens: (tokens: number) => `AIが考え中...（約${tokens}トークン）`,
     executingTool: (toolName: string) => `${toolName}を実行中...`,
     waitingForApproval: 'ツールの承認待ち',
     messageQueued: 'メッセージがキュー中...',
@@ -99,14 +101,15 @@ export const jaTranslations: Translation = {
   // Workspace Browser
   workspaceBrowser: workspaceBrowserJa,
 
+  // Left Sidebar
+  leftSidebar: leftSidebarJa,
+
   // Right Panel - Including all tab translations
   rightPanel: {
-    sessions: rightPanelJa.sessions,
     workspace: rightPanelJa.workspace,
     prompts: rightPanelJa.prompts,
     skills: rightPanelJa.skills,
     closePanel: rightPanelJa.closePanel,
-    sessionsTab: rightPanelJa.sessionsTab,
     promptsTab: rightPanelJa.promptsTab,
     workspaceTab: rightPanelJa.workspaceTab,
     skillsTab: rightPanelJa.skillsTab,

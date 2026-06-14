@@ -30,10 +30,6 @@ export const settingsEn = {
   defaults: {
     title: 'Default Settings',
     description: 'Configure default values for new sessions',
-    model: 'Default Model',
-    selectModel: 'Select a model',
-    modelDescription: 'Model used when creating new sessions',
-    authRequired: 'Authentication required to select model',
     role: 'Default Role',
     selectRole: 'Select a role',
     roleDescription: 'Role used when creating new sessions',

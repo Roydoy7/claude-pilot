@@ -22,10 +22,9 @@ import type {
 } from './preload-types.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../../core/templates/template-manager.js';
-import type { ModelInfo } from '../../core/providers/model-list-manager.js';
+import type { ModelInfo, EffortLevel } from '../../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
-import type { PromptSuggestion, Language } from '../../core/suggestions/suggestions-manager.js';
 import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
 
 /**
@@ -99,6 +98,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     setSettingSources: (sources: SettingSource[]): Promise<{ success: boolean; error?: string }> =>
       invokeChannel(IpcChannels.agent.setSettingSources, sources),
+
+    getModelName: (): Promise<{ success: boolean; modelName: string }> =>
+      invokeChannel(IpcChannels.agent.getModelName),
+
+    setModel: (model: string): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.setModel, model),
+
+    getEffortLevel: (): Promise<{ success: boolean; effortLevel?: EffortLevel }> =>
+      invokeChannel(IpcChannels.agent.getEffortLevel),
+
+    setEffortLevel: (level: EffortLevel): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.setEffortLevel, level),
   },
 
   // Session management
@@ -228,24 +239,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     reset: (): Promise<{ success: boolean }> =>
       invokeChannel(IpcChannels.settings.reset),
-  },
-
-  // Suggestions management
-  suggestions: {
-    get: (agentId: string, language: Language = 'en'): Promise<PromptSuggestion[]> =>
-      invokeChannel(IpcChannels.suggestions.get, agentId, language),
-
-    getTemplates: (): Promise<PromptSuggestion[]> =>
-      invokeChannel(IpcChannels.suggestions.getTemplates),
-
-    getDefaults: (agentId: string, language: Language = 'en'): Promise<PromptSuggestion[]> =>
-      invokeChannel(IpcChannels.suggestions.getDefaults, agentId, language),
-
-    refresh: (agentId: string, language: Language = 'en'): Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }> =>
-      invokeChannel(IpcChannels.suggestions.refresh, agentId, language),
-
-    clearCache: (agentId?: string): Promise<{ success: boolean }> =>
-      invokeChannel(IpcChannels.suggestions.clearCache, agentId),
   },
 
   // Agent definitions

@@ -32,6 +32,29 @@ export function updateStatusItem(items: MessageListItem[], state: AgentState): M
 }
 
 /**
+ * Update the live thinking-token estimate on the current status item, if any.
+ * No-op if there is no status item (e.g. thinking already ended).
+ */
+export function updateThinkingTokens(items: MessageListItem[], estimatedTokens: number): MessageListItem[] {
+  const statusIndex = items.findIndex((item) => item.type === 'status');
+  if (statusIndex === -1) {
+    return items;
+  }
+
+  const statusItem = items[statusIndex];
+  if (statusItem.type !== 'status' || !statusItem.agentState) {
+    return items;
+  }
+
+  const next = [...items];
+  next[statusIndex] = {
+    ...statusItem,
+    agentState: { ...statusItem.agentState, thinkingTokens: estimatedTokens },
+  };
+  return next;
+}
+
+/**
  * Insert an item, keeping any existing status item at the end of the list.
  */
 export function addItemKeepingStatusAtEnd(items: MessageListItem[], item: MessageListItem): MessageListItem[] {

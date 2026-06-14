@@ -13,6 +13,7 @@ export const sessionConfigJa = {
   workspaceInstruction: 'AIにローカルファイルへのアクセスを許可するには、フォルダを追加してください',
   workspaceLink: 'ワークスペース',
   startConversationInstruction: '以下から最初のメッセージを送信して会話を開始してください',
+  tryAsking: '試してみる',
   loadingConfiguration: '設定を読み込み中...',
   authMethod: '認証方法',
   oauth: 'OAuth',

@@ -9,9 +9,9 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { Header } from './components/Header';
 import { ChatArea } from './components/ChatArea';
+import { LeftSidebar } from './components/LeftSidebar';
 import { RightPanel } from './components/RightPanel';
 import { useAgentDefinitions } from './hooks/useAgentDefinitions.js';
-import { DEFAULT_MODEL } from '../../core/providers/model-list-manager.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 
 const PANEL_WIDTH_KEY = 'rightPanelWidth';
@@ -169,10 +169,15 @@ function App() {
             showSettingsOnMount={showSettingsOnMount}
           />
           <div className="main-layout">
+            <LeftSidebar
+              currentSessionId={currentSession?.id}
+              onSessionSelect={handleSessionSelect}
+            />
             <ChatArea
               sessionId={currentSession?.id}
               defaultAgentId={currentSession?.agentId || agentDefinitions[0]?.id}
-              defaultModel={currentSession?.modelName || DEFAULT_MODEL}
+              defaultModel={currentSession?.modelName}
+              defaultEffortLevel={currentSession?.effortLevel}
               onSessionUpdate={handleSessionUpdate}
               templateContent={templateContent}
               onTemplateApplied={handleTemplateApplied}
@@ -187,7 +192,6 @@ function App() {
                 <RightPanel
                   sessionId={currentSession?.id}
                   onClose={togglePanel}
-                  onSessionSelect={handleSessionSelect}
                   onApplyTemplate={handleApplyTemplate}
                   width={panelWidth}
                 />

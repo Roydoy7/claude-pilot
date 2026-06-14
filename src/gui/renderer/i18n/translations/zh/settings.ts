@@ -30,10 +30,6 @@ export const settingsZh = {
   defaults: {
     title: '默认设置',
     description: '配置新会话的默认值',
-    model: '默认模型',
-    selectModel: '选择模型',
-    modelDescription: '创建新会话时使用的模型',
-    authRequired: '需要认证才能选择模型',
     role: '默认角色',
     selectRole: '选择角色',
     roleDescription: '创建新会话时使用的角色',

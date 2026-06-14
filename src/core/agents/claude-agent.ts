@@ -20,6 +20,7 @@ import type {
   CanUseTool,
   SettingSource,
   TerminalReason,
+  EffortLevel,
 } from '@anthropic-ai/claude-agent-sdk';
 import { SessionManager } from '../sessions/session-manager.js';
 import { readTranscript } from '../sessions/transcript-manager.js';
@@ -89,6 +90,8 @@ export interface ToolCallForApproval {
  */
 export interface AgentState {
   thinking: boolean;
+  // Live estimate of thinking tokens consumed during the current thinking phase
+  thinkingTokens?: number;
   tool?: {
     type: 'executing' | 'waiting_approval';
     toolName?: string;
@@ -118,6 +121,7 @@ export type StreamEvent =
   | { type: 'state'; state: AgentState }
   | { type: 'text_delta'; text: string; usage?: UsageMetadata }
   | { type: 'thinking'; thinking: string }
+  | { type: 'thinking_tokens'; estimatedTokens: number }
   | { type: 'tool_start'; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: 'tool_end'; toolName: string; toolCallId: string; output: string; error?: string }
   | { type: 'tool_progress'; toolName: string; toolCallId?: string; progressType: string; message: string; timestamp: number }
@@ -287,12 +291,36 @@ export class ClaudeAgent {
   }
 
   /**
-   * Set model for the current query
-   * Only available when a query is running
+   * Set model for current and future queries
+   * If a query is running, updates it immediately
+   * Also saves the model for next query initialization
    */
   async setModel(model?: string): Promise<void> {
+    if (model) {
+      this.config.modelName = model;
+    }
     if (this.currentQuery) {
       await this.currentQuery.setModel(model);
+    }
+  }
+
+  /**
+   * Get current thinking effort level (undefined for models that don't support it)
+   */
+  getEffortLevel(): EffortLevel | undefined {
+    return this.config.effort;
+  }
+
+  /**
+   * Set thinking effort level for current and future queries
+   * If a query is running, updates it immediately via applyFlagSettings
+   * (the SDK's flag-settings layer doesn't support 'max', which only takes
+   * effect on the next query). Also saves the level for next query initialization.
+   */
+  async setEffortLevel(level: EffortLevel): Promise<void> {
+    this.config.effort = level;
+    if (this.currentQuery && level !== 'max') {
+      await this.currentQuery.applyFlagSettings({ effortLevel: level });
     }
   }
 
@@ -853,6 +881,7 @@ export class ClaudeAgent {
 
               case 'thinking_tokens': {
                 // Approximate live thinking-token estimate for spinners - not authoritative usage
+                yield { type: 'thinking_tokens', estimatedTokens: chunk.estimated_tokens };
                 break;
               }
 
@@ -910,7 +939,7 @@ export class ClaudeAgent {
           }
 
           case 'prompt_suggestion': {
-            // Predicted next-prompt suggestions are produced by the separate suggestions-manager query
+            // Predicted next-prompt suggestions - no UI surface yet
             break;
           }
 

@@ -1,18 +1,15 @@
 /**
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
- * useSuggestions - Loads prompt templates and smart (role-based) suggestions
- * for the "Quick Prompts" popup, and manages the popup's open state.
+ * useSuggestions - Loads the user's saved prompt templates for the
+ * "Quick Prompts" popup, and manages the popup's open state.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Language, PromptSuggestion } from '../../../../preload/preload-types';
 
-export function useSuggestions(agentId: string | undefined, language: Language) {
+export function useSuggestions() {
   const [showPromptsMenu, setShowPromptsMenu] = useState(false);
   const [promptTemplates, setPromptTemplates] = useState<{ id: string; name: string; content: string }[]>([]);
-  const [smartSuggestions, setSmartSuggestions] = useState<PromptSuggestion[]>([]);
-  const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const promptsMenuRef = useRef<HTMLDivElement>(null);
 
   // Load prompt templates
@@ -26,42 +23,12 @@ export function useSuggestions(agentId: string | undefined, language: Language) 
     }
   }, []);
 
-  // Load smart suggestions
-  const loadSmartSuggestions = useCallback(async () => {
-    if (!agentId) return;
-    try {
-      const suggestions = await window.electronAPI.suggestions.getDefaults(agentId, language);
-      // Filter out template suggestions (only show tool/llm based ones)
-      setSmartSuggestions(suggestions.filter(s => s.source !== 'template'));
-    } catch (error) {
-      console.error('Failed to load smart suggestions:', error);
-    }
-  }, [agentId, language]);
-
-  // Refresh smart suggestions with LLM
-  const refreshSmartSuggestions = useCallback(async () => {
-    if (!agentId) return;
-    setIsRefreshingSuggestions(true);
-    try {
-      const result = await window.electronAPI.suggestions.refresh(agentId, language);
-      if (result.success && result.suggestions) {
-        // Filter out template suggestions
-        setSmartSuggestions(result.suggestions.filter(s => s.source !== 'template'));
-      }
-    } catch (error) {
-      console.error('Failed to refresh smart suggestions:', error);
-    } finally {
-      setIsRefreshingSuggestions(false);
-    }
-  }, [agentId, language]);
-
-  // Load templates and suggestions when menu opens
+  // Load templates when menu opens
   useEffect(() => {
     if (showPromptsMenu) {
       loadPromptTemplates();
-      loadSmartSuggestions();
     }
-  }, [showPromptsMenu, loadPromptTemplates, loadSmartSuggestions]);
+  }, [showPromptsMenu, loadPromptTemplates]);
 
   // Close prompts menu when clicking outside
   useEffect(() => {
@@ -82,8 +49,5 @@ export function useSuggestions(agentId: string | undefined, language: Language) 
     setShowPromptsMenu,
     promptsMenuRef,
     promptTemplates,
-    smartSuggestions,
-    isRefreshingSuggestions,
-    refreshSmartSuggestions,
   };
 }

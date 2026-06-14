@@ -28,6 +28,7 @@ import {
   applyUsageLimitEvent,
   applyDone,
   buildDisplayItemsFromHistory,
+  updateThinkingTokens,
 } from './session-agent/display-items.js';
 
 interface SessionAgentCallbacks {
@@ -154,6 +155,15 @@ export class SessionAgent {
         const thinkingItem = createThinkingItem(this.sessionId, event.thinking);
         this.displayItems = addItemKeepingStatusAtEnd(this.displayItems, thinkingItem);
         this.notifyDisplayItemsChanged();
+        break;
+      }
+
+      case 'thinking_tokens': {
+        const next = updateThinkingTokens(this.displayItems, event.estimatedTokens);
+        if (next !== this.displayItems) {
+          this.displayItems = next;
+          this.notifyDisplayItemsChanged();
+        }
         break;
       }
 

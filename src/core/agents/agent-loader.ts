@@ -26,6 +26,7 @@ export interface AgentDefinition {
   id: string;
   displayName: string;
   description: string;
+  prompts: string []; 
   systemPrompt: string;
   tools: string[];
   safeTools: string[];
@@ -185,10 +186,11 @@ function resolveMcpServers(mcpTools: string[]): Record<string, McpServer> {
 async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<AgentDefinition> {
   const dir = path.join(agentDefsPath, id);
 
-  const [descriptionContent, systemPrompt, toolsContent] = await Promise.all([
+  const [descriptionContent, systemPrompt, toolsContent, promptsContent] = await Promise.all([
     fs.readFile(path.join(dir, 'description.md'), 'utf-8'),
     fs.readFile(path.join(dir, 'system-prompt.md'), 'utf-8'),
     fs.readFile(path.join(dir, 'tools.md'), 'utf-8'),
+    fs.readFile(path.join(dir, 'prompts.md'), 'utf-8'),
   ]);
 
   const descriptionLines = descriptionContent.split('\n');
@@ -206,6 +208,7 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
     displayName,
     description,
     systemPrompt: systemPrompt.trim(),
+    prompts: promptsContent.split('\n').map((line) => line.trim()).filter((line): line is string => !!line),
     tools,
     safeTools,
     mcpServers: resolveMcpServers(mcpTools),

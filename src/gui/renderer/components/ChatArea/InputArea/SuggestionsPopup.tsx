@@ -2,29 +2,25 @@
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
  * SuggestionsPopup - Toolbar button + dropdown showing the user's saved
- * prompt templates and role-based smart suggestions.
+ * prompt templates.
  */
 
 import { useLanguage } from '../../../i18n/LanguageContext';
 import { useSuggestions } from './useSuggestions';
 
 interface SuggestionsPopupProps {
-  agentId?: string;
   onSelect: (content: string) => void;
   disabled?: boolean;
 }
 
-export function SuggestionsPopup({ agentId, onSelect, disabled = false }: SuggestionsPopupProps) {
-  const { t, language } = useLanguage();
+export function SuggestionsPopup({ onSelect, disabled = false }: SuggestionsPopupProps) {
+  const { t } = useLanguage();
   const {
     showPromptsMenu,
     setShowPromptsMenu,
     promptsMenuRef,
     promptTemplates,
-    smartSuggestions,
-    isRefreshingSuggestions,
-    refreshSmartSuggestions,
-  } = useSuggestions(agentId, language);
+  } = useSuggestions();
 
   return (
     <div ref={promptsMenuRef} style={{ position: 'relative' }}>
@@ -71,7 +67,7 @@ export function SuggestionsPopup({ agentId, onSelect, disabled = false }: Sugges
             <span>{t.suggestions?.myTemplates || 'My Templates'}</span>
           </div>
           {promptTemplates.length === 0 ? (
-            <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
               {t.inputArea.promptsButton?.noTemplates || 'No templates yet'}
             </div>
           ) : (
@@ -99,89 +95,6 @@ export function SuggestionsPopup({ agentId, onSelect, disabled = false }: Sugges
                 📋 {template.name}
               </div>
             ))
-          )}
-
-          {/* Smart Suggestions Section */}
-          {agentId && (
-            <>
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>💡</span>
-                  <span>{t.suggestions?.tryThese || 'Try These'}</span>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    refreshSmartSuggestions();
-                  }}
-                  disabled={isRefreshingSuggestions}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 6px',
-                    fontSize: '0.7rem',
-                    color: 'var(--text-secondary)',
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    cursor: isRefreshingSuggestions ? 'wait' : 'pointer',
-                    opacity: isRefreshingSuggestions ? 0.6 : 1,
-                  }}
-                  title={t.suggestions?.refresh || 'Refresh'}
-                >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{
-                      animation: isRefreshingSuggestions ? 'spin 1s linear infinite' : 'none',
-                    }}
-                  >
-                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                    <path d="M21 3v5h-5" />
-                  </svg>
-                </button>
-              </div>
-              {smartSuggestions.length === 0 ? (
-                <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                  {t.suggestions?.noSuggestions || 'No suggestions available'}
-                </div>
-              ) : (
-                smartSuggestions.slice(0, 6).map((suggestion) => (
-                  <div
-                    key={suggestion.id}
-                    onClick={() => onSelect(suggestion.prompt)}
-                    style={{
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      borderBottom: '1px solid var(--border)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                      <span>{suggestion.icon}</span>
-                      <span style={{ fontWeight: 500 }}>{suggestion.title}</span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {suggestion.description}
-                    </div>
-                  </div>
-                ))
-              )}
-            </>
           )}
         </div>
       )}

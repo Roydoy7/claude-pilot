@@ -69,4 +69,17 @@ export const inputAreaJa = {
     title: 'プロンプトテンプレート',
     noTemplates: 'テンプレートがありません',
   },
+  modelSelector: {
+    label: 'モデル',
+  },
+  effortLevelSelector: {
+    label: '思考の強さ',
+    levels: {
+      low: '低',
+      medium: '中',
+      high: '高',
+      xhigh: '非常に高い',
+      max: '最大',
+    },
+  },
 };

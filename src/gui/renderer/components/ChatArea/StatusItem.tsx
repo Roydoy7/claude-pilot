@@ -363,7 +363,13 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
           <span className="status-icon-thinking">
             <ThinkingIcon />
           </span>
-          <AnimatedText text={t.status.aiThinking} />
+          <AnimatedText
+            text={
+              state.thinkingTokens
+                ? t.status.aiThinkingWithTokens(state.thinkingTokens)
+                : t.status.aiThinking
+            }
+          />
         </div>
       )}
 

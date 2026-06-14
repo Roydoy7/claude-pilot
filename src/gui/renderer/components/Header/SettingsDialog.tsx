@@ -8,7 +8,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import type { AuthStatus } from '../../../../core/types/auth-types.js';
-import type { ModelInfo } from '../../../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../../../core/settings/settings-manager.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
 import { useTheme } from '../../contexts/ThemeContext.js';
@@ -38,7 +37,6 @@ export function SettingsDialog({
   // Settings state
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedCwd, setSelectedCwd] = useState<string>('');
 
   // Auth state
@@ -46,8 +44,6 @@ export function SettingsDialog({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Models state
-  const [models, setModels] = useState<ModelInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load settings and auth on open
@@ -77,23 +73,11 @@ export function SettingsDialog({
       const appSettings = await window.electronAPI.settings.get();
       setSettings(appSettings);
       setSelectedAgentId(appSettings.defaultAgentId ?? '');
-      setSelectedModel(appSettings.defaultModel);
       setSelectedCwd(appSettings.defaultCwd);
 
       // Load auth status
       const status = await window.electronAPI.auth.isAuthenticated();
       setAuthStatus(status);
-
-      // Load models
-      const modelList = await window.electronAPI.models.list();
-      setModels(modelList);
-
-      // Set default model if not set
-      if (!appSettings.defaultModel && modelList.length > 0) {
-        const defaultModelId = await window.electronAPI.models.getDefault();
-        const foundDefault = modelList.find(m => m.id === defaultModelId);
-        setSelectedModel(foundDefault ? foundDefault.id : modelList[0].id);
-      }
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
@@ -113,11 +97,6 @@ export function SettingsDialog({
   const handleAgentChange = (agentId: string) => {
     setSelectedAgentId(agentId);
     handleSaveSettings({ defaultAgentId: agentId });
-  };
-
-  const handleModelChange = (model: string) => {
-    setSelectedModel(model);
-    handleSaveSettings({ defaultModel: model });
   };
 
   const handleSelectDirectory = async () => {
@@ -153,10 +132,6 @@ export function SettingsDialog({
         const status = await window.electronAPI.auth.isAuthenticated();
         setAuthStatus(status);
         onAuthChange?.(true);
-
-        // Reload models after auth
-        const modelList = await window.electronAPI.models.list();
-        setModels(modelList);
       } else {
         setLoginError(result.error || t.settings?.account?.loginFailed || 'Login failed');
       }
@@ -350,7 +325,7 @@ export function SettingsDialog({
     </div>
   );
 
-  // Defaults settings (Role, Model, Working Directory)
+  // Defaults settings (Role, Working Directory)
   const renderDefaultsSettings = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Default Role */}
@@ -381,43 +356,6 @@ export function SettingsDialog({
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Default Model */}
-      <div className="settings-group">
-        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-          {t.settings?.defaults?.model || 'Default Model'}
-        </h4>
-        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          {t.settings?.defaults?.modelDescription || 'Model used when creating new sessions'}
-        </p>
-        <select
-          value={selectedModel}
-          onChange={(e) => handleModelChange(e.target.value)}
-          disabled={!authStatus?.authenticated}
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            fontSize: '0.875rem',
-            border: '1px solid var(--border)',
-            borderRadius: '6px',
-            backgroundColor: 'var(--bg-secondary)',
-            color: 'var(--text-primary)',
-            cursor: authStatus?.authenticated ? 'pointer' : 'not-allowed',
-            opacity: authStatus?.authenticated ? 1 : 0.5,
-          }}
-        >
-          {models.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-        {!authStatus?.authenticated && (
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            {t.settings?.defaults?.authRequired || 'Authentication required to select model'}
-          </p>
-        )}
       </div>
 
       {/* Default Working Directory */}

@@ -77,6 +77,7 @@ export interface Translation {
     workspaceInstruction: string;
     workspaceLink: string;
     startConversationInstruction: string;
+    tryAsking: string;
     loadingConfiguration: string;
     authMethod: string;
     oauth: string;
@@ -171,6 +172,19 @@ export interface Translation {
       title: string;
       noTemplates: string;
     };
+    modelSelector?: {
+      label: string;
+    };
+    effortLevelSelector?: {
+      label: string;
+      levels: {
+        low: string;
+        medium: string;
+        high: string;
+        xhigh: string;
+        max: string;
+      };
+    };
   };
 
   // Message
@@ -234,6 +248,7 @@ export interface Translation {
   // Status
   status: {
     aiThinking: string;
+    aiThinkingWithTokens: (tokens: number) => string;
     executingTool: (toolName: string) => string;
     waitingForApproval: string;
     messageQueued: string;
@@ -271,25 +286,26 @@ export interface Translation {
     close: string;
   };
 
+  // Left Sidebar (Sessions)
+  leftSidebar: {
+    newSession: string;
+    newSessionFallback: string;
+    noSessions: string;
+    loading: string;
+    collapse: string;
+    expand: string;
+    deleteAllTooltip: (count: number) => string;
+    noSessionsToDelete: string;
+    deleteAllConfirm: (count: number) => string;
+    deleteSessionConfirm: string;
+  };
+
   // Right Panel
   rightPanel: {
-    sessions: string;
     workspace: string;
     prompts: string;
     skills: string;
     closePanel: string;
-
-    // Sessions Tab
-    sessionsTab: {
-      loading: string;
-      newSession: string;
-      noSessions: string;
-      newSessionFallback: string;
-      deleteAllTooltip: (count: number) => string;
-      noSessionsToDelete: string;
-      deleteAllConfirm: (count: number) => string;
-      deleteSessionConfirm: string;
-    };
 
     // Prompts Tab
     promptsTab: {
@@ -416,10 +432,6 @@ export interface Translation {
     defaults: {
       title: string;
       description: string;
-      model: string;
-      selectModel: string;
-      modelDescription: string;
-      authRequired: string;
       role: string;
       selectRole: string;
       roleDescription: string;
@@ -445,9 +457,5 @@ export interface Translation {
   // Prompt Suggestions
   suggestions?: {
     myTemplates: string;
-    tryThese: string;
-    refresh: string;
-    refreshing: string;
-    noSuggestions: string;
   };
 }

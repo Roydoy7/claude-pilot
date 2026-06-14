@@ -69,4 +69,17 @@ export const inputAreaEn = {
     title: 'Prompt Templates',
     noTemplates: 'No templates yet',
   },
+  modelSelector: {
+    label: 'Model',
+  },
+  effortLevelSelector: {
+    label: 'Thinking Effort',
+    levels: {
+      low: 'Low',
+      medium: 'Medium',
+      high: 'High',
+      xhigh: 'Extra High',
+      max: 'Max',
+    },
+  },
 };

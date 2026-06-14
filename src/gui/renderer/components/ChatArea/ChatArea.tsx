@@ -5,13 +5,13 @@
  * Uses history-based updates instead of complex streaming state management
  */
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { SessionConfig } from './SessionConfig';
 import type { MessageListItem, MessageContent, PermissionMode, SettingSource, UsageMetadata } from '../../../preload/preload-types';
 import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
-import { DEFAULT_MODEL, getModelContextWindow } from '../../../../core/providers/model-list-manager.js';
+import { DEFAULT_MODEL, DEFAULT_EFFORT_LEVEL, getModelContextWindow, getSupportedEffortLevels, type EffortLevel, type ModelInfo } from '../../../../core/providers/model-list-manager.js';
 import { getErrorMessage } from '../../../../core/errors.js';
 import { SessionAgent, SessionAgentCache } from '../../utils/SessionAgent.js';
 
@@ -25,6 +25,19 @@ function getContextWindowSize(modelName: string): number {
     return getModelContextWindow(modelName);
   } catch {
     return modelName.includes('[1m]') ? 1000000 : 200000;
+  }
+}
+
+/**
+ * Get supported effort levels for a model.
+ * Returns an empty array for models retired from the supported set
+ * (e.g. historical sessions), hiding the effort level selector.
+ */
+function getSupportedEffortLevelsSafe(modelName: string): EffortLevel[] {
+  try {
+    return getSupportedEffortLevels(modelName);
+  } catch {
+    return [];
   }
 }
 
@@ -46,12 +59,13 @@ interface ChatAreaProps {
   sessionId?: string | null;
   defaultAgentId?: string;
   defaultModel?: string;
+  defaultEffortLevel?: EffortLevel;
   onSessionUpdate?: (session: import('../../../../core/sessions/session-manager.js').Session) => void;
   templateContent?: string;
   onTemplateApplied?: () => void;
 }
 
-export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpdate, templateContent, onTemplateApplied }: ChatAreaProps) {
+export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffortLevel, onSessionUpdate, templateContent, onTemplateApplied }: ChatAreaProps) {
   const agentDefinitions = useAgentDefinitions();
   const [items, setItems] = useState<MessageListItem[]>([]); // Display items from SessionAgent
   const [sessionStarted, setSessionStarted] = useState<boolean>(!!sessionId);
@@ -68,12 +82,17 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
   const [sessionConfig, setSessionConfig] = useState<{
     agentId: string;
     modelName: string;
+    effortLevel: EffortLevel;
     cwd: string;
   }>({
     agentId: defaultAgentId || '',
     modelName: defaultModel || DEFAULT_MODEL,
+    effortLevel: defaultEffortLevel || DEFAULT_EFFORT_LEVEL,
     cwd: '', // Will be loaded from settings or getLastCwd
   });
+
+  // Models available for selection in the InputArea toolbar
+  const [models, setModels] = useState<ModelInfo[]>([]);
 
   // Load default configuration from settings
   useEffect(() => {
@@ -83,7 +102,8 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
         // Only use settings if no defaults were provided via props
         setSessionConfig(prev => ({
           agentId: defaultAgentId || settings.defaultAgentId || prev.agentId,
-          modelName: defaultModel || settings.defaultModel || prev.modelName,
+          modelName: defaultModel || prev.modelName,
+          effortLevel: defaultEffortLevel || prev.effortLevel,
           cwd: settings.defaultCwd || prev.cwd,
         }));
       } catch (error) {
@@ -91,7 +111,14 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
       }
     }
     loadDefaultConfig();
-  }, [defaultAgentId, defaultModel]);
+  }, [defaultAgentId, defaultModel, defaultEffortLevel]);
+
+  // Load available models for the model selector
+  useEffect(() => {
+    window.electronAPI.models.list().then(setModels).catch((error) => {
+      console.error('Failed to load models:', error);
+    });
+  }, []);
 
   // Fall back to the first available agent definition once it loads, if
   // nothing else (props/settings) resolved an agent yet.
@@ -224,6 +251,65 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
     }
   };
 
+  // Stable callback for SessionConfig - avoids re-triggering its
+  // onConfigChange effect on every ChatArea render
+  const handleSessionConfigChange = useCallback((config: { agentId: string; modelName: string; cwd: string }) => {
+    setSessionConfig(prev => ({ ...prev, ...config }));
+  }, []);
+
+  // Handle model change - takes effect immediately for an active session,
+  // persisted to the session record by the backend
+  const handleModelChange = async (model: string) => {
+    const supportedLevels = getSupportedEffortLevelsSafe(model);
+    const fallbackEffortLevel = supportedLevels.includes(sessionConfig.effortLevel)
+      ? sessionConfig.effortLevel
+      : supportedLevels[0];
+
+    if (sessionStarted && currentSessionId) {
+      try {
+        const result = await window.electronAPI.agent.setModel(model);
+        if (!result.success) {
+          console.error('Failed to set model:', result.error);
+          return;
+        }
+        if (fallbackEffortLevel && fallbackEffortLevel !== sessionConfig.effortLevel) {
+          const effortResult = await window.electronAPI.agent.setEffortLevel(fallbackEffortLevel);
+          if (!effortResult.success) {
+            console.error('Failed to set effort level:', effortResult.error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to set model:', error);
+        return;
+      }
+    }
+
+    setSessionConfig(prev => ({
+      ...prev,
+      modelName: model,
+      effortLevel: fallbackEffortLevel ?? prev.effortLevel,
+    }));
+  };
+
+  // Handle thinking effort level change - takes effect immediately for an
+  // active session, persisted to the session record by the backend
+  const handleEffortLevelChange = async (level: EffortLevel) => {
+    if (sessionStarted && currentSessionId) {
+      try {
+        const result = await window.electronAPI.agent.setEffortLevel(level);
+        if (!result.success) {
+          console.error('Failed to set effort level:', result.error);
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to set effort level:', error);
+        return;
+      }
+    }
+
+    setSessionConfig(prev => ({ ...prev, effortLevel: level }));
+  };
+
   // Handle slash command selection - send as message
   const handleSlashCommandSelect = async (command: string) => {
     // Send the slash command as a message
@@ -269,6 +355,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
           title,
           agentId: sessionConfig.agentId,
           modelName: sessionConfig.modelName,
+          effortLevel: sessionConfig.effortLevel,
           cwd: sessionConfig.cwd,
         });
 
@@ -418,14 +505,13 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
           defaultAgentId={sessionConfig.agentId}
           defaultModel={sessionConfig.modelName}
           defaultCwd={sessionConfig.cwd}
-          onConfigChange={setSessionConfig}
+          onConfigChange={handleSessionConfigChange}
           onSuggestionClick={handleSuggestionClick}
         />
       )}
       <InputArea
         sessionId={sessionId || undefined}
         cwd={sessionConfig.cwd || undefined}
-        agentId={sessionConfig.agentId}
         onSend={handleSendMessage}
         onCancel={handleCancelRequest}
         isProcessing={isProcessing}
@@ -438,6 +524,12 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, onSessionUpd
         contextUsage={contextUsage}
         slashCommands={slashCommands}
         onSlashCommandSelect={handleSlashCommandSelect}
+        modelName={sessionConfig.modelName}
+        models={models}
+        onModelChange={handleModelChange}
+        effortLevel={sessionConfig.effortLevel}
+        supportedEffortLevels={getSupportedEffortLevelsSafe(sessionConfig.modelName)}
+        onEffortLevelChange={handleEffortLevelChange}
       />
     </div>
   );

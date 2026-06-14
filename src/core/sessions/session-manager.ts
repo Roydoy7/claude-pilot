@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 import { getSessionsDir, getConfigDir } from '../storage/storage.js';
 import { SessionPersistenceError } from '../errors.js';
+import type { EffortLevel } from '../providers/model-list-manager.js';
 
 export interface Session {
   id: string; //This is our local UUID session ID, created by frontend
@@ -16,6 +17,7 @@ export interface Session {
   title: string;
   agentId: string;
   modelName: string;
+  effortLevel?: EffortLevel; // Thinking effort level (omitted for models that don't support it)
   cwd: string; // Current working directory for this session (aligns with SDK Options.cwd)
   additionalDirectories?: string[]; // Additional directories beyond cwd (aligns with SDK Options.additionalDirectories)
   // messages field removed - conversation history now stored in agent memory
@@ -60,13 +62,15 @@ export class SessionManager {
     title: string,
     agentId: string,
     modelName: string,
-    cwd: string
+    cwd: string,
+    effortLevel?: EffortLevel
   ): Session {
     const session: Session = {
       id: this.generateSessionId(),
       title,
       agentId,
       modelName,
+      effortLevel,
       cwd,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -226,6 +230,34 @@ export class SessionManager {
     }
 
     session.title = newTitle;
+    session.updatedAt = Date.now();
+    this.saveSession(session);
+  }
+
+  /**
+   * Update session model
+   */
+  updateSessionModel(sessionId: string, modelName: string): void {
+    const session = this.loadSession(sessionId);
+    if (!session) {
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
+    }
+
+    session.modelName = modelName;
+    session.updatedAt = Date.now();
+    this.saveSession(session);
+  }
+
+  /**
+   * Update session thinking effort level
+   */
+  updateSessionEffortLevel(sessionId: string, effortLevel: EffortLevel): void {
+    const session = this.loadSession(sessionId);
+    if (!session) {
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
+    }
+
+    session.effortLevel = effortLevel;
     session.updatedAt = Date.now();
     this.saveSession(session);
   }

@@ -30,10 +30,6 @@ export const settingsJa = {
   defaults: {
     title: 'デフォルト設定',
     description: '新規セッションのデフォルト値を設定',
-    model: 'デフォルトモデル',
-    selectModel: 'モデルを選択',
-    modelDescription: '新規セッション作成時に使用するモデル',
-    authRequired: 'モデルを選択するには認証が必要です',
     role: 'デフォルトロール',
     selectRole: 'ロールを選択',
     roleDescription: '新規セッション作成時に使用するロール',

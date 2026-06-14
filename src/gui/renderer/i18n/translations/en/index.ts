@@ -9,6 +9,7 @@ import { commonEn } from './common';
 import { headerEn } from './header';
 import { sessionConfigEn } from './session-config';
 import { inputAreaEn } from './input-area';
+import { leftSidebarEn } from './left-sidebar';
 import { rightPanelEn } from './right-panel';
 import { workspaceBrowserEn } from './workspace-browser';
 import { settingsEn } from './settings';
@@ -79,6 +80,7 @@ export const enTranslations: Translation = {
   // Status
   status: {
     aiThinking: 'AI is thinking...',
+    aiThinkingWithTokens: (tokens: number) => `AI is thinking... (~${tokens} tokens)`,
     executingTool: (toolName: string) => `Executing ${toolName}...`,
     waitingForApproval: 'Waiting for tool approval',
     messageQueued: 'Message queued, waiting...',
@@ -99,14 +101,15 @@ export const enTranslations: Translation = {
   // Workspace Browser
   workspaceBrowser: workspaceBrowserEn,
 
+  // Left Sidebar
+  leftSidebar: leftSidebarEn,
+
   // Right Panel - Including all tab translations
   rightPanel: {
-    sessions: rightPanelEn.sessions,
     workspace: rightPanelEn.workspace,
     prompts: rightPanelEn.prompts,
     skills: rightPanelEn.skills,
     closePanel: rightPanelEn.closePanel,
-    sessionsTab: rightPanelEn.sessionsTab,
     promptsTab: rightPanelEn.promptsTab,
     workspaceTab: rightPanelEn.workspaceTab,
     skillsTab: rightPanelEn.skillsTab,

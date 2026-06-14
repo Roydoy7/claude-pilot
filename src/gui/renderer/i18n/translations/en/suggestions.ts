@@ -6,8 +6,4 @@
 
 export const suggestionsEn = {
   myTemplates: 'My Templates',
-  tryThese: 'Try These',
-  refresh: 'Refresh',
-  refreshing: 'Refreshing...',
-  noSuggestions: 'No suggestions available',
 };

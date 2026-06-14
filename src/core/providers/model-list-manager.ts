@@ -5,8 +5,14 @@
  * Handles model definitions, fetching from API, and thinking configuration
  */
 
-import type { ThinkingConfig } from '@anthropic-ai/claude-agent-sdk';
+import type { ThinkingConfig, EffortLevel } from '@anthropic-ai/claude-agent-sdk';
 import { tokenStore } from '../auth/token-store.js';
+
+/**
+ * Re-export EffortLevel for consumers that need to reference it
+ * without importing directly from the SDK.
+ */
+export type { EffortLevel };
 
 /**
  * Provider type - only Claude/Anthropic is supported
@@ -109,6 +115,45 @@ export function getThinkingConfig(modelName: string): ThinkingConfig {
     throw new Error(`Model "${modelName}" is no longer supported. Please select a different model.`);
   }
   return config;
+}
+
+/**
+ * Effort levels supported by each model.
+ *
+ * `effort` works together with adaptive thinking, so it is only available
+ * on models whose thinking config is `{ type: 'adaptive' }`. `'xhigh'` is
+ * only supported on Fable 5 and Opus 4.7+ (the SDK falls back to `'high'`
+ * for other adaptive-thinking models). `'max'` is supported on Fable 5 and
+ * Opus 4.6+/Sonnet 4.6. Haiku 4.5 uses a fixed thinking budget and does not
+ * support `effort` at all.
+ */
+const MODEL_EFFORT_LEVELS: Record<ClaudeModel, EffortLevel[]> = {
+  [ClaudeModel.FABLE_5]: ['low', 'medium', 'high', 'xhigh', 'max'],
+  [ClaudeModel.OPUS_4_8]: ['low', 'medium', 'high', 'xhigh', 'max'],
+  [ClaudeModel.OPUS_4_7]: ['low', 'medium', 'high', 'xhigh', 'max'],
+  [ClaudeModel.OPUS_4_6]: ['low', 'medium', 'high', 'max'],
+  [ClaudeModel.SONNET_4_6]: ['low', 'medium', 'high', 'max'],
+  [ClaudeModel.HAIKU_4_5]: [],
+};
+
+/**
+ * Default effort level - matches the SDK's own default ('high').
+ */
+export const DEFAULT_EFFORT_LEVEL: EffortLevel = 'high';
+
+/**
+ * Get the effort levels supported by a model. Returns an empty array for
+ * models that don't support the `effort` option at all (e.g. Haiku 4.5).
+ *
+ * Throws if the model is not in the currently supported set - e.g. a
+ * historical session referencing a retired model.
+ */
+export function getSupportedEffortLevels(modelName: string): EffortLevel[] {
+  const levels = MODEL_EFFORT_LEVELS[modelName as ClaudeModel];
+  if (!levels) {
+    throw new Error(`Model "${modelName}" is no longer supported. Please select a different model.`);
+  }
+  return levels;
 }
 
 /**

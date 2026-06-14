@@ -10,7 +10,7 @@ import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { authManager } from '../auth/auth-manager.js';
 import { getAgentDefinition } from './agent-loader.js';
 import { getSystemReminders } from '../context/system-reminders.js';
-import { ClaudeModel, getThinkingConfig } from '../providers/model-list-manager.js';
+import { ClaudeModel, getThinkingConfig, getSupportedEffortLevels, type EffortLevel } from '../providers/model-list-manager.js';
 import { SkillManager } from '../skills/skill-manager.js';
 
 /**
@@ -161,6 +161,12 @@ export async function createAgentFromSessionData(
     thinking: getThinkingConfig(session.modelName),
   };
 
+  // effort works together with adaptive thinking - only set it for models
+  // that support at least one effort level (e.g. Haiku 4.5 does not).
+  if (session.effortLevel && getSupportedEffortLevels(session.modelName).includes(session.effortLevel)) {
+    agentConfig.effort = session.effortLevel;
+  }
+
   // Install skills for this agent
   const skillManager = SkillManager.getInstance();
   await skillManager.initialize();
@@ -177,12 +183,13 @@ export async function createNewAgent(
   title: string,
   agentId: string,
   modelName: string = ClaudeModel.SONNET_4_6,
-  cwd: string
+  cwd: string,
+  effortLevel?: EffortLevel
 ): Promise<ClaudeAgent> {
   const sessionManager = SessionManager.getInstance();
 
   // Create new session (provider is always Claude now)
-  const session = sessionManager.createSession(title, agentId, modelName, cwd);
+  const session = sessionManager.createSession(title, agentId, modelName, cwd, effortLevel);
 
   // Install skills for this agent
   const skillManager = SkillManager.getInstance();

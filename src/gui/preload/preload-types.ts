@@ -10,9 +10,8 @@ import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
 import type { AgentState, StreamEvent, PermissionMode, SettingSource, HistoryMessage } from '../../core/agents/claude-agent.js';
 import type { MessageContent } from '../../core/types/message-types.js';
-import type { ModelInfo } from '../../core/providers/model-list-manager.js';
+import type { ModelInfo, EffortLevel } from '../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
-import type { PromptSuggestion, Language } from '../../core/suggestions/suggestions-manager.js';
 
 /**
  * Re-export PermissionMode and SettingSource for frontend use
@@ -22,7 +21,7 @@ export type { PermissionMode, SettingSource };
 /**
  * Re-export types for consistency
  */
-export type { MessageContent, OAuthResult, AppSettings, PromptSuggestion, Language };
+export type { MessageContent, OAuthResult, AppSettings };
 
 /**
  * Service initialization request (no longer needs apiKey)
@@ -229,6 +228,7 @@ export interface SessionCreateRequest {
   title: string;
   agentId: string;
   modelName: string;
+  effortLevel?: EffortLevel;
   cwd: string;
 }
 
@@ -239,6 +239,7 @@ export interface AgentSummary {
   id: string;
   displayName: string;
   description: string;
+  prompts: string[];
 }
 
 /**
@@ -303,6 +304,10 @@ export interface ElectronAPI {
     setPermissionMode: (mode: PermissionMode) => Promise<{ success: boolean; error?: string }>;
     getSettingSources: () => Promise<{ success: boolean; sources: SettingSource[] }>;
     setSettingSources: (sources: SettingSource[]) => Promise<{ success: boolean; error?: string }>;
+    getModelName: () => Promise<{ success: boolean; modelName: string }>;
+    setModel: (model: string) => Promise<{ success: boolean; error?: string }>;
+    getEffortLevel: () => Promise<{ success: boolean; effortLevel?: EffortLevel }>;
+    setEffortLevel: (level: EffortLevel) => Promise<{ success: boolean; error?: string }>;
   };
 
   // Session management
@@ -386,15 +391,6 @@ export interface ElectronAPI {
     update: (updates: Partial<AppSettings>) => Promise<{ success: boolean }>;
     hasSettings: () => Promise<boolean>;
     reset: () => Promise<{ success: boolean }>;
-  };
-
-  // Suggestions management
-  suggestions: {
-    get: (agentId: string, language?: Language) => Promise<PromptSuggestion[]>;
-    getTemplates: () => Promise<PromptSuggestion[]>;
-    getDefaults: (agentId: string, language?: Language) => Promise<PromptSuggestion[]>;
-    refresh: (agentId: string, language?: Language) => Promise<{ success: boolean; suggestions?: PromptSuggestion[]; error?: string }>;
-    clearCache: (agentId?: string) => Promise<{ success: boolean }>;
   };
 
   // Agent definitions

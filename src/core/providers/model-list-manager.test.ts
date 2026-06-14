@@ -9,10 +9,12 @@ import {
   ClaudeModel,
   MODEL_DISPLAY_NAMES,
   DEFAULT_MODEL,
+  DEFAULT_EFFORT_LEVEL,
   getDefaultModel,
   getModelDisplayName,
   getThinkingConfig,
   getModelContextWindow,
+  getSupportedEffortLevels,
 } from './model-list-manager.js';
 
 describe('ClaudeModel', () => {
@@ -69,6 +71,41 @@ describe('getThinkingConfig', () => {
 
   it('throws for a retired model instead of silently substituting a default', () => {
     expect(() => getThinkingConfig('claude-sonnet-4-5-20250929')).toThrow(/no longer supported/);
+  });
+});
+
+describe('getSupportedEffortLevels', () => {
+  it('matches the SDK default effort level', () => {
+    expect(DEFAULT_EFFORT_LEVEL).toBe('high');
+  });
+
+  it('supports xhigh only on Fable 5 and Opus 4.7+', () => {
+    for (const model of [ClaudeModel.FABLE_5, ClaudeModel.OPUS_4_8, ClaudeModel.OPUS_4_7]) {
+      expect(getSupportedEffortLevels(model)).toContain('xhigh');
+    }
+    for (const model of [ClaudeModel.OPUS_4_6, ClaudeModel.SONNET_4_6]) {
+      expect(getSupportedEffortLevels(model)).not.toContain('xhigh');
+    }
+  });
+
+  it('supports max on Fable 5, Opus 4.6+ and Sonnet 4.6', () => {
+    for (const model of [
+      ClaudeModel.FABLE_5,
+      ClaudeModel.OPUS_4_8,
+      ClaudeModel.OPUS_4_7,
+      ClaudeModel.OPUS_4_6,
+      ClaudeModel.SONNET_4_6,
+    ]) {
+      expect(getSupportedEffortLevels(model)).toContain('max');
+    }
+  });
+
+  it('returns no effort levels for Haiku 4.5 (fixed thinking budget)', () => {
+    expect(getSupportedEffortLevels(ClaudeModel.HAIKU_4_5)).toEqual([]);
+  });
+
+  it('throws for a retired model instead of silently substituting a default', () => {
+    expect(() => getSupportedEffortLevels('claude-sonnet-4-5-20250929')).toThrow(/no longer supported/);
   });
 });
 

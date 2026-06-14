@@ -6,24 +6,10 @@
 
 export const rightPanelJa = {
   // Tab labels
-  sessions: 'セッション',
   workspace: 'ワークスペース',
   prompts: 'プロンプト',
   skills: 'スキル',
   closePanel: 'パネルを閉じる',
-
-  // Sessions Tab
-  sessionsTab: {
-    loading: 'セッションを読み込み中...',
-    newSession: '+ 新しいセッション',
-    noSessions: 'まだセッションがありません。新しいセッションを作成して始めましょう！',
-    newSessionFallback: '新しいセッション',
-    deleteAllTooltip: (count: number) => `すべての${count}件のセッションを削除`,
-    noSessionsToDelete: '削除するセッションがありません',
-    deleteAllConfirm: (count: number) =>
-      `本当にすべての${count}件のセッションを削除しますか？この操作は元に戻せません。`,
-    deleteSessionConfirm: '本当にこのセッションを削除しますか？',
-  },
 
   // Prompts Tab
   promptsTab: {

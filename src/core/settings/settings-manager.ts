@@ -8,7 +8,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { DEFAULT_MODEL } from '../providers/model-list-manager.js';
 
 /**
  * Application settings structure
@@ -16,8 +15,6 @@ import { DEFAULT_MODEL } from '../providers/model-list-manager.js';
 export interface AppSettings {
   /** Default agent id for new sessions */
   defaultAgentId?: string;
-  /** Default model name for new sessions */
-  defaultModel: string;
   /** Default working directory for new sessions */
   defaultCwd: string;
   /** UI theme */
@@ -30,7 +27,6 @@ export interface AppSettings {
  * Default settings values
  */
 const DEFAULT_SETTINGS: AppSettings = {
-  defaultModel: DEFAULT_MODEL,
   defaultCwd: os.homedir(),
   theme: 'light',
   language: 'en',

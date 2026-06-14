@@ -6,24 +6,10 @@
 
 export const rightPanelEn = {
   // Tab labels
-  sessions: 'Sessions',
   workspace: 'Workspace',
   prompts: 'Prompts',
   skills: 'Skills',
   closePanel: 'Close Panel',
-
-  // Sessions Tab
-  sessionsTab: {
-    loading: 'Loading sessions...',
-    newSession: '+ New Session',
-    noSessions: 'No sessions yet. Create one to get started!',
-    newSessionFallback: 'New Session',
-    deleteAllTooltip: (count: number) => `Delete all ${count} sessions`,
-    noSessionsToDelete: 'No sessions to delete',
-    deleteAllConfirm: (count: number) =>
-      `Are you sure you want to delete all ${count} sessions? This action cannot be undone.`,
-    deleteSessionConfirm: 'Are you sure you want to delete this session?',
-  },
 
   // Prompts Tab
   promptsTab: {

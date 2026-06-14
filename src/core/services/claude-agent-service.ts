@@ -27,7 +27,7 @@ import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { workspaceManager } from '../config/workspace-manager.js';
 import { getAgentDefinitions } from '../agents/agent-loader.js';
 import { settingsManager } from '../settings/settings-manager.js';
-import { ClaudeModel } from '../providers/model-list-manager.js';
+import { ClaudeModel, type EffortLevel } from '../providers/model-list-manager.js';
 import { authManager, type AuthStatus } from '../auth/auth-manager.js';
 import { templateManager, type PromptTemplate } from '../templates/template-manager.js';
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
@@ -607,10 +607,11 @@ export class ClaudeAgentService {
     title: string,
     agentId: string,
     modelName: string,
-    cwd: string
+    cwd: string,
+    effortLevel?: EffortLevel
   ): Promise<{ success: boolean; session?: Session; error?: string }> {
     try {
-      this.currentAgent = await createNewAgent(title, agentId, modelName, cwd);
+      this.currentAgent = await createNewAgent(title, agentId, modelName, cwd, effortLevel);
 
       // Apply tool approval handler
       if (this.toolApprovalRequestHandler) {
@@ -763,6 +764,40 @@ export class ClaudeAgentService {
 
   getSettingSources(): SettingSource[] {
     return this.currentAgent?.getSettingSources() || [...ALL_SETTING_SOURCES];
+  }
+
+  /**
+   * Model Management
+   * Model is managed per-agent via ClaudeAgent.setModel(), and persisted
+   * to the session record so switching sessions shows the correct model.
+   */
+
+  async setModel(model: string): Promise<void> {
+    if (this.currentAgent) {
+      await this.currentAgent.setModel(model);
+      this.sessionManager.updateSessionModel(this.currentAgent.getSessionId(), model);
+    }
+  }
+
+  getModelName(): string {
+    return this.currentAgent?.getModelName() || ClaudeModel.SONNET_4_6;
+  }
+
+  /**
+   * Thinking Effort Management
+   * Effort level is managed per-agent via ClaudeAgent.setEffortLevel(), and
+   * persisted to the session record so switching sessions shows the correct level.
+   */
+
+  async setEffortLevel(level: EffortLevel): Promise<void> {
+    if (this.currentAgent) {
+      await this.currentAgent.setEffortLevel(level);
+      this.sessionManager.updateSessionEffortLevel(this.currentAgent.getSessionId(), level);
+    }
+  }
+
+  getEffortLevel(): EffortLevel | undefined {
+    return this.currentAgent?.getEffortLevel();
   }
 }
 
