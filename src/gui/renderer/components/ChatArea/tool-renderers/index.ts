@@ -91,6 +91,7 @@ export {
   ApprovalWaitingIcon,
   AnimatedApprovalText,
   ProgressLog,
+  CopyButton,
 } from './shared-components';
 
 // Python code display

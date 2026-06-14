@@ -38,7 +38,8 @@ export interface ToolConfig {
     args: ToolArgs,
     showResult?: boolean,
     response?: ToolResponse,
-    showDetails?: boolean
+    showDetails?: boolean,
+    setShowDetails?: (show: boolean) => void
   ) => ReactNode;
 }
 

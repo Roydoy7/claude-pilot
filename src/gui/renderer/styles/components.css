@@ -755,6 +755,7 @@
 .message-bubble {
   padding: 0.5rem 0.75rem;
   border-radius: 10px;
+  font-size: 0.875rem;
   word-wrap: break-word;
 }
 

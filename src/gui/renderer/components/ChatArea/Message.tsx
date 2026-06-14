@@ -11,6 +11,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { MessageContent, UsageMetadata } from '../../../preload/preload-types';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { CopyButton } from './tool-renderers';
 
 // Re-export UsageMetadata for consumers that import from this file
 export type { UsageMetadata };
@@ -41,6 +42,8 @@ interface MessageProps {
 export const Message = memo(function Message({ message }: MessageProps) {
   const { t } = useLanguage();
   const isUser = message.role === 'user';
+  // Usage stats display temporarily disabled
+  const showUsage = false;
   const [isSaving, setIsSaving] = useState(false);
   const [viewingImage, setViewingImage] = useState<{ data: string; mimeType: string } | null>(null);
 
@@ -253,12 +256,15 @@ export const Message = memo(function Message({ message }: MessageProps) {
               {formatTime(message.timestamp)}
             </span>
           )}
-          {message.usage && !isUser && (
+          {!isUser && contentString && contentString.trim() !== '' && (
+            <CopyButton text={contentString} />
+          )}
+          {showUsage && message.usage && !isUser && (
             <div className="message-usage">
               {/* Basic token counts */}
               <span title={t.message.tokens.input}>{message.usage.input_tokens}↑</span>
               <span title={t.message.tokens.output}>{message.usage.output_tokens}↓</span>
-              <span title={t.message.tokens.total}>{message.usage.total_tokens}Σ</span>
+              <span title={t.message.tokens.total}>Σ{message.usage.total_tokens}</span>
 
               {/* Prompt caching info - only show if cache was used or created */}
               {((message.usage.cache_read_input_tokens || 0) > 0 || (message.usage.cache_creation_input_tokens || 0) > 0) && (

@@ -98,6 +98,45 @@ export function AnimatedApprovalText({ text }: { text: string }) {
 }
 
 // ============================================
+// Copy Button
+// ============================================
+
+/**
+ * Small button that copies the given text to the clipboard
+ */
+export function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        padding: '0.125rem 0.375rem',
+        fontSize: '0.65rem',
+        backgroundColor: copied ? '#10b981' : 'var(--bg-secondary)',
+        color: copied ? '#ffffff' : 'var(--text-secondary)',
+        border: '0px solid var(--border)',
+        borderRadius: '3px',
+        cursor: 'pointer',
+        transition: 'background-color 0.2s',
+      }}
+    >
+      {copied ? '✓ Copied' : '📋 Copy'}
+    </button>
+  );
+}
+
+// ============================================
 // Progress Log Component
 // ============================================
 

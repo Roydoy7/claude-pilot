@@ -87,7 +87,7 @@ export const ThinkingItem = memo(function ThinkingItem({ item }: ThinkingItemPro
               cursor: 'pointer',
               color: 'var(--text-tertiary)',
               fontSize: '0.7rem',
-              fontStyle: 'italic',
+              fontStyle: 'normal',
               textAlign: 'left',
               transition: 'all 0.15s ease',
             }}

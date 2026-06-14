@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react';
 import type { ToolConfig, ToolArgs } from './types';
 import { getButtonStyle, contentContainerStyle, codeStyle, isMcpToolError } from './types';
+import { CopyButton } from './shared-components';
 import type { ToolResponse } from '../../../../preload/preload-types';
 
 // ============================================
@@ -310,14 +311,16 @@ export const bashRenderer: ToolConfig = {
 
   hasDetails: (): boolean => true,
 
-  defaultExpanded: true,
+  defaultExpanded: false,
 
   renderButton: () => null,
 
   renderContent: (
     args: ToolArgs,
     _showResult?: boolean,
-    response?: ToolResponse
+    response?: ToolResponse,
+    showDetails?: boolean,
+    setShowDetails?: (show: boolean) => void
   ) => {
     const cmd = String(args.command || '');
     const formattedCmd = cmd
@@ -356,24 +359,35 @@ export const bashRenderer: ToolConfig = {
       }
     }
 
+    const hasOutput = !!(displayOutput || wasInterrupted || hasStderr);
+
     return (
       <div
         style={{
-          marginLeft: '1.5rem',
           marginTop: '0.5rem',
-          padding: '0.5rem 0.75rem',
+          width: 'fit-content',
+          maxWidth: '100%',
+          padding: '0.05rem 0.75rem',
           backgroundColor: 'var(--bg-tertiary)',
-          borderRadius: '4px',
+          borderRadius: '10px',
           border: isError ? '1px solid #ef4444' : wasInterrupted ? '1px solid #f59e0b' : '1px solid var(--border)',
-          maxHeight: '400px',
-          overflow: 'auto',
+          maxHeight: showDetails ? '400px' : undefined,
+          overflow: showDetails ? 'auto' : 'hidden',
         }}
       >
-        <pre style={{ ...codeStyle, color: 'var(--text-primary)', lineHeight: '1.5' }}>
+        <pre
+          onClick={() => hasOutput && setShowDetails?.(!showDetails)}
+          style={{ ...codeStyle, color: 'var(--text-primary)', lineHeight: '1.5', cursor: hasOutput ? 'pointer' : 'default' }}
+        >
           <span style={{ color: '#10b981' }}>$</span> {formattedCmd}
+          {hasOutput && (
+            <span style={{ marginLeft: '0.5rem', opacity: 0.5, fontSize: '0.65rem' }}>
+              {showDetails ? '▾' : '▸'}
+            </span>
+          )}
         </pre>
 
-        {(displayOutput || wasInterrupted) && (
+        {showDetails && (displayOutput || wasInterrupted) && (
           <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
             {wasInterrupted && (
               <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>
@@ -381,16 +395,24 @@ export const bashRenderer: ToolConfig = {
               </div>
             )}
             {displayOutput && (
-              <pre style={{ ...codeStyle, color: isError ? '#ef4444' : 'var(--text-secondary)', lineHeight: '1.5' }}>
-                {displayOutput}
-              </pre>
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.25rem' }}>
+                  <CopyButton text={displayOutput} />
+                </div>
+                <pre style={{ ...codeStyle, color: isError ? '#ef4444' : 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  {displayOutput}
+                </pre>
+              </>
             )}
           </div>
         )}
 
-        {hasStderr && (
+        {showDetails && hasStderr && (
           <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
-            <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>stderr:</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+              <span style={{ color: '#f59e0b', fontSize: '0.65rem' }}>stderr:</span>
+              <CopyButton text={stderrContent} />
+            </div>
             <pre style={{ ...codeStyle, color: '#f59e0b', lineHeight: '1.5', opacity: 0.8 }}>
               {stderrContent}
             </pre>

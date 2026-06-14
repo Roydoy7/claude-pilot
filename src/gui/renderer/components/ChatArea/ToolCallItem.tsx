@@ -214,8 +214,7 @@ export function ToolCallItem({
                   fontSize: '0.7rem',
                   fontWeight: '600',
                   color: isError ? '#ef4444' : '#10b981',
-                  padding: '0.125rem 0.375rem',
-                  backgroundColor: isError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                  padding: '0.05rem 0.075rem',
                   borderRadius: '3px',
                 }}
               >
@@ -229,8 +228,7 @@ export function ToolCallItem({
                 fontSize: '0.7rem',
                 fontWeight: '600',
                 color: '#f59e0b',
-                padding: '0.125rem 0.375rem',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                padding: '0.05rem 0.075rem',
                 borderRadius: '3px',
               }}
             >
@@ -257,8 +255,7 @@ export function ToolCallItem({
                   fontSize: '0.7rem',
                   fontWeight: '600',
                   color: '#f59e0b',
-                  padding: '0.125rem 0.375rem',
-                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  padding: '0.05rem 0.075rem',
                   borderRadius: '3px',
                 }}
               >
@@ -273,8 +270,7 @@ export function ToolCallItem({
                     fontSize: '0.7rem',
                     fontWeight: '600',
                     color: isError ? '#ef4444' : '#10b981',
-                    padding: '0.125rem 0.375rem',
-                    backgroundColor: isError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                    padding: '0.05rem 0.075rem',
                     borderRadius: '3px',
                   }}
                 >
@@ -306,6 +302,9 @@ export function ToolCallItem({
           {showDetails && toolConfig.renderContent(toolCall.args, false, undefined, showDetails)}
           {showResult && response && toolConfig.renderContent(toolCall.args, true, response, showDetails)}
         </>
+      ) : canonicalToolName === 'Bash' ? (
+        // Bash - command always visible, click command line to expand/collapse output
+        toolConfig.renderContent(toolCall.args, showResult, response, showDetails, setShowDetails)
       ) : (
         // Default rendering for other tools
         hasDetails && (showDetails || showResult) && toolConfig.renderContent(toolCall.args, showResult, response, showDetails)
@@ -315,7 +314,7 @@ export function ToolCallItem({
       {needsApproval && !response && (onApprove || onReject) && (
         <div
           className="tool-approval-container"
-          style={{ marginBottom: '0.5rem', marginLeft: '1.5rem' }}
+          style={{ marginTop: '0.5rem', marginBottom: '0.5rem', marginLeft: '1.5rem' }}
         >
           <ApprovalWaitingIcon />
           <AnimatedApprovalText text={t.status.waitingForApproval} />
