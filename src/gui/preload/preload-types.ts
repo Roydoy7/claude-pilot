@@ -70,6 +70,14 @@ export interface UsageMetadata {
   cache_creation?: CacheCreationBreakdown;
   /** Service tier (standard, max, etc.) */
   service_tier?: string | null;
+  /** Total cost in USD (if available) */
+  total_cost_usd?: number;
+  /** Wall-clock duration of the turn in milliseconds (from result message) */
+  duration_ms?: number;
+  /** Number of agent turns in this exchange (from result message) */
+  num_turns?: number;
+  /** Model(s) used for this turn (from result message's modelUsage keys) */
+  model?: string;
 }
 
 /**

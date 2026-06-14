@@ -167,8 +167,9 @@ export const Message = memo(function Message({ message }: MessageProps) {
                       className={className}
                       style={{
                         backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
-                        padding: '0.125em 0.25em',
-                        borderRadius: '3px',
+                        border: `1px solid ${isUser ? 'rgba(255,255,255,0.25)' : 'var(--border)'}`,
+                        padding: '0.125em 0.3em',
+                        borderRadius: '4px',
                         fontSize: '0.9em',
                       }}
                       {...props}
@@ -204,10 +205,10 @@ export const Message = memo(function Message({ message }: MessageProps) {
                   <blockquote
                     style={{
                       margin: '0.5em 0',
-                      padding: '0.5em 0.75em',
+                      padding: '0.4em 0.75em',
                       backgroundColor: isUser ? 'rgba(255,255,255,0.1)' : 'var(--bg-tertiary)',
-                      borderRadius: '4px',
-                      border: 'none',
+                      borderLeft: `3px solid ${isUser ? 'rgba(255,255,255,0.5)' : 'var(--accent)'}`,
+                      borderRadius: '0 4px 4px 0',
                     }}
                   >
                     {children}
@@ -250,12 +251,37 @@ export const Message = memo(function Message({ message }: MessageProps) {
         )}
 
         <div className="message-footer">
-          {/* Timestamp */}
-          {message.timestamp && (
-            <span className="message-timestamp">
-              {formatTime(message.timestamp)}
-            </span>
-          )}
+          <div className="message-footer-left">
+            {/* Timestamp */}
+            {message.timestamp && (
+              <span className="message-timestamp">
+                {formatTime(message.timestamp)}
+              </span>
+            )}
+            {/* Turn stats: duration, cost, turns, model */}
+            {!isUser && message.usage?.total_cost_usd !== undefined && (
+              <div className="message-stats">
+                {message.usage.duration_ms !== undefined && (
+                  <span title={t.message.stats.duration}>
+                    ⏱ {(message.usage.duration_ms / 1000).toFixed(1)}s
+                  </span>
+                )}
+                <span title={t.message.stats.cost}>
+                  💲 ${message.usage.total_cost_usd.toFixed(4)}
+                </span>
+                {message.usage.num_turns !== undefined && (
+                  <span title={t.message.stats.turns}>
+                    🔁 {message.usage.num_turns} turns
+                  </span>
+                )}
+                {message.usage.model && (
+                  <span title={t.message.stats.model}>
+                    {message.usage.model}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           {!isUser && contentString && contentString.trim() !== '' && (
             <CopyButton text={contentString} />
           )}

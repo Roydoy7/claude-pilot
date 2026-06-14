@@ -65,11 +65,11 @@
 /* Override highlight.js background for message bubbles */
 .message-bubble pre {
   background-color: var(--bg-secondary) !important;
-  padding: 0.5rem !important;
-  border-radius: 4px !important;
-  border: none !important;
+  padding: 0.75rem 0.875rem !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border) !important;
   overflow-x: auto !important;
-  margin: 0.25em 0 !important;
+  margin: 0.5em 0 !important;
   max-width: 100% !important;
   width: 0 !important; /* Force pre to respect parent constraints */
   min-width: 100% !important; /* But fill available space */
@@ -78,6 +78,7 @@
 
 .message-user .message-bubble pre {
   background-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
 }
 
 .message-bubble code {
@@ -125,11 +126,11 @@
 .message-bubble h5,
 .message-bubble h6 { font-size: 1em; }
 
-.message-bubble p:first-child {
+.message-bubble > *:first-child {
   margin-top: 0;
 }
 
-.message-bubble p:last-child {
+.message-bubble > *:last-child {
   margin-bottom: 0;
 }
 
@@ -145,27 +146,26 @@
   width: 100%;
   margin: 0.5em 0;
   font-size: 0.9em;
-  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .message-bubble th,
 .message-bubble td {
-  border: none;
-  border-bottom: 1px solid var(--border);
-  padding: 0.35em 0.5em;
+  border: 1px solid var(--border);
+  padding: 0.4em 0.7em;
   text-align: left;
-}
-
-.message-bubble tr:last-child td {
-  border-bottom: none;
 }
 
 .message-bubble th {
   background-color: var(--bg-tertiary);
   font-weight: 600;
   font-size: 0.95em;
+}
+
+.message-bubble tr:nth-child(even) td {
+  background-color: var(--bg-secondary);
 }
 
 /* Streaming cursor animation */

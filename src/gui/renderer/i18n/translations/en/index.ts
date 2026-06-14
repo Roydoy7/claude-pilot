@@ -36,6 +36,12 @@ export const enTranslations: Translation = {
       cache1hour: '1-hour cache (Max tier)',
       serviceTier: (tier: string) => `Service tier: ${tier}`,
     },
+    stats: {
+      duration: 'Duration',
+      cost: 'Cost for this turn (USD)',
+      turns: 'Number of turns',
+      model: 'Model used',
+    },
   },
 
   // Message List

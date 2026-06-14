@@ -753,9 +753,10 @@
 }
 
 .message-bubble {
-  padding: 0.5rem 0.75rem;
-  border-radius: 10px;
+  padding: 0.625rem 0.875rem;
+  border-radius: 12px;
   font-size: 0.875rem;
+  line-height: 1.6;
   word-wrap: break-word;
 }
 
@@ -778,6 +779,7 @@
 .message-ai .message-bubble {
   background-color: var(--ai-bubble);
   color: var(--ai-bubble-text);
+  border: 1px solid var(--border);
   width: fit-content;
   max-width: 100%;
 }
@@ -789,6 +791,20 @@
   margin-top: 0.25rem;
   padding: 0 0.25rem;
   gap: 0.5rem;
+}
+
+.message-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.message-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
 }
 
 .message-time {

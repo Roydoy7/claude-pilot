@@ -204,6 +204,12 @@ export interface Translation {
       /** Service tier label */
       serviceTier: (tier: string) => string;
     };
+    stats: {
+      duration: string;
+      cost: string;
+      turns: string;
+      model: string;
+    };
   };
 
   // Message List

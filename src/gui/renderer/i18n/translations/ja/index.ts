@@ -36,6 +36,12 @@ export const jaTranslations: Translation = {
       cache1hour: '1時間キャッシュ（Max契約）',
       serviceTier: (tier: string) => `サービス層: ${tier}`,
     },
+    stats: {
+      duration: '所要時間',
+      cost: 'このターンのコスト（USD）',
+      turns: 'ターン数',
+      model: '使用モデル',
+    },
   },
 
   // Message List

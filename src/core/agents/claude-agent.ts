@@ -73,6 +73,12 @@ export interface UsageMetadata {
   total_cost_usd?: number;
   /** Service tier (standard, max, etc.) */
   service_tier?: string | null;
+  /** Wall-clock duration of the turn in milliseconds (from result message) */
+  duration_ms?: number;
+  /** Number of agent turns in this exchange (from result message) */
+  num_turns?: number;
+  /** Model(s) used for this turn (from result message's modelUsage keys) */
+  model?: string;
 }
 
 /**
@@ -725,9 +731,19 @@ export class ClaudeAgent {
 
             // NOTE: result.usage is cumulative (sum of all API calls in this turn)
             // We use finalUsage from the last assistant message instead, which has
-            // the actual per-message usage that matches what's stored in transcripts
-
+            // the actual per-message usage that matches what's stored in transcripts.
+            // Turn-level stats (cost, duration, turn count, model) are only available
+            // on the result message, so merge them into finalUsage here.
             if (resultMessage.subtype === 'success') {
+              if (finalUsage) {
+                finalUsage = {
+                  ...finalUsage,
+                  total_cost_usd: resultMessage.total_cost_usd,
+                  duration_ms: resultMessage.duration_ms,
+                  num_turns: resultMessage.num_turns,
+                  model: Object.keys(resultMessage.modelUsage)[0],
+                };
+              }
               if (accumulatedText) {
                 this.conversationHistory.push({
                   role: 'assistant',
@@ -736,7 +752,6 @@ export class ClaudeAgent {
                   usage: finalUsage, // Use usage from last assistant message
                 });
               }
-              // finalUsage is already set from the last assistant message
             } else {
               const errors = 'errors' in resultMessage ? resultMessage.errors : [];
               yield {

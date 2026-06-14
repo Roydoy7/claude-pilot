@@ -36,6 +36,12 @@ export const zhTranslations: Translation = {
       cache1hour: '1 小时缓存（Max 订阅）',
       serviceTier: (tier: string) => `服务层级：${tier}`,
     },
+    stats: {
+      duration: '耗时',
+      cost: '本轮花费（美元）',
+      turns: '对话轮数',
+      model: '使用的模型',
+    },
   },
 
   // Message List
