@@ -184,40 +184,13 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
             {templates.map((template) => (
               <div
                 key={template.id}
+                className="prompt-item"
                 onClick={() => handleApply(template)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 10px',
-                  cursor: 'pointer',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                  e.currentTarget.style.borderColor = 'var(--accent)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                  e.currentTarget.style.borderColor = 'var(--border)';
-                }}
               >
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.9rem',
-                  }}
-                >
+                <span className="prompt-item-name" title={template.name}>
                   {template.name}
                 </span>
-                <div style={{ display: 'flex', gap: '6px', marginLeft: '8px', flexShrink: 0 }}>
+                <div className="prompt-item-actions">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

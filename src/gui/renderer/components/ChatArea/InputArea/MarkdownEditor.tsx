@@ -7,6 +7,7 @@
  * inside the same `input-container` as the textarea.
  */
 
+import { useState } from 'react';
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
 
 export interface AttachedImage {
@@ -55,6 +56,8 @@ export function MarkdownEditor({
   extraToolbarButtons,
   children,
 }: MarkdownEditorProps) {
+  const [enlargedImage, setEnlargedImage] = useState<AttachedImage | null>(null);
+
   return (
     <>
       {/* Toolbar - minimal like Teams */}
@@ -113,6 +116,31 @@ export function MarkdownEditor({
 
       {/* Input container with send button */}
       <div className="input-container">
+        {/* Image previews - inside the input box, above the textarea */}
+        {images.length > 0 && (
+          <div className="image-previews">
+            {images.map(img => (
+              <div key={img.id} className="image-preview-item">
+                <img
+                  src={img.preview}
+                  alt="Preview"
+                  className="image-preview-thumb"
+                  onClick={() => setEnlargedImage(img)}
+                />
+                <button
+                  className="image-preview-remove"
+                  onClick={() => onRemoveImage(img.id)}
+                  title="Remove image"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="input-text-area">
           <textarea
             ref={textareaRef}
@@ -135,62 +163,22 @@ export function MarkdownEditor({
         {children}
       </div>
 
-      {/* Image previews - below input area */}
-      {images.length > 0 && (
-        <div className="image-previews" style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '8px',
-          flexWrap: 'wrap',
-          backgroundColor: 'var(--bg-secondary, #f8f9fa)',
-          borderTop: '1px solid var(--border-color, #dee2e6)',
-          borderRadius: '0 0 8px 8px',
-        }}>
-          {images.map(img => (
-            <div key={img.id} style={{
-              position: 'relative',
-              width: '80px',
-              height: '80px',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              border: '1px solid var(--border-color, #dee2e6)',
-              backgroundColor: 'white',
-            }}>
-              <img
-                src={img.preview}
-                alt="Preview"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                }}
-              />
-              <button
-                onClick={() => onRemoveImage(img.id)}
-                style={{
-                  position: 'absolute',
-                  top: '2px',
-                  right: '2px',
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: 'rgba(0, 0, 0, 0.6)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  padding: 0,
-                  lineHeight: 1,
-                }}
-                title="Remove image"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+      {/* Lightbox for enlarged image preview */}
+      {enlargedImage && (
+        <div className="image-preview-lightbox" onClick={() => setEnlargedImage(null)}>
+          <div className="image-preview-lightbox-content">
+            <img src={enlargedImage.preview} alt="Preview" />
+            <button
+              className="image-preview-lightbox-close"
+              onClick={() => setEnlargedImage(null)}
+              title="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
     </>

@@ -203,9 +203,8 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
                 </svg>
               </button>
               <div className="left-sidebar-item-meta">
-                {agentDefinitions.find((agent) => agent.id === session.agentId)?.displayName ?? session.agentId} · {session.modelName}
-              </div>
-              <div className="left-sidebar-item-date">
+                {agentDefinitions.find((agent) => agent.id === session.agentId)?.displayName ?? session.agentId}
+                <span className="left-sidebar-item-meta-dot">·</span>
                 {formatDate(session.createdAt)}
               </div>
             </div>

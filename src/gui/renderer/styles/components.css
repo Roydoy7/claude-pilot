@@ -397,7 +397,7 @@
 }
 
 .left-sidebar-item {
-  padding: 0.75rem;
+  padding: 0.625rem 0.75rem;
   margin-bottom: 0.25rem;
   border-radius: 6px;
   border-left: 3px solid transparent;
@@ -418,7 +418,7 @@
 .left-sidebar-item-title {
   font-size: 0.875rem;
   font-weight: 500;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.1875rem;
   margin-right: 1.5rem;
   color: var(--text-primary);
   white-space: nowrap;
@@ -427,14 +427,19 @@
 }
 
 .left-sidebar-item-meta {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.25rem;
-}
-
-.left-sidebar-item-date {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.7rem;
   color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.left-sidebar-item-meta-dot {
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .left-sidebar-item-delete {
@@ -504,7 +509,7 @@
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.625rem 0.875rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background-color: var(--bg-secondary);
@@ -549,8 +554,8 @@
 
 .role-card-check {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 4px;
   box-sizing: border-box;
   border-radius: 50%;
@@ -923,6 +928,109 @@
   gap: 0.375rem;
 }
 
+/* Attached image previews - shown inside the input box, above the textarea */
+.image-previews {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.image-preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+  transition: opacity 0.15s ease;
+}
+
+.image-preview-thumb:hover {
+  opacity: 0.85;
+}
+
+.image-preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview-remove:hover {
+  background: rgba(220, 53, 69, 0.85);
+}
+
+/* Lightbox for viewing an enlarged image preview */
+.image-preview-lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  z-index: 2000;
+}
+
+.image-preview-lightbox-content {
+  position: relative;
+  display: inline-flex;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.image-preview-lightbox-content img {
+  display: block;
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.image-preview-lightbox-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview-lightbox-close:hover {
+  background: rgba(220, 53, 69, 0.85);
+}
+
 .send-btn {
   background-color: transparent;
   color: var(--accent);
@@ -1195,6 +1303,45 @@ body.resizing-panel {
   color: white;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.prompt-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.prompt-item:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent);
+}
+
+.prompt-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.prompt-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.prompt-item:hover .prompt-item-actions {
+  opacity: 1;
 }
 
 .template-list-section {

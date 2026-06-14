@@ -97,7 +97,7 @@ export function SessionConfig({
         justifyContent: 'flex-start',
         padding: '2rem',
         paddingTop: '1rem',
-        gap: '1.5rem',
+        gap: '1.25rem',
         overflowY: 'auto',
       }}
     >
@@ -105,15 +105,15 @@ export function SessionConfig({
       <div style={{ textAlign: 'center', maxWidth: '500px' }}>
         <div
           style={{
-            width: '56px',
-            height: '56px',
+            width: '48px',
+            height: '48px',
             borderRadius: '50%',
             backgroundColor: 'var(--accent)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.75rem',
-            margin: '0 auto 1rem',
+            fontSize: '1.5rem',
+            margin: '0 auto 0.75rem',
           }}
         >
           💬
@@ -135,7 +135,7 @@ export function SessionConfig({
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.5rem',
+          gap: '1.25rem',
           width: '100%',
           maxWidth: '500px',
         }}
@@ -157,7 +157,7 @@ export function SessionConfig({
             style={{
               fontSize: '0.8125rem',
               color: 'var(--text-secondary)',
-              margin: '0 0 0.75rem 0',
+              margin: '0 0 0.5rem 0',
             }}
           >
             {t.sessionConfig.chooseRoleDescription}
