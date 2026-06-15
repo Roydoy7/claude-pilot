@@ -26,6 +26,12 @@ export const settingsJa = {
     loginFailed: 'ログイン失敗',
     envHint: 'または環境変数を設定',
     welcomeMessage: 'ようこそ！Claude Pilotを使用するには、まず認証してください。',
+    sourceLabels: {
+      environment: '環境変数',
+      claudeSettings: 'Claude設定ファイル (~/.claude/settings.json)',
+      oauth: 'Claudeアカウント (OAuth)',
+      none: 'なし',
+    },
   },
   defaults: {
     title: 'デフォルト設定',

@@ -13,7 +13,8 @@
 interface TokenState {
   accessToken: string | null;
   expiresAt: number | null;
-  source: 'environment' | 'oauth' | 'none';
+  source: 'environment' | 'claude-settings'| 'oauth' | 'none';
+  baseUrl: string | null;
 }
 
 /**
@@ -26,6 +27,7 @@ class TokenStore {
     accessToken: null,
     expiresAt: null,
     source: 'none',
+    baseUrl: null,
   };
 
   private constructor() {}
@@ -40,7 +42,7 @@ class TokenStore {
   /**
    * Set access token (called by auth-manager)
    */
-  setToken(token: string | null, source: 'environment' | 'oauth' | 'none', expiresAt?: number): void {
+  setToken(token: string | null, source: 'environment' | 'claude-settings'| 'oauth' | 'none', expiresAt?: number): void {
     this.state.accessToken = token;
     this.state.source = source;
     this.state.expiresAt = expiresAt || null;
@@ -56,7 +58,7 @@ class TokenStore {
   /**
    * Get token source
    */
-  getTokenSource(): 'environment' | 'oauth' | 'none' {
+  getTokenSource(): 'environment' | 'claude-settings'| 'oauth' | 'none' {
     return this.state.source;
   }
 
@@ -67,8 +69,8 @@ class TokenStore {
     if (!this.state.accessToken) {
       return false;
     }
-    if (this.state.source === 'environment') {
-      // Environment tokens don't expire
+    if (this.state.source === 'environment' || this.state.source === 'claude-settings') {
+      // Environment / claude-settings tokens don't expire
       return true;
     }
     if (!this.state.expiresAt) {
@@ -79,12 +81,27 @@ class TokenStore {
   }
 
   /**
+   * Set API base URL (for proxy setups loaded from claude settings)
+   */
+  setBaseUrl(url: string | null): void {
+    this.state.baseUrl = url;
+  }
+
+  /**
+   * Get API base URL (undefined means use Anthropic default)
+   */
+  getBaseUrl(): string | undefined {
+    return this.state.baseUrl ?? undefined;
+  }
+  
+  /**
    * Clear token
    */
   clear(): void {
     this.state.accessToken = null;
     this.state.expiresAt = null;
     this.state.source = 'none';
+    this.state.baseUrl = null;
   }
 
   /**

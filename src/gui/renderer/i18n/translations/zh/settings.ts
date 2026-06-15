@@ -26,6 +26,12 @@ export const settingsZh = {
     loginFailed: '登录失败',
     envHint: '或设置环境变量',
     welcomeMessage: '欢迎！请先认证以开始使用 Claude Pilot。',
+    sourceLabels: {
+      environment: '环境变量',
+      claudeSettings: 'Claude 配置文件 (~/.claude/settings.json)',
+      oauth: 'Claude 账户 (OAuth)',
+      none: '无',
+    },
   },
   defaults: {
     title: '默认设置',

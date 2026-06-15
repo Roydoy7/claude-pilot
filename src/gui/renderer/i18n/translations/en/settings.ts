@@ -26,6 +26,12 @@ export const settingsEn = {
     loginFailed: 'Login failed',
     envHint: 'Or set environment variable',
     welcomeMessage: 'Welcome! Please authenticate to start using Claude Pilot.',
+    sourceLabels: {
+      environment: 'Environment Variable',
+      claudeSettings: 'Claude Settings (~/.claude/settings.json)',
+      oauth: 'Claude Account (OAuth)',
+      none: 'None',
+    },
   },
   defaults: {
     title: 'Default Settings',

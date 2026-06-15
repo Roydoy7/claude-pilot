@@ -3,9 +3,11 @@
  *
  * Auth Manager - Unified authentication manager
  * Supports both API Key and OAuth authentication
- * Priority: Environment variable API Key > OAuth credentials
+ * Priority: Environment variable API Key > ~/.claude/settings.json API Key > OAuth credentials
  */
-
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { ClaudeOAuth } from './claude-oauth';
 import { tokenStore } from './token-store';
 import type {
@@ -24,6 +26,11 @@ export type { AuthStatus, OAuthLoginOptions };
  * Environment variable name for Anthropic API key
  */
 const ANTHROPIC_API_KEY_ENV = 'ANTHROPIC_API_KEY';
+
+/**
+ * Path to Claude Code settings file
+ */
+const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
 
 /**
  * Auth Manager - Singleton
@@ -47,6 +54,36 @@ class AuthManager {
   }
 
   /**
+   * Read env values from ~/.claude/settings.json
+   */
+  private loadClaudeSettingsEnv(): Record<string, string> {
+    try {
+      const raw = fs.readFileSync(CLAUDE_SETTINGS_PATH, 'utf-8');
+      const settings = JSON.parse(raw) as { env?: Record<string, string> };
+      return settings?.env ?? {};
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Read ANTHROPIC_API_KEY from ~/.claude/settings.json env section
+   */
+  private loadApiKeyFromClaudeSettings(): string | null {
+    const key = this.loadClaudeSettingsEnv()[ANTHROPIC_API_KEY_ENV];
+    return typeof key === 'string' ? key : null;
+  }
+
+  /**
+   * Get ANTHROPIC_BASE_URL from ~/.claude/settings.json (for proxy setups)
+   * Returns undefined if not configured (use Anthropic default)
+   */
+  getApiBaseUrl(): string | undefined {
+    const url = this.loadClaudeSettingsEnv()['ANTHROPIC_BASE_URL'];
+    return typeof url === 'string' && url.length > 0 ? url : undefined;
+  }
+
+  /**
    * Initialize tokenStore with current credentials
    * Called during construction to ensure tokenStore is always populated
    * Handles token refresh if needed
@@ -59,7 +96,15 @@ class AuthManager {
       return;
     }
 
-    // Priority 2: OAuth credentials
+    // Priority 2: ~/.claude/settings.json env.ANTHROPIC_API_KEY
+    const settingsApiKey = this.loadApiKeyFromClaudeSettings();
+    if (settingsApiKey && this.validateSettingsApiKey(settingsApiKey)) {
+      tokenStore.setToken(settingsApiKey, 'claude-settings');
+      tokenStore.setBaseUrl(this.getApiBaseUrl() ?? null);
+      return;
+    }
+
+    // Priority 3: OAuth credentials
     const oauthCreds = ClaudeOAuth.loadCredentials();
     if (oauthCreds) {
       // Check if token is valid
@@ -104,7 +149,7 @@ class AuthManager {
 
   /**
    * Get current authentication status
-   * Priority: Environment variable > OAuth
+   * Priority: Environment variable > ~/.claude/settings.json > OAuth
    */
   isAuthenticated(): AuthStatus {
     // Priority 1: Environment variable API Key
@@ -116,7 +161,16 @@ class AuthManager {
       };
     }
 
-    // Priority 2: OAuth credentials
+    // Priority 2: ~/.claude/settings.json env.ANTHROPIC_API_KEY
+    const settingsApiKey = this.loadApiKeyFromClaudeSettings();
+    if (settingsApiKey && this.validateSettingsApiKey(settingsApiKey)) {
+      return {
+        authenticated: true,
+        apiKeySource: 'claude-settings',
+      };
+    }
+
+    // Priority 3: OAuth credentials
     const oauthCreds = ClaudeOAuth.loadCredentials();
     if (oauthCreds && ClaudeOAuth.isCredentialsValid(oauthCreds)) {
       return {
@@ -143,6 +197,13 @@ class AuthManager {
    */
   private validateApiKeyFormat(key: string): boolean {
     return key.startsWith('sk-ant-') && key.length >= 40;
+  }
+
+  /**
+   * Validate API key from trusted config file (lenient — allows proxy keys)
+   */
+  private validateSettingsApiKey(key: string): boolean {
+    return key.length >= 8;
   }
 
   /**

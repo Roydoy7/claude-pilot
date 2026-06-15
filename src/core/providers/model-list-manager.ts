@@ -235,7 +235,8 @@ const FALLBACK_MODELS: ModelInfo[] = [
  * Fetch available models from Anthropic API
  */
 async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
-  const endpoint = 'https://api.anthropic.com/v1/models';
+  const baseUrl = tokenStore.getBaseUrl() ?? 'https://api.anthropic.com';
+  const endpoint = `${baseUrl.replace(/\/$/, '')}/v1/models`;
 
   const response = await fetch(endpoint, {
     headers: {

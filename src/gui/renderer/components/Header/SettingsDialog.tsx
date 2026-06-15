@@ -196,6 +196,21 @@ export function SettingsDialog({
     }
   };
 
+  // Map an API key source to its localized display label
+  const getAuthSourceLabel = (source: AuthStatus['apiKeySource']): string => {
+    const labels = t.settings?.account?.sourceLabels;
+    switch (source) {
+      case 'environment':
+        return labels?.environment || 'Environment Variable';
+      case 'claude-settings':
+        return labels?.claudeSettings || 'Claude Settings (~/.claude/settings.json)';
+      case 'oauth':
+        return labels?.oauth || 'Claude Account (OAuth)';
+      default:
+        return labels?.none || 'None';
+    }
+  };
+
   // Account settings (Authentication)
   const renderAccountSettings = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -233,7 +248,7 @@ export function SettingsDialog({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', marginBottom: '0.75rem' }}>
               <span>✓</span>
               <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                {t.settings?.account?.authenticated || 'Authenticated'} ({authStatus.apiKeySource})
+                {t.settings?.account?.authenticated || 'Authenticated'} ({getAuthSourceLabel(authStatus.apiKeySource)})
               </span>
             </div>
             {authStatus.oauthInfo && (

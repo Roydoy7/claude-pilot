@@ -50,7 +50,7 @@ export interface OAuthResult {
  */
 export interface AuthStatus {
   authenticated: boolean;
-  apiKeySource: 'environment' | 'oauth' | 'none';
+  apiKeySource: 'environment' | 'claude-settings'| 'oauth' | 'none';
   error?: string;
   oauthInfo?: {
     subscriptionType?: string | null;

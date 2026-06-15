@@ -434,6 +434,12 @@ export interface Translation {
       loginFailed: string;
       envHint: string;
       welcomeMessage: string;
+      sourceLabels: {
+        environment: string;
+        claudeSettings: string;
+        oauth: string;
+        none: string;
+      };
     };
     defaults: {
       title: string;
