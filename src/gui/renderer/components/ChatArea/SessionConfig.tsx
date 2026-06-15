@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
-import { SamplePrompts } from './SamplePrompts.js';
+import { RoleExampleRotator } from './RoleExampleRotator.js';
 
 interface SessionConfigProps {
   defaultAgentId?: string;
@@ -87,6 +87,8 @@ export function SessionConfig({
     onSuggestionClick?.(prompt);
   }, [onSuggestionClick]);
 
+  const selectedAgent = agentDefinitions.find((agent) => agent.id === selectedAgentId);
+
   return (
     <div
       style={{
@@ -137,65 +139,48 @@ export function SessionConfig({
           flexDirection: 'column',
           gap: '1.25rem',
           width: '100%',
-          maxWidth: '500px',
+          maxWidth: '900px',
         }}
       >
         {/* Role Selection */}
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'var(--text-primary)',
-              marginBottom: '0.125rem',
-            }}
-          >
-            {t.sessionConfig.chooseRole}
-          </label>
-          <p
-            style={{
-              fontSize: '0.8125rem',
-              color: 'var(--text-secondary)',
-              margin: '0 0 0.5rem 0',
-            }}
-          >
-            {t.sessionConfig.chooseRoleDescription}
-          </p>
-          <div className="role-card-list">
-            {agentDefinitions.map((agent) => (
-              <button
-                key={agent.id}
-                type="button"
-                className="role-card"
-                data-selected={selectedAgentId === agent.id}
-                onClick={() => handleAgentChange(agent.id)}
-              >
-                <div className="role-card-content">
-                  <div className="role-card-name">{agent.displayName}</div>
-                  {agent.description && (
-                    <div className="role-card-description">{agent.description}</div>
-                  )}
-                  {selectedAgentId === agent.id && agent.prompts.length > 0 && (
-                    <SamplePrompts prompts={agent.prompts} onPromptClick={handleSuggestionClick} />
-                  )}
-                </div>
-                {selectedAgentId === agent.id && (
-                  <svg
-                    className="role-card-check"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                )}
-              </button>
-            ))}
+          <div className="role-section-header">
+            <div className="role-section-number">1</div>
+            <div>
+              <label className="role-section-title">
+                {t.sessionConfig.chooseRole}
+              </label>
+              <p className="role-section-description">
+                {t.sessionConfig.chooseRoleDescription}
+              </p>
+            </div>
           </div>
+          <div className="role-card-list">
+            {agentDefinitions.map((agent) => {
+              const isActive = selectedAgentId === agent.id;
+              return (
+                <button
+                  key={agent.id}
+                  type="button"
+                  className="role-card"
+                  data-selected={isActive}
+                  onClick={() => handleAgentChange(agent.id)}
+                >
+                  <span className="role-card-name">{agent.displayName}</span>
+                  {agent.description && (
+                    <span className="role-card-description">{agent.description}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {selectedAgent && selectedAgent.prompts.length > 0 && (
+            <RoleExampleRotator
+              examples={selectedAgent.prompts}
+              label={t.sessionConfig.tryAsking}
+              onExampleClick={handleSuggestionClick}
+            />
+          )}
         </div>
 
         {/* Working Directory Selection */}
