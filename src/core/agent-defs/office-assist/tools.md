@@ -11,6 +11,8 @@ mcp__image__process
 mcp__pptx__pptx
 mcp__xlsx__xlsx
 mcp__docx__docx
+mcp__python__python
+mcp__typescript__typescript
 
 #SAFE-MCP-TOOLS
 mcp__convert__convert
