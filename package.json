@@ -118,8 +118,8 @@
         ]
       },
       {
-        "from": "packages/libreoffice-25.2.3",
-        "to": "libreoffice-25.2.3",
+        "from": "packages/libreofficePortable/LibreOfficePortable",
+        "to": "LibreOfficePortable",
         "filter": [
           "**/*"
         ]

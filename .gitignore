@@ -38,8 +38,10 @@ yarn-error.log*
 packages/python-3.13.11-embed-amd64/
 # Ignore 7za
 packages/7za/
-# Ignore calibre
-packages/calibre
+# Ignore calibre (extracted runtime; keep the bundled CalibrePortable.zip)
+packages/calibrePortable/CalibrePortable/
+# Ignore LibreOffice (extracted runtime; keep the bundled LibreOfficePortable.zip)
+packages/libreofficePortable/LibreOfficePortable/
 
 # User data and runtime files (should not be committed)
 # Session data with SQLite checkpoints

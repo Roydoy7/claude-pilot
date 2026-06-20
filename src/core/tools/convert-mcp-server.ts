@@ -18,29 +18,18 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
- * LibreOffice version for portable installation
- */
-const LIBREOFFICE_VERSION = '25.2.3';
-
-/**
  * LibreOffice paths configuration
+ * Note: setup-libreoffice.js extracts the bundled ZIP into "LibreOfficePortable" subdirectory
  */
 const LIBREOFFICE_PATHS = {
   // Portable version in packages folder
   portable: path.join(
     process.cwd(),
     'packages',
-    `libreoffice-${LIBREOFFICE_VERSION}`,
+    'libreofficePortable',
+    'LibreOfficePortable',
     'App',
     'libreoffice',
-    'program',
-    'soffice.exe'
-  ),
-  // Alternative portable structure
-  portableAlt: path.join(
-    process.cwd(),
-    'packages',
-    `libreoffice-${LIBREOFFICE_VERSION}`,
     'program',
     'soffice.exe'
   ),
@@ -51,15 +40,15 @@ const LIBREOFFICE_PATHS = {
 
 /**
  * Calibre paths configuration
- * Note: Portable installer creates "Calibre Portable" subdirectory
+ * Note: setup-calibre.js extracts the bundled ZIP into "CalibrePortable" subdirectory
  */
 const CALIBRE_PATHS = {
   // Portable version in packages folder (highest priority)
   portable: path.join(
     process.cwd(),
     'packages',
-    'calibre',
-    'Calibre Portable',
+    'calibrePortable',
+    'CalibrePortable',
     'Calibre',
     'ebook-convert.exe'
   ),
@@ -197,9 +186,6 @@ interface ConvertExecutionResult {
 function findLibreOffice(): string | null {
   if (existsSync(LIBREOFFICE_PATHS.portable)) {
     return LIBREOFFICE_PATHS.portable;
-  }
-  if (existsSync(LIBREOFFICE_PATHS.portableAlt)) {
-    return LIBREOFFICE_PATHS.portableAlt;
   }
   if (existsSync(LIBREOFFICE_PATHS.programFiles)) {
     return LIBREOFFICE_PATHS.programFiles;
