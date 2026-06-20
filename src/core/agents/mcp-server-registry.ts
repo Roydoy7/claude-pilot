@@ -16,6 +16,7 @@ import { imageMcpServer } from '../tools/image-mcp-server.js';
 import { pptxMcpServer } from '../tools/pptx-mcp-server.js';
 import { xlsxMcpServer } from '../tools/xlsx-mcp-server.js';
 import { docxMcpServer } from '../tools/docx-mcp-server.js';
+import { financeMcpServer } from '../tools/finance-mcp-server.js';
 
 export type McpServer = typeof pythonMcpServer;
 
@@ -28,4 +29,5 @@ export const MCP_SERVER_REGISTRY: Record<string, McpServer> = {
   pptx: pptxMcpServer,
   xlsx: xlsxMcpServer,
   docx: docxMcpServer,
+  finance: financeMcpServer,
 };
