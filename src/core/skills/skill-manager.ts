@@ -607,7 +607,7 @@ export class SkillManager {
 
   /**
    * Install skills for an agent to the session's cwd
-   * Skips skills that are already installed
+   * Force-updates skills even if already installed (removes the existing copy first)
    */
   async installSkillsForAgent(agentId: string, cwd: string): Promise<InstalledSkillInfo[]> {
     const agentDef = await getAgentDefinition(agentId);
@@ -617,9 +617,9 @@ export class SkillManager {
     for (const skillPath of defaultSkills) {
       const skillName = path.basename(skillPath);
       try {
-        // Skip if already installed
+        // Remove existing install so it gets refreshed from the built-in marketplace
         if (await this.isSkillInstalled(cwd, skillName)) {
-          continue;
+          await this.uninstallSkill(cwd, skillName);
         }
 
         // Install from built-in marketplace
