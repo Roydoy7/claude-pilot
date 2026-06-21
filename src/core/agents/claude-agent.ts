@@ -44,6 +44,11 @@ export type { PermissionMode, SettingSource };
 export const ALL_SETTING_SOURCES: SettingSource[] = ['user', 'project', 'local'];
 
 /**
+ * Built-in file edit tools auto-approved under permissionMode 'acceptEdits'
+ */
+const FILE_EDIT_TOOLS = ['Write', 'Edit'];
+
+/**
  * Cache creation breakdown by TTL
  */
 export interface CacheCreationBreakdown {
@@ -355,6 +360,39 @@ export class ClaudeAgent {
         return {
           behavior: 'allow',
           updatedInput: toolInput,
+        };
+      }
+
+      // bypassPermissions: auto-allow every tool call
+      if (this.permissionMode === 'bypassPermissions') {
+        return {
+          behavior: 'allow',
+          updatedInput: toolInput,
+        };
+      }
+
+      // acceptEdits: auto-allow built-in file edit tools (Write/Edit)
+      if (this.permissionMode === 'acceptEdits' && FILE_EDIT_TOOLS.includes(toolName)) {
+        return {
+          behavior: 'allow',
+          updatedInput: toolInput,
+        };
+      }
+
+      // plan: no tool execution allowed - deny everything except ExitPlanMode,
+      // which is the user's actual decision point and falls through to the UI prompt below
+      if (this.permissionMode === 'plan' && toolName !== 'ExitPlanMode') {
+        return {
+          behavior: 'deny',
+          message: 'Currently in plan mode: no tool execution is allowed. Call ExitPlanMode to present your plan.',
+        };
+      }
+
+      // dontAsk: deny tools that aren't pre-approved, never prompt the user
+      if (this.permissionMode === 'dontAsk') {
+        return {
+          behavior: 'deny',
+          message: 'Tool not pre-approved under dontAsk permission mode',
         };
       }
 
@@ -920,6 +958,16 @@ export class ClaudeAgent {
                 break;
               }
 
+              case 'worker_shutting_down': {
+                // Opt-in graceful worker teardown notice (e.g. host_exit, remote_control_disabled) - no UI surface yet
+                break;
+              }
+
+              case 'informational': {
+                // Host-rendered system notice (info/notice/suggestion/warning) - no UI surface yet
+                break;
+              }
+
               default: {
                 const _exhaustive: never = chunk;
                 break;
@@ -1091,6 +1139,9 @@ export class ClaudeAgent {
         // No maxTurns limit - allow unlimited turns like Claude Code interactive mode
         resume: this.claudeSessionId,
         permissionMode: this.permissionMode, // Use instance variable (may be updated via setPermissionMode)
+        // Required by the SDK for permissionMode 'bypassPermissions' to take effect; actual bypass
+        // decisions are still gated by our own canUseTool callback based on the active permissionMode
+        allowDangerouslySkipPermissions: true,
         settingSources: this.settingSources, // Use instance variable (may be updated via setSettingSources)
         canUseTool: canUseToolCallback,
         hooks: {
