@@ -17,6 +17,7 @@ import { pptxMcpServer } from '../tools/pptx-mcp-server.js';
 import { xlsxMcpServer } from '../tools/xlsx-mcp-server.js';
 import { docxMcpServer } from '../tools/docx-mcp-server.js';
 import { financeMcpServer } from '../tools/finance-mcp-server.js';
+import { claudeMcpServer } from '../tools/claude-mcp-server.js';
 
 export type McpServer = typeof pythonMcpServer;
 
@@ -30,4 +31,5 @@ export const MCP_SERVER_REGISTRY: Record<string, McpServer> = {
   xlsx: xlsxMcpServer,
   docx: docxMcpServer,
   finance: financeMcpServer,
+  claude: claudeMcpServer,
 };

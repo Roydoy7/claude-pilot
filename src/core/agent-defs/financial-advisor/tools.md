@@ -7,6 +7,7 @@ SAFE_TOOLS
 #MCP-TOOLS
 mcp__python__python
 mcp__typescript__typescript
+mcp__claude__ask_claude
 mcp__finance__get_quote
 mcp__finance__get_historical_prices
 mcp__finance__get_fundamentals
@@ -23,6 +24,7 @@ mcp__finance__get_sec_filings
 mcp__finance__get_sec_xbrl_facts
 
 #SAFE-MCP-TOOLS
+mcp__claude__ask_claude
 mcp__finance__get_quote
 mcp__finance__get_historical_prices
 mcp__finance__get_fundamentals
