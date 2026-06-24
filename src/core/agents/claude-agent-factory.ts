@@ -130,7 +130,7 @@ export async function createAgentFromSessionData(
 ): Promise<ClaudeAgent> {
 
   // Validate API key
-  const authStatus = authManager.isAuthenticated();
+  const authStatus = await authManager.isAuthenticated();
   if (!authStatus.authenticated) {
     throw new Error(`Authentication failed: ${authStatus.error}`);
   }

@@ -15,6 +15,7 @@ import type {
   OAuthResult,
   AuthStatus,
   OAuthLoginOptions,
+  ClaudeCredentials,
 } from '../types/auth-types.js';
 
 /**
@@ -33,12 +34,18 @@ const ANTHROPIC_API_KEY_ENV = 'ANTHROPIC_API_KEY';
 const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
 
 /**
+ * Refresh the OAuth access token this many ms before it actually expires
+ */
+const OAUTH_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+/**
  * Auth Manager - Singleton
  * Manages both API Key and OAuth authentication
  */
 class AuthManager {
   private static instance: AuthManager;
   private oauthProvider: ClaudeOAuth;
+  private refreshTimer: NodeJS.Timeout | null = null;
 
   private constructor() {
     this.oauthProvider = new ClaudeOAuth();
@@ -109,8 +116,9 @@ class AuthManager {
     if (oauthCreds) {
       // Check if token is valid
       if (ClaudeOAuth.isCredentialsValid(oauthCreds)) {
-        // Valid token, set it directly
+        // Valid token, set it directly and schedule the next refresh
         tokenStore.setToken(oauthCreds.accessToken, 'oauth', oauthCreds.expiresAt);
+        this.scheduleRefresh(oauthCreds.expiresAt);
       } else {
         // Token expired, try to refresh in background
         this.refreshTokenInBackground();
@@ -123,10 +131,18 @@ class AuthManager {
   }
 
   /**
-   * Refresh OAuth token in background
-   * Updates tokenStore on success
+   * Refresh OAuth token in background (fire-and-forget)
    */
-  private async refreshTokenInBackground(): Promise<void> {
+  private refreshTokenInBackground(): void {
+    void this.tryRefreshOAuth();
+  }
+
+  /**
+   * Attempt to refresh OAuth credentials using the stored refresh token.
+   * Updates tokenStore and schedules the next refresh on success.
+   * Clears credentials on failure, since the refresh token is no longer usable.
+   */
+  private async tryRefreshOAuth(): Promise<ClaudeCredentials['claudeAiOauth'] | null> {
     try {
       const refreshResult = await this.oauthProvider.refresh();
       if (refreshResult.success && refreshResult.credentials) {
@@ -135,23 +151,38 @@ class AuthManager {
           'oauth',
           refreshResult.credentials.expiresAt
         );
-      } else {
-        // Refresh failed, clear invalid credentials
-        ClaudeOAuth.clearCredentials();
-        tokenStore.clear();
+        this.scheduleRefresh(refreshResult.credentials.expiresAt);
+        return refreshResult.credentials;
       }
     } catch (error) {
-      console.error('[AuthManager] Failed to refresh token on initialization:', error);
-      ClaudeOAuth.clearCredentials();
-      tokenStore.clear();
+      console.error('[AuthManager] OAuth token refresh failed:', error);
     }
+
+    ClaudeOAuth.clearCredentials();
+    tokenStore.clear();
+    return null;
+  }
+
+  /**
+   * Schedule the next proactive OAuth refresh, timed to fire
+   * OAUTH_REFRESH_BUFFER_MS before the access token expires.
+   * Without this, the token only ever gets refreshed once at startup,
+   * so a long-running session eventually finds itself unauthenticated
+   * even though the refresh token is still perfectly valid.
+   */
+  private scheduleRefresh(expiresAt: number): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+    const delay = Math.max(0, expiresAt - Date.now() - OAUTH_REFRESH_BUFFER_MS);
+    this.refreshTimer = setTimeout(() => this.refreshTokenInBackground(), delay);
   }
 
   /**
    * Get current authentication status
    * Priority: Environment variable > ~/.claude/settings.json > OAuth
    */
-  isAuthenticated(): AuthStatus {
+  async isAuthenticated(): Promise<AuthStatus> {
     // Priority 1: Environment variable API Key
     const envApiKey = process.env[ANTHROPIC_API_KEY_ENV];
     if (envApiKey && this.validateApiKeyFormat(envApiKey)) {
@@ -170,8 +201,13 @@ class AuthManager {
       };
     }
 
-    // Priority 3: OAuth credentials
-    const oauthCreds = ClaudeOAuth.loadCredentials();
+    // Priority 3: OAuth credentials - if the access token expired, try a
+    // transparent refresh before reporting failure (the refresh token may
+    // still be perfectly valid even though nothing proactively refreshed it).
+    let oauthCreds = ClaudeOAuth.loadCredentials();
+    if (oauthCreds && !ClaudeOAuth.isCredentialsValid(oauthCreds)) {
+      oauthCreds = await this.tryRefreshOAuth();
+    }
     if (oauthCreds && ClaudeOAuth.isCredentialsValid(oauthCreds)) {
       return {
         authenticated: true,
@@ -219,6 +255,7 @@ class AuthManager {
         'oauth',
         result.credentials.expiresAt
       );
+      this.scheduleRefresh(result.credentials.expiresAt);
     }
 
     return result;
@@ -228,6 +265,10 @@ class AuthManager {
    * Logout - clear OAuth credentials and token store
    */
   logout(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
     ClaudeOAuth.clearCredentials();
     this.oauthProvider.cancel();
     tokenStore.clear();

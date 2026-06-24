@@ -603,7 +603,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Check if authenticated
    */
   handleIpc(IpcChannels.auth.isAuthenticated, async () => {
-    return authManager.isAuthenticated();
+    return await authManager.isAuthenticated();
   });
 
   /**

@@ -732,7 +732,7 @@ export class ClaudeAgentService {
    * Authentication Management
    */
 
-  isAuthenticated(): AuthStatus {
+  async isAuthenticated(): Promise<AuthStatus> {
     return authManager.isAuthenticated();
   }
 
