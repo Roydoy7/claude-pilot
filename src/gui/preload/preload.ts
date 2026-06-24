@@ -246,4 +246,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: (): Promise<AgentSummary[]> =>
       invokeChannel(IpcChannels.agents.list),
   },
+
+  // Dialogs
+  dialog: {
+    confirm: (message: string): Promise<boolean> =>
+      invokeChannel(IpcChannels.dialog.confirm, message),
+  },
 });

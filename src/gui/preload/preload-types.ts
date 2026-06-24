@@ -406,6 +406,11 @@ export interface ElectronAPI {
     list: () => Promise<AgentSummary[]>;
   };
 
+  // Dialogs
+  dialog: {
+    confirm: (message: string) => Promise<boolean>;
+  };
+
   // Utility
   ping: () => Promise<string>;
 }

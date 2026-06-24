@@ -83,7 +83,7 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(t.rightPanel.promptsTab.deleteConfirm)) return;
+    if (!(await window.electronAPI.dialog.confirm(t.rightPanel.promptsTab.deleteConfirm))) return;
 
     try {
       await window.electronAPI.templates.delete(id);
@@ -95,7 +95,7 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
 
   const handleDeleteAll = async () => {
     if (templates.length === 0) return;
-    if (!confirm(t.rightPanel.promptsTab.deleteAllConfirm(templates.length))) return;
+    if (!(await window.electronAPI.dialog.confirm(t.rightPanel.promptsTab.deleteAllConfirm(templates.length)))) return;
 
     try {
       for (const template of templates) {

@@ -58,7 +58,7 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
       return;
     }
 
-    if (!confirm(t.leftSidebar.deleteAllConfirm(sessions.length))) {
+    if (!(await window.electronAPI.dialog.confirm(t.leftSidebar.deleteAllConfirm(sessions.length)))) {
       return;
     }
 
@@ -83,7 +83,7 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
   const handleDeleteSession = async (sessionId: string, event: React.MouseEvent) => {
     event.stopPropagation();
 
-    if (!confirm(t.leftSidebar.deleteSessionConfirm)) {
+    if (!(await window.electronAPI.dialog.confirm(t.leftSidebar.deleteSessionConfirm))) {
       return;
     }
 

@@ -143,6 +143,9 @@ export const IpcChannels = {
   agents: {
     list: 'agents:list',
   },
+  dialog: {
+    confirm: 'dialog:confirm',
+  },
 } as const;
 
 /**
@@ -245,4 +248,7 @@ export interface ChannelMap {
 
   // Agents
   'agents:list': { args: []; result: AgentSummary[] };
+
+  // Dialog
+  'dialog:confirm': { args: [message: string]; result: boolean };
 }

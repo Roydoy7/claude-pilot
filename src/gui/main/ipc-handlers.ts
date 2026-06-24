@@ -762,4 +762,27 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     const definitions = await getAgentDefinitions();
     return definitions.map(({ id, displayName, description, prompts }) => ({ id, displayName, description, prompts }));
   });
+
+  /**
+   * Dialog Management
+   */
+
+  /**
+   * Show a native OK/Cancel confirm dialog.
+   * Uses dialog.showMessageBox rather than the renderer's window.confirm() -
+   * the latter blocks the webContents thread, and on some platforms the
+   * window never reliably regains keyboard focus afterward (inputs render
+   * with no cursor and silently ignore keystrokes until the window is
+   * refocused manually).
+   */
+  handleIpc(IpcChannels.dialog.confirm, async (_event, message: string) => {
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      buttons: ['OK', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      message,
+    });
+    return result.response === 0;
+  });
 }
