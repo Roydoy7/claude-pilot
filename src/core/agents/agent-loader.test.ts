@@ -34,7 +34,7 @@ describe('getAgentDefinitions', () => {
     const officeAssist = await getAgentDefinition('office-assist');
 
     expect(Object.keys(officeAssist.mcpServers).sort()).toEqual(
-      ['convert', 'docx', 'image', 'pdf', 'pptx', 'python', 'typescript', 'xlsx'].sort(),
+      ['claude', 'convert', 'docx', 'image', 'pdf', 'pptx', 'python', 'typescript', 'xlsx'].sort(),
     );
     expect(officeAssist.autoApprovedMcpTools).toContain('mcp__convert__convert');
   });
