@@ -155,7 +155,7 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
                 title={title}
                 onClick={() => onSessionSelect?.(session)}
               >
-                {title.charAt(0).toUpperCase()}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" /></svg>
               </button>
             );
           })}
@@ -177,7 +177,7 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
           </svg>
         </button>
         <button
-          className="icon-button"
+          className="icon-button sidebar-delete-all"
           onClick={handleDeleteAll}
           disabled={sessions.length === 0}
           title={sessions.length === 0 ? t.leftSidebar.noSessionsToDelete : t.leftSidebar.deleteAllTooltip(sessions.length)}

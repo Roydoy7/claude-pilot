@@ -15,9 +15,9 @@ import { useAgentDefinitions } from './hooks/useAgentDefinitions.js';
 import type { Session } from '../../core/sessions/session-manager.js';
 
 const PANEL_WIDTH_KEY = 'rightPanelWidth';
-const DEFAULT_PANEL_WIDTH = 380;
-const MIN_PANEL_WIDTH = 280;
-const MAX_PANEL_WIDTH = 800;
+const DEFAULT_PANEL_WIDTH = 360;
+const MIN_PANEL_WIDTH = 304;
+const MAX_PANEL_WIDTH = 520;
 
 function App() {
   const agentDefinitions = useAgentDefinitions();
