@@ -216,35 +216,19 @@ export function SettingsDialog({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Welcome message for first-time users */}
       {showWelcomeMessage && !authStatus?.authenticated && (
-        <div
-          style={{
-            padding: '1rem',
-            backgroundColor: 'var(--warning-subtle)',
-            border: '1px solid var(--warning)',
-            borderRadius: '8px',
-            color: 'var(--warning)',
-            fontSize: '0.875rem',
-          }}
-        >
+        <div className="alert-error" style={{ backgroundColor: 'var(--warning-subtle)', borderColor: 'var(--warning)', color: 'var(--warning)', fontSize: 'var(--text-sm)', padding: '1rem' }}>
           {t.settings?.account?.welcomeMessage || 'Welcome! Please authenticate to start using Claude Pilot.'}
         </div>
       )}
 
       {/* Authentication Status */}
       <div className="settings-group">
-        <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <h4 className="settings-section-title" style={{ marginBottom: '1rem' }}>
           {t.settings?.account?.status || 'Authentication Status'}
         </h4>
 
         {authStatus?.authenticated ? (
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-            }}
-          >
+          <div className="panel-card" style={{ padding: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', marginBottom: '0.75rem' }}>
               <span>✓</span>
               <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
@@ -260,31 +244,13 @@ export function SettingsDialog({
               </div>
             )}
             {authStatus.apiKeySource === 'oauth' && (
-              <button
-                onClick={handleLogout}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  border: '1px solid #dc2626',
-                  borderRadius: '6px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--error)',
-                  cursor: 'pointer',
-                }}
-              >
+              <button className="btn btn-danger-ghost" onClick={handleLogout}>
                 {t.settings?.account?.logout || 'Logout'}
               </button>
             )}
           </div>
         ) : (
-          <div
-            style={{
-              padding: '1rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-            }}
-          >
+          <div className="panel-card" style={{ padding: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--error)', marginBottom: '1rem' }}>
               <span>⚠</span>
               <span style={{ fontSize: '0.875rem' }}>{t.settings?.account?.notAuthenticated || 'Not authenticated'}</span>
@@ -292,34 +258,18 @@ export function SettingsDialog({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <button
+                className="btn btn-primary"
                 onClick={() => handleOAuthLogin('claudeai')}
                 disabled={isLoggingIn}
-                style={{
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  border: '1px solid var(--accent)',
-                  borderRadius: '6px',
-                  backgroundColor: isLoggingIn ? 'var(--bg-tertiary)' : 'var(--accent)',
-                  color: 'var(--on-accent)',
-                  cursor: isLoggingIn ? 'not-allowed' : 'pointer',
-                }}
+                style={{ padding: '0.75rem 1rem' }}
               >
                 {isLoggingIn ? (t.settings?.account?.loggingIn || 'Logging in...') : (t.settings?.account?.loginWithClaude || 'Login with Claude Account (Pro/Max/Team)')}
               </button>
               <button
+                className="btn btn-secondary"
                 onClick={() => handleOAuthLogin('console')}
                 disabled={isLoggingIn}
-                style={{
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  border: '1px solid var(--border)',
-                  borderRadius: '6px',
-                  backgroundColor: isLoggingIn ? 'var(--bg-tertiary)' : 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  cursor: isLoggingIn ? 'not-allowed' : 'pointer',
-                }}
+                style={{ padding: '0.75rem 1rem' }}
               >
                 {isLoggingIn ? (t.settings?.account?.loggingIn || 'Logging in...') : (t.settings?.account?.loginWithConsole || 'Login with Console Account (API Billing)')}
               </button>
@@ -345,27 +295,19 @@ export function SettingsDialog({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Default Role */}
       <div className="settings-group">
-        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <h4 className="settings-section-title">
           {t.settings?.defaults?.role || 'Default Role'}
         </h4>
-        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+        <p className="settings-section-desc">
           {t.settings?.defaults?.roleDescription || 'Role used when creating new sessions'}
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {agentDefinitions.map((agent) => (
             <button
               key={agent.id}
+              className="choice-btn"
+              data-selected={selectedAgentId === agent.id}
               onClick={() => handleAgentChange(agent.id)}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                backgroundColor: selectedAgentId === agent.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: selectedAgentId === agent.id ? 'var(--on-accent)' : 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
             >
               {agent.displayName}
             </button>
@@ -375,29 +317,19 @@ export function SettingsDialog({
 
       {/* Default Working Directory */}
       <div className="settings-group">
-        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <h4 className="settings-section-title">
           {t.settings?.defaults?.workingDirectory || 'Default Working Directory'}
         </h4>
-        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+        <p className="settings-section-desc">
           {t.settings?.defaults?.workingDirectoryDescription || 'Working directory used when creating new sessions'}
         </p>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem',
-            border: '1px solid var(--border)',
-            borderRadius: '6px',
-            backgroundColor: 'var(--bg-secondary)',
-          }}
-        >
+        <div className="panel-card" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem' }}>
           <div
+            className="mono"
             style={{
               flex: 1,
-              fontSize: '0.875rem',
+              fontSize: 'var(--text-sm)',
               color: selectedCwd ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontFamily: 'monospace',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -407,18 +339,9 @@ export function SettingsDialog({
             {selectedCwd || (t.settings?.defaults?.noDirectory || 'No directory selected')}
           </div>
           <button
+            className="btn btn-secondary btn-sm"
             onClick={handleSelectDirectory}
-            style={{
-              padding: '0.375rem 0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              backgroundColor: 'var(--accent)',
-              color: 'var(--on-accent)',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
+            style={{ flexShrink: 0 }}
           >
             {t.settings?.defaults?.browse || 'Browse'}
           </button>
@@ -434,54 +357,28 @@ export function SettingsDialog({
       <div className="settings-group">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+            <h4 className="settings-section-title" style={{ marginBottom: '0.25rem' }}>
               {t.settings?.appearance?.theme || 'Theme'}
             </h4>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            <p className="settings-section-desc" style={{ margin: 0 }}>
               {t.settings?.appearance?.themeDescription || 'Choose your preferred color theme'}
             </p>
           </div>
-          <div
-            style={{
-              display: 'flex',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              overflow: 'hidden',
-            }}
-          >
+          <div className="segmented">
             <button
+              className="segmented-btn"
+              data-active={theme === 'light'}
               onClick={() => handleThemeChange('light')}
-              style={{
-                padding: '0.375rem 0.75rem',
-                fontSize: '0.8125rem',
-                fontWeight: 500,
-                border: 'none',
-                backgroundColor: theme === 'light' ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: theme === 'light' ? 'var(--on-accent)' : 'var(--text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.375rem',
-              }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}
             >
               <span>☀️</span>
               <span>{t.settings?.appearance?.themeLight || 'Light'}</span>
             </button>
             <button
+              className="segmented-btn"
+              data-active={theme === 'dark'}
               onClick={() => handleThemeChange('dark')}
-              style={{
-                padding: '0.375rem 0.75rem',
-                fontSize: '0.8125rem',
-                fontWeight: 500,
-                border: 'none',
-                borderLeft: '1px solid var(--border)',
-                backgroundColor: theme === 'dark' ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: theme === 'dark' ? 'var(--on-accent)' : 'var(--text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.375rem',
-              }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}
             >
               <span>🌙</span>
               <span>{t.settings?.appearance?.themeDark || 'Dark'}</span>
@@ -494,26 +391,18 @@ export function SettingsDialog({
       <div className="settings-group">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+            <h4 className="settings-section-title" style={{ marginBottom: '0.25rem' }}>
               {t.settings?.appearance?.language || 'Language'}
             </h4>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            <p className="settings-section-desc" style={{ margin: 0 }}>
               {t.settings?.appearance?.languageDescription || 'Choose your preferred language'}
             </p>
           </div>
           <select
+            className="form-input"
             value={language}
             onChange={(e) => handleLanguageChange(e.target.value as 'en' | 'zh' | 'ja')}
-            style={{
-              padding: '0.375rem 0.75rem',
-              fontSize: '0.8125rem',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              minWidth: '120px',
-            }}
+            style={{ minWidth: '120px', cursor: 'pointer' }}
           >
             <option value="en">🇺🇸 {t.settings?.appearance?.languageEn || 'English'}</option>
             <option value="zh">🇨🇳 {t.settings?.appearance?.languageZh || '中文'}</option>
@@ -526,63 +415,22 @@ export function SettingsDialog({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
+      className="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        style={{
-          backgroundColor: 'var(--bg-primary)',
-          borderRadius: '12px',
-          width: '90%',
-          maxWidth: '700px',
-          height: '80vh',
-          maxHeight: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          overflow: 'hidden',
-        }}
+        className="modal"
+        style={{ width: '90%', maxWidth: '700px', height: '80vh', maxHeight: '600px', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '1rem 1.5rem',
-            borderBottom: '1px solid var(--border)',
-            flexShrink: 0,
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div className="modal-header" style={{ flexShrink: 0, alignItems: 'center' }}>
+          <h2 className="modal-title">
             {t.settings?.title || 'Settings'}
           </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              padding: '0.25rem',
-              lineHeight: 1,
-            }}
-          >
+          <button className="modal-close" onClick={onClose} style={{ fontSize: '20px' }}>
             ×
           </button>
         </div>
@@ -608,34 +456,9 @@ export function SettingsDialog({
             {categories.map((category) => (
               <button
                 key={category.id}
+                className="settings-nav-btn"
+                data-active={activeCategory === category.id}
                 onClick={() => setActiveCategory(category.id)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: activeCategory === category.id ? 600 : 400,
-                  border: 'none',
-                  borderRadius: '6px',
-                  backgroundColor: activeCategory === category.id ? 'var(--accent)' : 'transparent',
-                  color: activeCategory === category.id ? 'var(--on-accent)' : 'var(--text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  textAlign: 'left',
-                  marginBottom: '0.25rem',
-                  transition: 'background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  if (activeCategory !== category.id) {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (activeCategory !== category.id) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
               >
                 <span>{category.icon}</span>
                 <span>{category.label}</span>

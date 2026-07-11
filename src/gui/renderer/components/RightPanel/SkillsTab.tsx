@@ -30,36 +30,19 @@ function SkillCard({ skill, isInstalled, onInstall, onUninstall, loading, t }: S
   const metadata = skill.metadata;
 
   return (
-    <div
-      style={{
-        padding: '0.75rem',
-        borderRadius: '8px',
-        border: '1px solid var(--border)',
-        backgroundColor: 'var(--bg-secondary)',
-        marginBottom: '0.5rem',
-      }}
-    >
+    <div className="panel-card" style={{ marginBottom: '0.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+          <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
             {metadata.name}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
             {metadata.description}
           </div>
           {metadata.tags && metadata.tags.length > 0 && (
             <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
               {metadata.tags.map((tag) => (
-                <span
-                  key={tag}
-                  style={{
-                    fontSize: '0.65rem',
-                    padding: '0.125rem 0.375rem',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
+                <span key={tag} className="tag">
                   {tag}
                 </span>
               ))}
@@ -68,37 +51,11 @@ function SkillCard({ skill, isInstalled, onInstall, onUninstall, loading, t }: S
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
           {isInstalled ? (
-            <button
-              onClick={onUninstall}
-              disabled={loading}
-              style={{
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.7rem',
-                borderRadius: '4px',
-                border: '1px solid #ef4444',
-                backgroundColor: 'transparent',
-                color: 'var(--error)',
-                cursor: loading ? 'wait' : 'pointer',
-                opacity: loading ? 0.5 : 1,
-              }}
-            >
+            <button className="btn btn-danger-ghost btn-sm" onClick={onUninstall} disabled={loading}>
               {loading ? '...' : t.uninstall}
             </button>
           ) : (
-            <button
-              onClick={onInstall}
-              disabled={loading}
-              style={{
-                padding: '0.25rem 0.75rem',
-                fontSize: '0.7rem',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: 'var(--accent)',
-                color: 'var(--on-accent)',
-                cursor: loading ? 'wait' : 'pointer',
-                opacity: loading ? 0.5 : 1,
-              }}
-            >
+            <button className="btn btn-primary btn-sm" onClick={onInstall} disabled={loading}>
               {loading ? t.installing : t.install}
             </button>
           )}
@@ -279,34 +236,18 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
         </div>
 
         {/* View Toggle */}
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
+        <div className="segmented">
           <button
+            className="segmented-btn"
+            data-active={view === 'installed'}
             onClick={() => setView('installed')}
-            style={{
-              flex: 1,
-              padding: '0.375rem',
-              fontSize: '0.75rem',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              backgroundColor: view === 'installed' ? 'var(--accent)' : 'transparent',
-              color: view === 'installed' ? 'var(--on-accent)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-            }}
           >
             {t.rightPanel.skillsTab.installed} ({installedSkills.length})
           </button>
           <button
+            className="segmented-btn"
+            data-active={view === 'marketplace'}
             onClick={() => setView('marketplace')}
-            style={{
-              flex: 1,
-              padding: '0.375rem',
-              fontSize: '0.75rem',
-              borderRadius: '4px',
-              border: '1px solid var(--border)',
-              backgroundColor: view === 'marketplace' ? 'var(--accent)' : 'transparent',
-              color: view === 'marketplace' ? 'var(--on-accent)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-            }}
           >
             {t.rightPanel.skillsTab.marketplace}
           </button>
@@ -315,17 +256,7 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
 
       {/* Error Message */}
       {error && (
-        <div
-          style={{
-            padding: '0.5rem',
-            marginBottom: '0.5rem',
-            borderRadius: '4px',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid #ef4444',
-            color: 'var(--error)',
-            fontSize: '0.75rem',
-          }}
-        >
+        <div className="alert-error" style={{ marginBottom: '0.5rem' }}>
           {error}
           <button
             onClick={() => setError(null)}
@@ -381,19 +312,12 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
             {/* Marketplace Selector */}
             <div style={{ marginBottom: '0.75rem' }}>
               <select
+                className="form-input"
                 value={selectedMarketplace}
                 onChange={(e) => {
                   setSelectedMarketplace(e.target.value);
                 }}
-                style={{
-                  width: '100%',
-                  padding: '0.375rem',
-                  fontSize: '0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)',
-                }}
+                style={{ width: '100%' }}
               >
                 {marketplaces.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -406,19 +330,10 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
             {/* Refresh Button */}
             <div style={{ marginBottom: '0.75rem' }}>
               <button
+                className="btn btn-secondary"
                 onClick={fetchMarketplace}
                 disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: '0.375rem',
-                  fontSize: '0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)',
-                  cursor: loading ? 'wait' : 'pointer',
-                  opacity: loading ? 0.7 : 1,
-                }}
+                style={{ width: '100%' }}
               >
                 {loading ? t.rightPanel.skillsTab.loading : t.rightPanel.skillsTab.refreshMarketplace}
               </button>

@@ -115,15 +115,8 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
     <div className="prompts-tab" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
       {/* Header */}
       <div style={{ padding: '1rem 1rem 12px 1rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <h3 className="tab-title" style={{ marginBottom: '8px', margin: 0 }}>{t.rightPanel.promptsTab.title}</h3>
-        <p
-          style={{
-            fontSize: '0.85rem',
-            color: 'var(--text-secondary)',
-            margin: 0,
-            lineHeight: '1.4',
-          }}
-        >
+        <h3 className="tab-title" style={{ margin: 0 }}>{t.rightPanel.promptsTab.title}</h3>
+        <p className="panel-tab-description" style={{ margin: '8px 0 0' }}>
           {t.rightPanel.promptsTab.description}
         </p>
       </div>
@@ -150,17 +143,10 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
           {t.rightPanel.promptsTab.newTemplate}
         </button>
         <button
+          className="btn btn-secondary"
           onClick={handleDeleteAll}
           disabled={templates.length === 0}
           style={{
-            padding: '8px 12px',
-            fontSize: '13px',
-            backgroundColor: 'var(--bg-secondary)',
-            color: templates.length === 0 ? 'var(--text-secondary)' : 'var(--text-primary)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            cursor: templates.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: templates.length === 0 ? 0.5 : 1,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -192,35 +178,12 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
                 </span>
                 <div className="prompt-item-actions">
                   <button
+                    className="item-action-btn"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleEdit(template);
                     }}
                     title={t.rightPanel.promptsTab.editTooltip}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      padding: 0,
-                      fontSize: '14px',
-                      backgroundColor: 'transparent',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid transparent',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                      e.currentTarget.style.borderColor = 'var(--border)';
-                      e.currentTarget.style.color = 'var(--text-primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                    }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -228,32 +191,9 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
                     </svg>
                   </button>
                   <button
+                    className="item-action-btn danger"
                     onClick={(e) => handleDelete(template.id, e)}
                     title={t.rightPanel.promptsTab.deleteTooltip}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      padding: 0,
-                      fontSize: '14px',
-                      backgroundColor: 'transparent',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid transparent',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--error-subtle)';
-                      e.currentTarget.style.borderColor = 'var(--error)';
-                      e.currentTarget.style.color = 'var(--error)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                    }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="3 6 5 6 21 6"></polyline>

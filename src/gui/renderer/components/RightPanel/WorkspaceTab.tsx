@@ -82,84 +82,39 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
   };
 
   return (
-    <div className="workspace-tab" style={{ padding: '1rem', overflowY: 'auto', height: '100%' }}>
+    <div className="workspace-tab panel-scroll">
       <h3 className="tab-title">{t.rightPanel.workspaceTab.title}</h3>
 
       {/* Description */}
-      <div style={{
-        marginBottom: '1rem',
-      }}>
-        <p style={{
-          fontSize: '0.9rem',
-          fontWeight: '500',
-          color: 'var(--accent)',
-          margin: 0,
-          lineHeight: '1.5',
-        }}>
-          {t.rightPanel.workspaceTab.description}
-        </p>
-      </div>
+      <p className="panel-tab-description">
+        {t.rightPanel.workspaceTab.description}
+      </p>
 
       {!sessionId ? (
         /* No Session Active */
-        <div style={{
-          padding: '1rem',
-          backgroundColor: 'var(--bg-hover)',
-          borderRadius: '8px',
-          textAlign: 'center',
-          color: 'var(--text-secondary)',
-          fontSize: '0.9rem',
-        }}>
+        <div className="panel-empty">
           {t.rightPanel.workspaceTab.noSessionWarning}
         </div>
       ) : (
         <>
           {/* Current Working Directory (Read-only) */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h4 style={{
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              color: 'var(--text-secondary)',
-              marginBottom: '0.5rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}>
+          <div className="panel-section">
+            <h4 className="panel-section-title">
               {t.rightPanel.workspaceTab.workingDirectory}
             </h4>
-            <div style={{
-              padding: '0.75rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: '6px',
-              border: '1px solid var(--border)',
-            }}>
-              <div style={{
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                fontFamily: 'monospace',
-                wordBreak: 'break-all',
-              }}>
+            <div className="panel-card">
+              <div className="mono" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
                 {cwd || t.sessionConfig.noDirectorySelected}
               </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginTop: '0.5rem',
-              }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                 {t.rightPanel.workspaceTab.setDuringCreation}
               </div>
             </div>
           </div>
 
           {/* Additional Directories */}
-          <div style={{ marginBottom: '1rem' }}>
-            <h4 style={{
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              color: 'var(--text-secondary)',
-              marginBottom: '0.5rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}>
+          <div className="panel-section">
+            <h4 className="panel-section-title">
               {t.rightPanel.workspaceTab.additionalDirectories(additionalDirectories.length)}
             </h4>
 
@@ -168,23 +123,14 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
               className="add-workspace-button"
               onClick={handleAddDirectory}
               disabled={loading}
-              style={{
-                marginBottom: '0.75rem',
-              }}
+              style={{ marginBottom: '0.75rem' }}
             >
               {t.rightPanel.workspaceTab.addDirectory}
             </button>
 
             {/* Directory List */}
             {additionalDirectories.length === 0 ? (
-              <div style={{
-                padding: '1rem',
-                backgroundColor: 'var(--bg-hover)',
-                borderRadius: '6px',
-                textAlign: 'center',
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-              }}>
+              <div className="panel-empty">
                 {t.rightPanel.workspaceTab.noAdditionalDirectories}
               </div>
             ) : (
@@ -192,22 +138,10 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                 {additionalDirectories.map((path, index) => (
                   <div key={index} className="workspace-item">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minWidth: 0 }}>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: 'var(--accent)',
-                        flexShrink: 0,
-                      }}>
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>
                         {t.rightPanel.workspaceTab.directoryLabel(index + 1)}
                       </span>
-                      <span
-                        className="workspace-path"
-                        title={path}
-                        style={{
-                          fontSize: '0.85rem',
-                          fontFamily: 'monospace',
-                        }}
-                      >
+                      <span className="workspace-path mono" title={path} style={{ fontSize: '0.85rem' }}>
                         {path}
                       </span>
                     </div>
@@ -225,16 +159,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
           </div>
 
           {/* Info Box */}
-          <div style={{
-            marginTop: '1.5rem',
-            padding: '0.75rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderLeft: '3px solid var(--accent)',
-            borderRadius: '4px',
-            fontSize: '0.8rem',
-            color: 'var(--text-secondary)',
-            lineHeight: '1.5',
-          }}>
+          <div className="panel-note">
             {t.rightPanel.workspaceTab.accessNote}
           </div>
         </>

@@ -104,57 +104,16 @@ export function TemplateEditorModal({ template, isNew, onClose, onSave, onCreate
   if (!template && !isNew) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onKeyDown={handleKeyDown}
-    >
+    <div className="modal-overlay" onKeyDown={handleKeyDown}>
       <div
-        style={{
-          backgroundColor: 'var(--bg-primary)',
-          borderRadius: '8px',
-          width: '80%',
-          maxWidth: '900px',
-          height: '80%',
-          maxHeight: '700px',
-          display: 'flex',
-          flexDirection: 'column',
-          border: '1px solid var(--border)',
-        }}
+        className="modal"
+        style={{ width: '80%', maxWidth: '900px', height: '80%', maxHeight: '700px' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>{isNew ? 'New Template' : 'Edit Template'}</h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              padding: '0 8px',
-            }}
-          >
+        <div className="modal-header">
+          <h3 className="modal-title">{isNew ? 'New Template' : 'Edit Template'}</h3>
+          <button className="modal-close" onClick={onClose} style={{ fontSize: '20px' }}>
             ×
           </button>
         </div>
@@ -166,15 +125,8 @@ export function TemplateEditorModal({ template, isNew, onClose, onSave, onCreate
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Template name..."
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              fontSize: '14px',
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              color: 'var(--text-primary)',
-            }}
+            className="form-input"
+            style={{ width: '100%' }}
           />
         </div>
 
@@ -190,16 +142,8 @@ export function TemplateEditorModal({ template, isNew, onClose, onSave, onCreate
           }}
         >
           <button
+            className={showPreview ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
             onClick={() => setShowPreview(!showPreview)}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              backgroundColor: showPreview ? 'var(--accent)' : 'var(--bg-secondary)',
-              color: showPreview ? 'white' : 'var(--text-primary)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
           >
             {showPreview ? '📝 Edit' : '👁 Preview'}
           </button>
@@ -209,157 +153,65 @@ export function TemplateEditorModal({ template, isNew, onClose, onSave, onCreate
               <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border)' }} />
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('**', '**')}
-                title="Bold"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                title="Bold" style={{ fontWeight: 'bold' }}
               >
                 B
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('*', '*')}
-                title="Italic"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontStyle: 'italic',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                title="Italic" style={{ fontStyle: 'italic' }}
               >
                 I
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('`', '`')}
-                title="Inline Code"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontFamily: 'monospace',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                title="Inline Code" style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {'</>'}
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('```\n', '\n```')}
                 title="Code Block"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 {'{ }'}
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('[', '](url)')}
                 title="Link"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 🔗
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('- ', '')}
                 title="Bullet List"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 •
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('1. ', '')}
                 title="Numbered List"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 1.
               </button>
 
               <button
+                className="editor-tool-btn"
                 onClick={() => insertMarkdown('# ', '')}
-                title="Heading"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text-primary)',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                title="Heading" style={{ fontWeight: 'bold' }}
               >
                 H
               </button>
@@ -392,7 +244,7 @@ Supports Markdown:
                 border: 'none',
                 color: 'var(--text-primary)',
                 resize: 'none',
-                fontFamily: 'monospace',
+                fontFamily: 'var(--font-mono)',
               }}
             />
           ) : (
@@ -453,42 +305,14 @@ Supports Markdown:
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '16px 20px',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px',
-          }}
-        >
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>
             Cancel
           </button>
           <button
+            className="btn btn-primary"
             onClick={handleSave}
             disabled={isSaving || !name.trim()}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              backgroundColor: isSaving || !name.trim() ? 'var(--bg-secondary)' : 'var(--accent)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: isSaving || !name.trim() ? 'not-allowed' : 'pointer',
-              opacity: isSaving || !name.trim() ? 0.5 : 1,
-            }}
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>

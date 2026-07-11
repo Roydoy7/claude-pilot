@@ -1331,6 +1331,355 @@ body.resizing-panel {
 }
 
 /* ========================================
+   Panel primitives (right panel tabs, dialogs)
+   ======================================== */
+
+.panel-scroll {
+  padding: var(--space-4);
+  overflow-y: auto;
+  height: 100%;
+}
+
+.panel-section {
+  margin-bottom: var(--space-5);
+}
+
+.panel-section-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 var(--space-2);
+}
+
+.panel-card {
+  padding: var(--space-3);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.panel-empty {
+  padding: var(--space-4);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.panel-tab-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-4);
+  line-height: 1.5;
+}
+
+.panel-note {
+  padding: var(--space-3);
+  background-color: var(--bg-tertiary);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Modal primitives - one language for every dialog */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+.modal {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 40px var(--shadow-hover);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  animation: slide-up var(--duration-normal) var(--ease-out);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5);
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background-color: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.modal-close:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Button primitives */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+}
+
+.btn-sm {
+  padding: 0.25rem 0.625rem;
+  font-size: var(--text-xs);
+}
+
+/* Segmented control (view toggles) */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.segmented-btn {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.segmented-btn:hover {
+  color: var(--text-primary);
+}
+
+.segmented-btn[data-active='true'] {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+/* Small metadata tag */
+.tag {
+  font-size: var(--text-xs);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+/* Inline error alert */
+.alert-error {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--error-subtle);
+  border: 1px solid var(--error);
+  color: var(--error);
+  font-size: var(--text-xs);
+}
+
+/* Settings dialog navigation */
+.settings-nav-btn {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-size: var(--text-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+  margin-bottom: 2px;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.settings-nav-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.settings-nav-btn[data-active='true'] {
+  background-color: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.settings-section-title {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-section-desc {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* Selectable choice chip (default role picker etc.) */
+.choice-btn {
+  padding: 0.5rem 1rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.choice-btn:hover {
+  border-color: var(--accent);
+}
+
+.choice-btn[data-selected='true'] {
+  border-color: var(--accent);
+  background-color: var(--accent-subtle);
+  color: var(--accent);
+}
+
+/* Markdown editor toolbar button (text glyphs, auto width) */
+.editor-tool-btn {
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+  background-color: transparent;
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.editor-tool-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+/* Small per-item icon action (edit / delete on list rows) */
+.item-action-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.item-action-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.item-action-btn.danger:hover {
+  background-color: var(--error-subtle);
+  color: var(--error);
+}
+
+/* Danger stays a ghost until hovered - never a solid red block */
+.btn-danger-ghost {
+  background-color: transparent;
+  color: var(--error);
+  border: 1px solid transparent;
+}
+
+.btn-danger-ghost:hover:not(:disabled) {
+  background-color: var(--error-subtle);
+}
+
+/* ========================================
    Workspace Tab
    ======================================== */
 
@@ -1673,16 +2022,13 @@ body.resizing-panel {
 
 .workspace-browser-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
-  animation: fade-in 0.15s ease;
+  z-index: var(--z-modal);
+  animation: fade-in var(--duration-normal) var(--ease-out);
 }
 
 @keyframes fade-in {
@@ -1699,11 +2045,11 @@ body.resizing-panel {
   max-width: 800px;
   max-height: 80vh;
   background-color: var(--bg-primary);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 40px var(--shadow-hover);
   display: flex;
   flex-direction: column;
-  animation: slide-up 0.2s ease;
+  animation: slide-up var(--duration-normal) var(--ease-out);
 }
 
 @keyframes slide-up {
@@ -1995,7 +2341,7 @@ body.resizing-panel {
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--border);
   background-color: var(--bg-secondary);
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .workspace-browser-selection-count {
