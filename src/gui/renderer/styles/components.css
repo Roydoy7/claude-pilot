@@ -25,40 +25,39 @@
 .header {
   display: flex;
   align-items: center;
-  height: 60px;
-  padding: 0 1.5rem;
+  height: 48px;
+  padding: 0 1rem;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
-  gap: 1.5rem;
+  gap: 1rem;
   flex-shrink: 0;
 }
 
 .header-logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  min-width: 120px;
+  gap: 0.5rem;
   font-weight: 600;
-  font-size: 1.125rem;
+  font-size: var(--text-base);
   color: var(--text-primary);
   text-decoration: none;
   user-select: none;
 }
 
 .header-logo-icon {
-  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
 }
 
+/* Session info as a plain breadcrumb - no box */
 .header-session-info {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.5rem 0.875rem;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.875rem;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
   user-select: none;
+  min-width: 0;
 }
 
 .session-role {
@@ -71,27 +70,22 @@
   font-weight: 300;
 }
 
-.session-provider {
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 0.8125rem;
-}
-
 .session-model {
   color: var(--text-secondary);
-  font-weight: 400;
-  font-family: monospace;
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 
 .session-cwd {
   color: var(--text-secondary);
-  font-weight: 400;
-  font-family: monospace;
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   display: inline-flex;
   align-items: center;
   cursor: default;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-cwd:hover {
@@ -101,7 +95,7 @@
 .session-label {
   color: var(--text-tertiary);
   font-weight: 400;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   margin-right: 4px;
 }
 
@@ -231,25 +225,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   background-color: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 .icon-button:hover {
-  background-color: var(--bg-tertiary);
-  border-color: var(--accent);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.icon-button:active {
-  transform: translateY(0);
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .icon-button:disabled {
@@ -259,9 +248,22 @@
 
 .icon-button:disabled:hover {
   background-color: transparent;
-  border-color: var(--border);
-  transform: none;
-  box-shadow: none;
+  color: var(--text-secondary);
+}
+
+/* One-shot attention pulse (auth warning etc.) - runs a few times, then rests */
+@keyframes attention-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.icon-button.attention {
+  color: var(--warning);
+  animation: attention-pulse 1s var(--ease-out) 3;
 }
 
 /* ========================================

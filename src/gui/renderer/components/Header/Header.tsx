@@ -105,14 +105,14 @@ export function Header({
             <span className="session-label">{t.header.sessionInfo.role}</span>
             {getAgentDisplayName(currentSession.agentId)}
           </span>
-          <span className="session-separator">•</span>
+          <span className="session-separator">/</span>
           <span className="session-model" title={`${t.header.sessionInfo.model}: ${currentSession.modelName}`}>
             <span className="session-label">{t.header.sessionInfo.model}</span>
             {getModelDisplayName(currentSession.modelName)}
           </span>
           {currentSession.cwd && (
             <>
-              <span className="session-separator">•</span>
+              <span className="session-separator">/</span>
               <span className="session-cwd" title={currentSession.cwd}>
                 <span className="session-label">{t.header.sessionInfo.workspace}</span>
                 {getShortDirName(currentSession.cwd)}
@@ -128,12 +128,9 @@ export function Header({
         {/* Auth warning icon - shown when not authenticated */}
         {!isAuthenticated && (
           <button
-            className="icon-button"
+            className="icon-button attention"
             onClick={handleOpenSettings}
             title="Authentication required"
-            style={{
-              color: 'var(--warning)',
-            }}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
