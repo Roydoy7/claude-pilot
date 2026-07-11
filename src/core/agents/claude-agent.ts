@@ -504,6 +504,7 @@ export class ClaudeAgent {
     let accumulatedText = '';
     let finalUsage: UsageMetadata | undefined;
     let terminalReason: TerminalReason | undefined;
+    let isCompacting = false;
 
     try {
       for await (const chunk of queryInstance) {
@@ -828,6 +829,7 @@ export class ClaudeAgent {
 
               case 'status': {
                 if (chunk.status === 'compacting') {
+                  isCompacting = true;
                   // Compacting started - show command running state
                   yield {
                     type: 'state',
@@ -836,8 +838,12 @@ export class ClaudeAgent {
                       command: { name: 'compact', status: 'running' },
                     },
                   };
-                } else if (chunk.status === null) {
-                  // Status cleared (e.g., compacting finished) - clear command state
+                } else if (chunk.status === null && isCompacting) {
+                  // Compacting finished - clear command state.
+                  // Other status:null messages (e.g. permission mode change
+                  // notifications, 'requesting' cleared) must NOT clear the
+                  // thinking state - the turn is still running.
+                  isCompacting = false;
                   yield {
                     type: 'state',
                     state: {
