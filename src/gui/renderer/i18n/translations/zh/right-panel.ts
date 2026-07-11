@@ -5,6 +5,7 @@
  */
 
 export const rightPanelZh = {
+  context: '上下文',
   // Tab labels
   workspace: '工作区',
   prompts: '提示词',

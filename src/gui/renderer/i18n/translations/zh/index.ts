@@ -113,6 +113,7 @@ export const zhTranslations: Translation = {
 
   // Right Panel - Including all tab translations
   rightPanel: {
+    context: rightPanelZh.context,
     workspace: rightPanelZh.workspace,
     prompts: rightPanelZh.prompts,
     skills: rightPanelZh.skills,

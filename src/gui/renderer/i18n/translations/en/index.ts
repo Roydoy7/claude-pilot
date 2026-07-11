@@ -113,6 +113,7 @@ export const enTranslations: Translation = {
 
   // Right Panel - Including all tab translations
   rightPanel: {
+    context: rightPanelEn.context,
     workspace: rightPanelEn.workspace,
     prompts: rightPanelEn.prompts,
     skills: rightPanelEn.skills,

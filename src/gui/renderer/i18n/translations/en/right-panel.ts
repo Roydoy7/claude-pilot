@@ -5,6 +5,7 @@
  */
 
 export const rightPanelEn = {
+  context: 'Context',
   // Tab labels
   workspace: 'Workspace',
   prompts: 'Prompts',

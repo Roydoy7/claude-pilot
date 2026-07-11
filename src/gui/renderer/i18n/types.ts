@@ -312,6 +312,7 @@ export interface Translation {
 
   // Right Panel
   rightPanel: {
+    context: string;
     workspace: string;
     prompts: string;
     skills: string;

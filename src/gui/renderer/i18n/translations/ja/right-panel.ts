@@ -5,6 +5,7 @@
  */
 
 export const rightPanelJa = {
+  context: 'コンテキスト',
   // Tab labels
   workspace: 'ワークスペース',
   prompts: 'プロンプト',
