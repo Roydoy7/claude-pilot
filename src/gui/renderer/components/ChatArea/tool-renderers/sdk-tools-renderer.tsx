@@ -42,7 +42,7 @@ export const WriteIcon = () => (
     height="16"
     viewBox="0 0 24 24"
     fill="none"
-    stroke="#10b981"
+    stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -178,7 +178,7 @@ export const readRenderer: ToolConfig = {
       <div
         style={{
           ...contentContainerStyle,
-          border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+          border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
           maxHeight: '300px',
           overflow: 'auto',
         }}
@@ -262,7 +262,7 @@ export const writeRenderer: ToolConfig = {
           key="details"
           style={{
             ...contentContainerStyle,
-            border: '1px solid #10b981',
+            border: '1px solid var(--success)',
           }}
         >
           <div style={{ marginBottom: content ? '0.25rem' : 0 }}>
@@ -286,7 +286,7 @@ export const writeRenderer: ToolConfig = {
           key="result"
           style={{
             ...contentContainerStyle,
-            border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--success)',
           }}
         >
           <span style={{ color: response.error ? 'var(--error)' : 'var(--success)' }}>
@@ -370,7 +370,7 @@ export const bashRenderer: ToolConfig = {
           padding: '0.05rem 0.75rem',
           backgroundColor: 'var(--bg-tertiary)',
           borderRadius: '10px',
-          border: isError ? '1px solid #ef4444' : wasInterrupted ? '1px solid #f59e0b' : '1px solid var(--border)',
+          border: isError ? '1px solid var(--error)' : wasInterrupted ? '1px solid var(--warning)' : '1px solid var(--border)',
           maxHeight: showDetails ? '400px' : undefined,
           overflow: showDetails ? 'auto' : 'hidden',
         }}
@@ -495,7 +495,7 @@ export const globRenderer: ToolConfig = {
       <div
         style={{
           ...contentContainerStyle,
-          border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+          border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
           maxHeight: '300px',
           overflow: 'auto',
         }}
@@ -619,7 +619,7 @@ export const grepRenderer: ToolConfig = {
           key="result"
           style={{
             ...contentContainerStyle,
-            border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
             maxHeight: '300px',
             overflow: 'auto',
           }}
@@ -679,7 +679,7 @@ export const lsRenderer: ToolConfig = {
       <div
         style={{
           ...contentContainerStyle,
-          border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+          border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
           maxHeight: '300px',
           overflow: 'auto',
         }}

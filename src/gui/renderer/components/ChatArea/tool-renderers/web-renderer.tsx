@@ -201,7 +201,7 @@ export const webFetchRenderer: ToolConfig = {
           key="result"
           style={{
             ...contentContainerStyle,
-            border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
             maxHeight: '300px',
             overflow: 'auto',
           }}
@@ -305,7 +305,7 @@ export const webSearchRenderer: ToolConfig = {
             key="result"
             style={{
               ...contentContainerStyle,
-              border: '1px solid #ef4444',
+              border: '1px solid var(--error)',
               maxHeight: '300px',
               overflow: 'auto',
             }}

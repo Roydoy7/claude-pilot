@@ -92,7 +92,7 @@ export const skillRenderer: ToolConfig = {
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          borderLeft: '3px solid #8b5cf6',
+          borderLeft: '3px solid var(--accent)',
         }}>
           <span style={{ color: 'var(--accent)', fontWeight: '600' }}>
             /{skillName}

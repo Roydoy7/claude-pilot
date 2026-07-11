@@ -169,7 +169,7 @@ export const pdfRenderer: ToolConfig = {
           style={{
             ...contentContainerStyle,
             padding: '0.75rem 1rem',
-            border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
+            border: isError ? '1px solid var(--error)' : '1px solid var(--border)',
             maxHeight: '300px',
             overflow: 'auto',
           }}

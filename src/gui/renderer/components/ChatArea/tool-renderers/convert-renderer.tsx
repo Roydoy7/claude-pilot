@@ -184,7 +184,7 @@ export const convertRenderer: ToolConfig = {
           style={{
             ...contentContainerStyle,
             padding: '0.75rem 1rem',
-            border: isError ? '1px solid #ef4444' : '1px solid var(--border)',
+            border: isError ? '1px solid var(--error)' : '1px solid var(--border)',
             maxHeight: '300px',
             overflow: 'auto',
           }}
@@ -338,7 +338,7 @@ export const markitdownRenderer: ToolConfig = {
           style={{
             ...contentContainerStyle,
             padding: '0.75rem',
-            border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
             maxHeight: '300px',
             overflow: 'auto',
           }}
@@ -511,7 +511,7 @@ export const markdownToWordRenderer: ToolConfig = {
           style={{
             ...contentContainerStyle,
             padding: '0.75rem',
-            border: response.error ? '1px solid #ef4444' : '1px solid #2b579a',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--accent)',
             maxHeight: '300px',
             overflow: 'auto',
           }}

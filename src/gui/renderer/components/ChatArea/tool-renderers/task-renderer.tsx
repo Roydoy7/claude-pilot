@@ -94,7 +94,7 @@ export const taskRenderer: ToolConfig = {
           key="result"
           style={{
             ...contentContainerStyle,
-            border: response.error ? '1px solid #ef4444' : '1px solid var(--border)',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--border)',
             maxHeight: '300px',
             overflow: 'auto',
           }}

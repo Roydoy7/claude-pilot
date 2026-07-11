@@ -92,7 +92,7 @@ export const docxRenderer: ToolConfig = {
         style={{
           ...contentContainerStyle,
           padding: '0.75rem 1rem',
-          border: isError ? '1px solid #ef4444' : '1px solid #2b579a33',
+          border: isError ? '1px solid var(--error)' : '1px solid var(--border)',
           maxHeight: '400px',
           overflow: 'auto',
         }}

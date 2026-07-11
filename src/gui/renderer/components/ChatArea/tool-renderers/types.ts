@@ -130,21 +130,30 @@ export function isMcpToolError(response: ToolResponse | undefined): boolean {
 export function parseMcpOutput(output: string): string {
   if (!output) return '';
 
+  let extracted = output;
   try {
     const parsed = JSON.parse(output);
     if (Array.isArray(parsed)) {
-      return parsed
+      extracted = parsed
         .filter((item: { type?: string }) => item.type === 'text')
         .map((item: { text?: string }) => item.text || '')
         .join('\n');
-    }
-    if (typeof parsed === 'object' && parsed !== null) {
-      if (parsed.text) return parsed.text;
-      if (parsed.stdout !== undefined) return parsed.stdout || '(no output)';
-      return JSON.stringify(parsed, null, 2);
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      if (typeof parsed.text === 'string') {
+        extracted = parsed.text;
+      } else if (parsed.stdout !== undefined) {
+        return parsed.stdout || '(no output)';
+      } else {
+        return JSON.stringify(parsed, null, 2);
+      }
     }
   } catch {
     // Not JSON, return as-is
   }
-  return output;
+  try {
+    const nested = JSON.parse(extracted);
+    return typeof nested === 'object' && nested !== null ? JSON.stringify(nested, null, 2) : extracted;
+  } catch {
+    return extracted;
+  }
 }

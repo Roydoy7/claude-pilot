@@ -373,7 +373,7 @@ export const editRenderer: ToolConfig = {
           key="result"
           style={{
             ...contentContainerStyle,
-            border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
+            border: response.error ? '1px solid var(--error)' : '1px solid var(--success)',
           }}
         >
           <span style={{ color: response.error ? 'var(--error)' : 'var(--success)' }}>
