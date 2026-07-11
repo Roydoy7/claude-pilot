@@ -25,6 +25,7 @@ import type { MessageListItem } from '../../../preload/preload-types';
 
 interface MessageListProps {
   items: MessageListItem[];
+  assistantLabel?: string;
   onToolApprove?: (toolCallId: string) => void;
   onToolReject?: (toolCallId: string) => void;
 }
@@ -128,6 +129,7 @@ const MessageRow = memo(function MessageRow({
 
 export function MessageList({
   items,
+  assistantLabel,
   onToolApprove,
   onToolReject,
 }: MessageListProps) {
@@ -272,7 +274,7 @@ export function MessageList({
       {filteredItems.map((item, index) => (
         <div key={item.id} className="message-row">
           {isAssistantSide(item) && (index === 0 || !isAssistantSide(filteredItems[index - 1])) && (
-            <TurnHeader label={t.messageList.assistant} />
+            <TurnHeader label={assistantLabel || t.messageList.assistant} />
           )}
           <MessageRow item={item} onToolApprove={onToolApprove} onToolReject={onToolReject} />
         </div>

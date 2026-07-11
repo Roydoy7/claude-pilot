@@ -501,6 +501,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
           // initialization and drops the previous session's scroll state
           key={currentSessionId ?? 'new-session'}
           items={items}
+          assistantLabel={agentDefinitions.find(agent => agent.id === sessionConfig.agentId)?.displayName}
           onToolApprove={handleToolApprove}
           onToolReject={handleToolReject}
         />

@@ -53,13 +53,11 @@ export const CancelledItem = memo(function CancelledItem({ item }: CancelledItem
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.35rem',
-            padding: '0.2rem 0.5rem',
-            backgroundColor: 'transparent',
-            border: '1px dashed var(--border)',
-            borderRadius: '4px',
+            padding: '0.25rem 0.625rem',
+            backgroundColor: 'var(--bg-secondary)',
+            borderRadius: 'var(--radius-full)',
             color: 'var(--text-tertiary)',
             fontSize: '0.7rem',
-            fontStyle: 'italic',
           }}
         >
           <StopIcon />

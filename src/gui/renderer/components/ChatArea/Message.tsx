@@ -4,9 +4,9 @@
  * Message Component - Displays a single chat message with Markdown support
  */
 
-import { useState, useEffect, memo, type JSX } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown, { type ExtraProps } from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { MessageContent, UsageMetadata } from '../../../preload/preload-types';
@@ -135,30 +135,6 @@ export const Message = memo(function Message({ message }: MessageProps) {
               components={{
                 // Custom renderers for better styling
                 p: ({ children }) => <p style={{ margin: '0.5em 0' }}>{children}</p>,
-                code: ({ node, className, children, ...props }: JSX.IntrinsicElements['code'] & ExtraProps) => {
-                  const inline = !className;
-                  // For block code, ReactMarkdown automatically wraps in <pre><code>
-                  // We just need to style the code tag
-                  return inline ? (
-                    <code
-                      className={className}
-                      style={{
-                        backgroundColor: 'var(--bg-tertiary)',
-                        border: '1px solid var(--border)',
-                        padding: '0.125em 0.3em',
-                        borderRadius: '4px',
-                        fontSize: '0.9em',
-                      }}
-                      {...props}
-                    >
-                      {children}
-                    </code>
-                  ) : (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  );
-                },
                 a: ({ children, href }) => (
                   <a
                     href={href}
@@ -182,10 +158,9 @@ export const Message = memo(function Message({ message }: MessageProps) {
                   <blockquote
                     style={{
                       margin: '0.5em 0',
-                      padding: '0.4em 0.75em',
-                      backgroundColor: 'var(--bg-tertiary)',
-                      borderLeft: '3px solid var(--accent)',
-                      borderRadius: '0 4px 4px 0',
+                      padding: '0.125em 0 0.125em 0.875em',
+                      borderLeft: '3px solid var(--border-strong)',
+                      color: 'var(--text-secondary)',
                     }}
                   >
                     {children}
