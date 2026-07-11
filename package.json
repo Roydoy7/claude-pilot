@@ -93,8 +93,10 @@
     },
     "files": [
       "dist/**/*",
+      "build/icon.png",
       "node_modules/**/*"
     ],
+    "icon": "build/icon.png",
     "asarUnpack": [
       "node_modules/**/*"
     ],
@@ -129,14 +131,16 @@
       }
     ],
     "mac": {
+      "icon": "build/icon.png",
       "target": "dmg"
     },
     "win": {
+      "icon": "build/icon.png",
       "target": "nsis",
-      "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false
     },
     "linux": {
+      "icon": "build/icon.png",
       "target": "AppImage"
     },
     "nsis": {
