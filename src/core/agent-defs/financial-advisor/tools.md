@@ -5,8 +5,8 @@ SDK_TOOLS
 SAFE_TOOLS
 
 #MCP-TOOLS
-mcp__python__python
-mcp__typescript__typescript
+mcp__python__run
+mcp__typescript__execute
 mcp__claude__ask_claude
 mcp__finance__get_quote
 mcp__finance__get_historical_prices

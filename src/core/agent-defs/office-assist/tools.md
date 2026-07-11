@@ -11,8 +11,8 @@ mcp__image__process
 mcp__pptx__pptx
 mcp__xlsx__xlsx
 mcp__docx__docx
-mcp__python__python
-mcp__typescript__typescript
+mcp__python__run
+mcp__typescript__execute
 mcp__claude__ask_claude
 
 #SAFE-MCP-TOOLS
