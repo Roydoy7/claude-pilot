@@ -14,6 +14,7 @@ export const inputAreaZh = {
   uploadImage: '上传图片',
   cancelRequest: '取消请求',
   sendMessage: '发送 (Enter)',
+  sendHint: 'Enter 发送 · Shift+Enter 换行',
   removeImage: '移除图片',
   permissionMode: {
     label: '权限模式',

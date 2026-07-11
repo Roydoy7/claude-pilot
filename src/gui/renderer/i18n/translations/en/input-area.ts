@@ -14,6 +14,7 @@ export const inputAreaEn = {
   uploadImage: 'Upload Image',
   cancelRequest: 'Cancel Request',
   sendMessage: 'Send (Enter)',
+  sendHint: 'Enter to send · Shift+Enter for newline',
   removeImage: 'Remove image',
   permissionMode: {
     label: 'Permission Mode',

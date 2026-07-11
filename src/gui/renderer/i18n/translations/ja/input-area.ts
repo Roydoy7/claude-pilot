@@ -14,6 +14,7 @@ export const inputAreaJa = {
   uploadImage: '画像をアップロード',
   cancelRequest: 'リクエストをキャンセル',
   sendMessage: '送信 (Enter)',
+  sendHint: 'Enter で送信 · Shift+Enter で改行',
   removeImage: '画像を削除',
   permissionMode: {
     label: '権限モード',

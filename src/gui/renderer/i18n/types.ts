@@ -117,6 +117,7 @@ export interface Translation {
     uploadImage: string;
     cancelRequest: string;
     sendMessage: string;
+    sendHint: string;
     removeImage: string;
     permissionMode: {
       label: string;

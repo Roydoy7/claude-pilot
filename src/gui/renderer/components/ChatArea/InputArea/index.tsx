@@ -6,6 +6,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
+import { useLanguage } from '../../../i18n/LanguageContext';
 import type { MessageContent, PermissionMode } from '../../../../preload/preload-types';
 import type { ModelInfo, EffortLevel } from '../../../../../core/providers/model-list-manager';
 import { MarkdownEditor, type AttachedImage } from './MarkdownEditor';
@@ -76,6 +77,7 @@ export function InputArea({
   supportedEffortLevels = [],
   onEffortLevelChange,
 }: InputAreaProps) {
+  const { t } = useLanguage();
   const [message, setMessage] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -439,7 +441,7 @@ export function InputArea({
                   fontSize: '11px',
                   fontWeight: 500,
                   color: contextUsage.percentUsed >= 90 ? 'var(--error)' : contextUsage.percentUsed >= 75 ? 'var(--warning)' : 'var(--text-secondary)',
-                  backgroundColor: contextUsage.percentUsed >= 90 ? 'rgba(239, 68, 68, 0.12)' : contextUsage.percentUsed >= 75 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-tertiary)',
+                  backgroundColor: contextUsage.percentUsed >= 90 ? 'var(--error-subtle)' : contextUsage.percentUsed >= 75 ? 'var(--warning-subtle)' : 'var(--bg-tertiary)',
                   borderRadius: '4px',
                 }}
               >
@@ -466,6 +468,7 @@ export function InputArea({
 
           {/* Right side - Expand, Upload and Send buttons */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span className="input-hint">{t.inputArea.sendHint}</span>
             <button
               className="toolbar-btn"
               onClick={toggleExpanded}
@@ -511,7 +514,7 @@ export function InputArea({
               title="Stop Response"
               style={{
                 backgroundColor: isProcessing ? 'var(--error)' : 'var(--bg-tertiary)',
-                color: isProcessing ? 'white' : 'var(--text-secondary)',
+                color: isProcessing ? 'var(--on-accent)' : 'var(--text-secondary)',
                 opacity: isProcessing ? 1 : 0.5,
                 cursor: isProcessing ? 'pointer' : 'not-allowed',
               }}
