@@ -50,6 +50,7 @@ export const jaTranslations: Translation = {
     newMessages: '新着メッセージ',
     scrollToBottom: '最下部へスクロール',
     usageLimitReached: '使用制限に達しました',
+    assistant: 'アシスタント',
   },
 
   // Compact Summary

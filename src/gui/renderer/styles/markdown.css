@@ -76,13 +76,8 @@
   box-sizing: border-box !important;
 }
 
-.message-user .message-bubble pre {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
-}
-
 .message-bubble code {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 

@@ -50,6 +50,7 @@ export const zhTranslations: Translation = {
     newMessages: '新消息',
     scrollToBottom: '滚动到底部',
     usageLimitReached: '已达到使用限额',
+    assistant: '助手',
   },
 
   // Compact Summary

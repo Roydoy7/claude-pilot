@@ -50,6 +50,7 @@ export const enTranslations: Translation = {
     newMessages: 'New messages',
     scrollToBottom: 'Scroll to bottom',
     usageLimitReached: 'Usage limit reached',
+    assistant: 'Assistant',
   },
 
   // Compact Summary

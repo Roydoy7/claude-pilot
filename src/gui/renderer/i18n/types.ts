@@ -218,6 +218,7 @@ export interface Translation {
     newMessages: string;
     scrollToBottom: string;
     usageLimitReached: string;
+    assistant: string;
   };
 
   // Compact Summary

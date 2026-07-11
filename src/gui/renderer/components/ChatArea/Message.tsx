@@ -124,29 +124,6 @@ export const Message = memo(function Message({ message }: MessageProps) {
 
   return (
     <div className={`message ${isUser ? 'message-user' : 'message-ai'}`}>
-      {/* Avatar */}
-      <div className="message-avatar">
-        {isUser ? (
-          <div className="avatar-icon user-avatar">
-            {/* User icon - person silhouette */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </div>
-        ) : (
-          <div className="avatar-icon ai-avatar">
-            {/* AI icon - bot/robot face */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="8" width="18" height="12" rx="2" />
-              <circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none" />
-              <circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none" />
-              <path d="M12 2v4" />
-              <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none" />
-            </svg>
-          </div>
-        )}
-      </div>
       <div className="message-content">
         {/* Message bubble - only show if there's content */}
         {contentString && contentString.trim() !== '' && (
@@ -166,8 +143,8 @@ export const Message = memo(function Message({ message }: MessageProps) {
                     <code
                       className={className}
                       style={{
-                        backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
-                        border: `1px solid ${isUser ? 'rgba(255,255,255,0.25)' : 'var(--border)'}`,
+                        backgroundColor: 'var(--bg-tertiary)',
+                        border: '1px solid var(--border)',
                         padding: '0.125em 0.3em',
                         borderRadius: '4px',
                         fontSize: '0.9em',
@@ -188,7 +165,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      color: isUser ? 'rgba(255,255,255,0.9)' : 'var(--accent)',
+                      color: 'var(--accent)',
                       textDecoration: 'underline',
                     }}
                   >
@@ -206,8 +183,8 @@ export const Message = memo(function Message({ message }: MessageProps) {
                     style={{
                       margin: '0.5em 0',
                       padding: '0.4em 0.75em',
-                      backgroundColor: isUser ? 'rgba(255,255,255,0.1)' : 'var(--bg-tertiary)',
-                      borderLeft: `3px solid ${isUser ? 'rgba(255,255,255,0.5)' : 'var(--accent)'}`,
+                      backgroundColor: 'var(--bg-tertiary)',
+                      borderLeft: '3px solid var(--accent)',
                       borderRadius: '0 4px 4px 0',
                     }}
                   >
@@ -326,36 +303,11 @@ export const Message = memo(function Message({ message }: MessageProps) {
           {/* Save as Template button - only for user messages */}
           {isUser && contentString && contentString.trim() !== '' && (
             <button
+              className="message-save-template"
+              data-saving={isSaving}
               onClick={handleSaveAsTemplate}
               disabled={isSaving}
               title={isSaving ? t.message.saved : t.message.saveAsTemplate}
-              style={{
-                width: '24px',
-                height: '24px',
-                padding: '4px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                backgroundColor: isSaving ? 'rgba(76,175,80,0.2)' : 'var(--bg-secondary)',
-                cursor: isSaving ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
-                opacity: 0.7,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isSaving ? 'var(--success)' : 'var(--text-secondary)',
-              }}
-              onMouseEnter={(e) => {
-                if (!isSaving) {
-                  e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '0.7';
-                e.currentTarget.style.backgroundColor = isSaving ? 'rgba(76,175,80,0.2)' : 'var(--bg-secondary)';
-                e.currentTarget.style.color = isSaving ? 'var(--success)' : 'var(--text-secondary)';
-              }}
             >
               {isSaving ? (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>

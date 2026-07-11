@@ -66,10 +66,6 @@ export const ThinkingItem = memo(function ThinkingItem({ item }: ThinkingItemPro
         marginBottom: expanded ? '0' : '-0.5rem',
       }}
     >
-      {/* Avatar placeholder to match message layout */}
-      <div className="message-avatar">
-        <div style={{ width: '2rem', height: '2rem' }} />
-      </div>
       <div className="message-content">
         {/* Collapsed: Single line with preview */}
         {!expanded ? (

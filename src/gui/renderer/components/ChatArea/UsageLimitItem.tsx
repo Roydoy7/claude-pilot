@@ -66,10 +66,6 @@ export const UsageLimitItem = memo(function UsageLimitItem({ item }: UsageLimitI
 
   return (
     <div className="message message-ai" style={{ marginTop: '-0.5rem', marginBottom: '-0.5rem' }}>
-      {/* Avatar placeholder to match message layout */}
-      <div className="message-avatar">
-        <div style={{ width: '2rem', height: '2rem' }} />
-      </div>
       <div className="message-content">
         <div
           style={{
@@ -77,8 +73,8 @@ export const UsageLimitItem = memo(function UsageLimitItem({ item }: UsageLimitI
             alignItems: 'center',
             gap: '0.5rem',
             padding: '0.4rem 0.75rem',
-            backgroundColor: 'rgba(234, 179, 8, 0.1)',
-            border: '1px solid rgba(234, 179, 8, 0.3)',
+            backgroundColor: 'var(--warning-subtle)',
+            border: '1px solid var(--warning)',
             borderRadius: '6px',
             color: 'var(--warning)',
             fontSize: '0.75rem',

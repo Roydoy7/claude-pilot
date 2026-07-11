@@ -47,10 +47,6 @@ export const CancelledItem = memo(function CancelledItem({ item }: CancelledItem
 
   return (
     <div className="message message-ai" style={{ marginTop: '-0.5rem', marginBottom: '-0.5rem' }}>
-      {/* Avatar placeholder to match message layout */}
-      <div className="message-avatar">
-        <div style={{ width: '2rem', height: '2rem' }} />
-      </div>
       <div className="message-content">
         <div
           style={{

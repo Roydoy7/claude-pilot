@@ -32,6 +32,32 @@ interface MessageListProps {
 const SCROLL_THRESHOLD = 150; // Distance from bottom to consider "at bottom"
 
 /**
+ * An item belongs to the assistant side of the conversation
+ * (anything that is not a user message).
+ */
+function isAssistantSide(item: MessageListItem): boolean {
+  return !(item.type === 'message' && item.role === 'user');
+}
+
+/**
+ * Turn header - rendered once at the start of each assistant turn
+ */
+function TurnHeader({ label }: { label: string }) {
+  return (
+    <div className="turn-header">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="8" width="18" height="12" rx="2" />
+        <circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none" />
+        <path d="M12 2v4" />
+        <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none" />
+      </svg>
+      <span className="turn-header-name">{label}</span>
+    </div>
+  );
+}
+
+/**
  * Check if an item should be rendered (not empty)
  */
 function shouldRenderItem(item: MessageListItem): boolean {
@@ -229,18 +255,7 @@ export function MessageList({
     return (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div className="message-list" ref={parentRef}>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: 'var(--text-secondary)',
-              gap: '1rem',
-            }}
-          >
-            <div style={{ fontSize: '3rem' }}>💬</div>
+          <div className="message-list-empty">
             <p>{t.messageList.noMessages}</p>
           </div>
         </div>
@@ -254,8 +269,11 @@ export function MessageList({
       ref={parentRef}
       onScroll={handleScroll}
     >
-      {filteredItems.map((item) => (
+      {filteredItems.map((item, index) => (
         <div key={item.id} className="message-row">
+          {isAssistantSide(item) && (index === 0 || !isAssistantSide(filteredItems[index - 1])) && (
+            <TurnHeader label={t.messageList.assistant} />
+          )}
           <MessageRow item={item} onToolApprove={onToolApprove} onToolReject={onToolReject} />
         </div>
       ))}
@@ -267,40 +285,8 @@ export function MessageList({
         <button
           onClick={() => scrollToBottom(true)}
           className="scroll-to-bottom-button"
-          style={{
-            position: 'sticky',
-            bottom: '1.5rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.25rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            border: '1px solid var(--border)',
-            borderRadius: '2rem',
-            color: 'var(--text-primary)',
-            fontSize: '0.9rem',
-            fontWeight: '500',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px var(--shadow-hover)',
-            transition: 'all 0.2s ease',
-            zIndex: 10,
-            marginTop: '-4rem',
-            pointerEvents: 'auto',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-            e.currentTarget.style.transform = 'translateX(-50%) translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px var(--shadow-hover)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-            e.currentTarget.style.transform = 'translateX(-50%)';
-            e.currentTarget.style.boxShadow = '0 4px 12px var(--shadow-hover)';
-          }}
         >
-          <span style={{ fontSize: '1.1rem' }}>↓</span>
+          <span aria-hidden="true">↓</span>
           {hasNewMessages ? t.messageList.newMessages : t.messageList.scrollToBottom}
         </button>
       )}

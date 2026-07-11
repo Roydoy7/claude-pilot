@@ -168,40 +168,17 @@ export function ToolCallItem({
   const hasDetails = toolConfig.hasDetails(toolCall.args, response);
 
   return (
-    <div className="chat-item chat-item-ai" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-      {/* AI Avatar */}
-      <div className="chat-item-avatar">
-        <div className="avatar-icon ai-avatar">
-          {/* AI icon - bot/robot face */}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="8" width="18" height="12" rx="2" />
-            <circle cx="9" cy="14" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="15" cy="14" r="1.5" fill="currentColor" stroke="none" />
-            <path d="M12 2v4" />
-            <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Tool call content */}
-      <div className="chat-item-content">
+    <div className="tool-row">
         {/* Tool call - first line: icon, name, inline text, and status for Bash */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '0.25rem',
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+        <div className="tool-row-line">
+          <span className="tool-row-icon">
             {typeof icon === 'string' ? icon : icon}
           </span>
-          <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+          <span className="tool-row-name">
             {toolCall.name}
           </span>
           {inlineText && (
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+            <span className="tool-row-summary">
               {inlineText}
             </span>
           )}
@@ -223,15 +200,7 @@ export function ToolCallItem({
 
         {/* Second line: status + action buttons (skip for Bash - status shown after content) */}
         {canonicalToolName !== 'Bash' && (response || wasRejected || hasDetails) && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              marginBottom: '0.25rem',
-              marginLeft: '1.5rem',
-            }}
-          >
+          <div className="tool-row-status-line">
             {/* Status badge */}
             {wasRejected && !response && (
               <span className="status-badge" data-status="rejected">
@@ -280,10 +249,7 @@ export function ToolCallItem({
 
       {/* Approval buttons (if needed) - with animated text */}
       {needsApproval && !response && (onApprove || onReject) && (
-        <div
-          className="tool-approval-container"
-          style={{ marginTop: '0.5rem', marginBottom: '0.5rem', marginLeft: '1.5rem' }}
-        >
+        <div className="tool-approval-container tool-row-status-line">
           <ApprovalWaitingIcon />
           <AnimatedApprovalText text={t.status.waitingForApproval} />
           {onReject && (
@@ -304,8 +270,6 @@ export function ToolCallItem({
           )}
         </div>
       )}
-
-      </div>
     </div>
   );
 }
