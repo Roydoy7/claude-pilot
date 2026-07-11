@@ -38,6 +38,8 @@ export const commonZh = {
   time: {
     today: '今天',
     yesterday: '昨天',
+    thisWeek: '本周',
+    earlier: '更早',
     daysAgo: (days: number) => `${days} 天前`,
   },
 };

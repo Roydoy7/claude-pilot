@@ -42,6 +42,8 @@ export interface Translation {
     time: {
       today: string;
       yesterday: string;
+      thisWeek: string;
+      earlier: string;
       daysAgo: (days: number) => string;
     };
   };

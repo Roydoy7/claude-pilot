@@ -38,6 +38,8 @@ export const commonJa = {
   time: {
     today: '今日',
     yesterday: '昨日',
+    thisWeek: '今週',
+    earlier: 'それ以前',
     daysAgo: (days: number) => `${days}日前`,
   },
 };

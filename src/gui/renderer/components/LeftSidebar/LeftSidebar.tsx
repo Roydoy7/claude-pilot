@@ -112,21 +112,21 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
+  /**
+   * Days between a timestamp and now, in whole calendar days
+   */
+  const daysAgo = (timestamp: number) => {
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    return Math.floor((startOfDay(now) - startOfDay(new Date(timestamp))) / (1000 * 60 * 60 * 24));
+  };
 
-    if (days === 0) {
-      return t.common.time.today;
-    } else if (days === 1) {
-      return t.common.time.yesterday;
-    } else if (days < 7) {
-      return t.common.time.daysAgo(days);
-    } else {
-      return date.toLocaleDateString();
-    }
+  const groupLabel = (timestamp: number) => {
+    const days = daysAgo(timestamp);
+    if (days <= 0) return t.common.time.today;
+    if (days === 1) return t.common.time.yesterday;
+    if (days < 7) return t.common.time.thisWeek;
+    return t.common.time.earlier;
   };
 
   if (isCollapsed) {
@@ -144,6 +144,22 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
+        <div className="left-sidebar-collapsed-list">
+          {sessions.map((session) => {
+            const title = session.title || t.leftSidebar.newSessionFallback;
+            return (
+              <button
+                key={session.id}
+                className="left-sidebar-collapsed-item"
+                data-active={session.id === currentSessionId}
+                title={title}
+                onClick={() => onSessionSelect?.(session)}
+              >
+                {title.charAt(0).toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -181,34 +197,40 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
         ) : sessions.length === 0 ? (
           <div className="left-sidebar-empty">{t.leftSidebar.noSessions}</div>
         ) : (
-          sessions.map((session) => (
-            <div
-              key={session.id}
-              className="left-sidebar-item"
-              data-active={session.id === currentSessionId}
-              onClick={() => onSessionSelect?.(session)}
-            >
-              <div className="left-sidebar-item-title">
-                {session.title || t.leftSidebar.newSessionFallback}
+          sessions.map((session, index) => {
+            const label = groupLabel(session.updatedAt);
+            const showGroupLabel = index === 0 || label !== groupLabel(sessions[index - 1].updatedAt);
+            return (
+              <div key={session.id}>
+                {showGroupLabel && (
+                  <div className="left-sidebar-group-label">{label}</div>
+                )}
+                <div
+                  className="left-sidebar-item"
+                  data-active={session.id === currentSessionId}
+                  onClick={() => onSessionSelect?.(session)}
+                >
+                  <div className="left-sidebar-item-title">
+                    {session.title || t.leftSidebar.newSessionFallback}
+                  </div>
+                  <button
+                    className="left-sidebar-item-delete"
+                    onClick={(e) => handleDeleteSession(session.id, e)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                  </button>
+                  <div className="left-sidebar-item-meta">
+                    {agentDefinitions.find((agent) => agent.id === session.agentId)?.displayName ?? session.agentId}
+                  </div>
+                </div>
               </div>
-              <button
-                className="left-sidebar-item-delete"
-                onClick={(e) => handleDeleteSession(session.id, e)}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-              </button>
-              <div className="left-sidebar-item-meta">
-                {agentDefinitions.find((agent) => agent.id === session.agentId)?.displayName ?? session.agentId}
-                <span className="left-sidebar-item-meta-dot">·</span>
-                {formatDate(session.createdAt)}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

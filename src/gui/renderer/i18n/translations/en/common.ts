@@ -38,6 +38,8 @@ export const commonEn = {
   time: {
     today: 'Today',
     yesterday: 'Yesterday',
+    thisWeek: 'This week',
+    earlier: 'Earlier',
     daysAgo: (days: number) => `${days} days ago`,
   },
 };
