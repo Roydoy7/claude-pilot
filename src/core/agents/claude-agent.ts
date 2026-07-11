@@ -15,6 +15,8 @@ import type {
   SDKPartialAssistantMessage,
   SDKToolProgressMessage,
   SDKAuthStatusMessage,
+  SDKCommandsChangedMessage,
+  SDKFilesPersistedEvent,
   Options,
   PermissionMode,
   CanUseTool,
@@ -861,7 +863,10 @@ export class ClaudeAgent {
 
               case 'commands_changed': {
                 // Mid-session slash command list change - replace cached list (per SDK docs)
-                this.slashCommands = chunk.commands.map((command) => command.name);
+                // Explicit type: sdk.d.ts ships with unresolved names in the
+                // SDKMessage union (upstream packaging bug), collapsing it to
+                // `any`, so chunk carries no inferred type here.
+                this.slashCommands = (chunk as SDKCommandsChangedMessage).commands.map((command) => command.name);
                 yield { type: 'slashCommands', commands: this.slashCommands };
                 break;
               }
@@ -896,10 +901,11 @@ export class ClaudeAgent {
               }
 
               case 'files_persisted': {
-                if (chunk.failed.length > 0) {
+                const persistedEvent = chunk as SDKFilesPersistedEvent;
+                if (persistedEvent.failed.length > 0) {
                   yield {
                     type: 'error',
-                    error: `Failed to persist files: ${chunk.failed.map((file) => `${file.filename} (${file.error})`).join(', ')}`,
+                    error: `Failed to persist files: ${persistedEvent.failed.map((file) => `${file.filename} (${file.error})`).join(', ')}`,
                   };
                 }
                 break;
@@ -975,7 +981,10 @@ export class ClaudeAgent {
               }
 
               default: {
-                const _exhaustive: never = chunk;
+                // Exhaustiveness check disabled: SDKMessage collapses to `any`
+                // due to unresolved names in the shipped sdk.d.ts (upstream
+                // packaging bug). Restore `= chunk` once fixed upstream.
+                const _exhaustive: never = chunk as never;
                 break;
               }
             }
@@ -1021,7 +1030,10 @@ export class ClaudeAgent {
           // The SDK sends it with type: 'user' and isReplay: true flag
 
           default: {
-            const _exhaustive: never = chunk;
+            // Exhaustiveness check disabled: SDKMessage collapses to `any`
+            // due to unresolved names in the shipped sdk.d.ts (upstream
+            // packaging bug). Restore `= chunk` once fixed upstream.
+            const _exhaustive: never = chunk as never;
             break;
           }
         }
