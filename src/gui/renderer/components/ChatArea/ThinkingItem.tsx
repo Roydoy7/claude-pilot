@@ -59,97 +59,33 @@ export const ThinkingItem = memo(function ThinkingItem({ item }: ThinkingItemPro
     : firstLine;
 
   return (
-    <div
-      className="message message-ai"
-      style={{
-        marginTop: expanded ? '0' : '-0.5rem',
-        marginBottom: expanded ? '0' : '-0.5rem',
-      }}
-    >
+    <div className="message message-ai thinking-item" data-expanded={expanded}>
       <div className="message-content">
         {/* Collapsed: Single line with preview */}
         {!expanded ? (
           <button
             onClick={() => setExpanded(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              gap: '0.35rem',
-              padding: '0.2rem 0.5rem',
-              backgroundColor: 'transparent',
-              border: '1px dashed var(--border)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              color: 'var(--text-tertiary)',
-              fontSize: '0.7rem',
-              fontStyle: 'normal',
-              textAlign: 'left',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-              e.currentTarget.style.borderColor = 'var(--text-tertiary)';
-              e.currentTarget.style.color = 'var(--text-secondary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = 'var(--border)';
-              e.currentTarget.style.color = 'var(--text-tertiary)';
-            }}
+            className="thinking-summary"
           >
             <SparklesIcon />
-            <span style={{ opacity: 0.8 }}>{previewText}</span>
-            <span style={{ opacity: 0.5, marginLeft: '0.25rem' }}>▸</span>
+            <span className="thinking-preview">{previewText}</span>
+            <svg className="thinking-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" /></svg>
           </button>
         ) : (
           /* Expanded: Full content */
-          <div
-            style={{
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              overflow: 'hidden',
-            }}
-          >
+          <div className="thinking-details">
             {/* Header */}
             <button
               onClick={() => setExpanded(false)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.35rem 0.6rem',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-tertiary)',
-                fontSize: '0.7rem',
-                textAlign: 'left',
-              }}
+              className="thinking-details-header"
             >
               <SparklesIcon />
-              <span style={{ fontWeight: 500 }}>Thinking</span>
-              <span style={{ marginLeft: 'auto', opacity: 0.5 }}>▾</span>
+              <span>{previewText}</span>
+              <svg className="thinking-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 15-6-6-6 6" /></svg>
             </button>
 
             {/* Content */}
-            <div
-              style={{
-                padding: '0.5rem 0.75rem',
-                paddingTop: '0',
-                color: 'var(--text-secondary)',
-                fontSize: '0.75rem',
-                lineHeight: '1.5',
-                fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace",
-                maxHeight: '200px',
-                overflowY: 'auto',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                opacity: 0.85,
-              }}
-            >
+            <div className="thinking-content">
               {thinkingContent}
             </div>
           </div>

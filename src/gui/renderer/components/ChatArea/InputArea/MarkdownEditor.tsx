@@ -151,9 +151,9 @@ export function MarkdownEditor({
             onPaste={onPaste}
             placeholder={placeholder}
             disabled={disabled}
-            rows={isExpanded ? 10 : 3}
+            rows={isExpanded ? 10 : 2}
             style={{
-              minHeight: isExpanded ? '200px' : '60px',
+              minHeight: isExpanded ? '200px' : '44px',
               maxHeight: `${currentMaxHeight}px`,
               resize: 'none',
               transition: 'min-height 0.2s ease',

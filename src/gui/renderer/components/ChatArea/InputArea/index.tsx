@@ -394,9 +394,9 @@ export function InputArea({
           </>
         }
       >
-        <div className="input-actions" style={{ justifyContent: 'space-between' }}>
+        <div className="input-actions">
           {/* Left side - Permission mode and Setting sources dropdowns */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="input-config-group">
             <PermissionModeSelector
               permissionMode={permissionMode}
               onPermissionModeChange={onPermissionModeChange}
@@ -433,33 +433,14 @@ export function InputArea({
             {contextUsage && (
               <div
                 title={`${contextUsage.usedTokens.toLocaleString()} / ${contextUsage.totalTokens.toLocaleString()} tokens`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  color: contextUsage.percentUsed >= 90 ? 'var(--error)' : contextUsage.percentUsed >= 75 ? 'var(--warning)' : 'var(--text-secondary)',
-                  backgroundColor: contextUsage.percentUsed >= 90 ? 'var(--error-subtle)' : contextUsage.percentUsed >= 75 ? 'var(--warning-subtle)' : 'var(--bg-tertiary)',
-                  borderRadius: '4px',
-                }}
+                className="context-usage"
+                data-level={contextUsage.percentUsed >= 90 ? 'error' : contextUsage.percentUsed >= 75 ? 'warning' : 'normal'}
               >
                 {/* Progress bar */}
-                <div style={{
-                  width: '40px',
-                  height: '4px',
-                  backgroundColor: 'var(--border)',
-                  borderRadius: '2px',
-                  overflow: 'hidden',
-                }}>
+                <div className="context-usage-track">
                   <div style={{
                     width: `${Math.min(100, contextUsage.percentUsed)}%`,
-                    height: '100%',
-                    backgroundColor: contextUsage.percentUsed >= 90 ? 'var(--error)' : contextUsage.percentUsed >= 75 ? 'var(--warning)' : 'var(--success)',
-                    borderRadius: '2px',
-                    transition: 'width 0.3s ease',
-                  }} />
+                  }} className="context-usage-value" />
                 </div>
                 <span>{contextUsage.percentUsed}%</span>
               </div>
@@ -467,7 +448,7 @@ export function InputArea({
           </div>
 
           {/* Right side - Expand, Upload and Send buttons */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="input-submit-group">
             <span className="input-hint">{t.inputArea.sendHint}</span>
             <button
               className="toolbar-btn"
@@ -506,35 +487,22 @@ export function InputArea({
                 <polyline points="21 15 16 10 5 21"></polyline>
               </svg>
             </button>
-            {/* Stop button - always visible, disabled when not processing */}
-            <button
-              className="toolbar-btn cancel-btn"
-              onClick={onCancel}
-              disabled={!isProcessing}
-              title="Stop Response"
-              style={{
-                backgroundColor: isProcessing ? 'var(--error)' : 'var(--bg-tertiary)',
-                color: isProcessing ? 'var(--on-accent)' : 'var(--text-secondary)',
-                opacity: isProcessing ? 1 : 0.5,
-                cursor: isProcessing ? 'pointer' : 'not-allowed',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              </svg>
-            </button>
-            {/* Send button - always visible */}
-            <button
-              className="toolbar-btn send-btn"
-              onClick={handleSend}
-              disabled={disabled || (!message.trim() && images.length === 0)}
-              title="Send (Enter)"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
+            {isProcessing ? (
+              <button className="toolbar-btn cancel-btn" onClick={onCancel} title="Stop Response">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+              </button>
+            ) : (
+              <button
+                className="toolbar-btn send-btn"
+                onClick={handleSend}
+                disabled={disabled || (!message.trim() && images.length === 0)}
+                title="Send (Enter)"
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </MarkdownEditor>
