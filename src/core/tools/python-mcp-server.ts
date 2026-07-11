@@ -56,7 +56,7 @@ interface PythonExecutorConfig {
 /**
  * Get default Python executable path
  */
-function getDefaultPythonPath(): string {
+export function getDefaultPythonPath(): string {
   // Use embedded Python from packages folder
   const embeddedPython = path.join(
     process.cwd(),
@@ -203,7 +203,7 @@ async function installPackage(
 /**
  * Check and install required packages
  */
-async function ensurePackagesInstalled(
+export async function ensurePackagesInstalled(
   pythonPath: string,
   requirements: string[],
   onProgress?: ProgressCallback

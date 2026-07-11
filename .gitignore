@@ -69,6 +69,7 @@ coverage/
 *.temp
 .cache/
 .ts-exec-temp/
+.agent-tools-temp/
 
 # Visual Studio
 .vs/

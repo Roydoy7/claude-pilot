@@ -54,7 +54,7 @@ interface TypeScriptExecutorConfig {
 /**
  * Get the project root directory (works in both dev and packaged app)
  */
-function getProjectRoot(): string {
+export function getProjectRoot(): string {
   // In packaged app, process.resourcesPath points to resources folder
   // node_modules is at resources/app.asar.unpacked/node_modules
   if (process.resourcesPath && fs.existsSync(path.join(process.resourcesPath, 'app.asar.unpacked'))) {
@@ -79,7 +79,7 @@ function isPackageInstalled(
 /**
  * Install npm packages using npm
  */
-async function installPackages(
+export async function installPackages(
   projectRoot: string,
   packages: string[],
   onProgress?: ProgressCallback
@@ -189,13 +189,16 @@ async function installPackages(
 }
 
 /**
- * Get tsx command and args
- * Returns { command, args, useShell } for spawn
+ * Get tsx command, args and extra env for spawn.
+ *
+ * In a packaged app there is no node_modules/.bin (electron-builder's
+ * asarUnpack does not materialize bin shims), so the tsx CLI entry is run
+ * directly with our own executable in node mode (ELECTRON_RUN_AS_NODE).
  */
-function getTsxCommand(tempFile: string): { command: string; args: string[]; useShell: boolean } {
+export function getTsxCommand(tempFile: string): { command: string; args: string[]; useShell: boolean; env: NodeJS.ProcessEnv } {
   const projectRoot = getProjectRoot();
 
-  // Check for tsx in node_modules/.bin
+  // Development: tsx bin shim from node_modules/.bin
   const tsxBin = process.platform === 'win32'
     ? path.join(projectRoot, 'node_modules', '.bin', 'tsx.cmd')
     : path.join(projectRoot, 'node_modules', '.bin', 'tsx');
@@ -206,15 +209,22 @@ function getTsxCommand(tempFile: string): { command: string; args: string[]; use
       command: tsxBin,
       args: [tempFile],
       useShell: process.platform === 'win32',
+      env: {},
     };
   }
 
-  // Fallback to npx tsx - always needs shell
-  return {
-    command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    args: ['tsx', tempFile],
-    useShell: true,
-  };
+  // Packaged app: run the tsx CLI entry with our own binary acting as node
+  const tsxCli = path.join(projectRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+  if (fs.existsSync(tsxCli)) {
+    return {
+      command: process.execPath,
+      args: [tsxCli, tempFile],
+      useShell: false,
+      env: { ELECTRON_RUN_AS_NODE: '1' },
+    };
+  }
+
+  throw new Error(`tsx not found under ${projectRoot} (looked for node_modules/.bin and node_modules/tsx/dist/cli.mjs)`);
 }
 
 /**
@@ -274,13 +284,14 @@ async function executeTypeScriptCode(
     fs.writeFileSync(tempFile, code, 'utf-8');
 
     return new Promise((resolve) => {
-      const { command, args, useShell } = getTsxCommand(tempFile);
+      const { command, args, useShell, env: tsxEnv } = getTsxCommand(tempFile);
 
       // Use tsx to execute TypeScript directly
       const tsProcess = spawn(command, args, {
         cwd: effectiveWorkingDir,
         env: {
           ...process.env,
+          ...tsxEnv,
           NODE_OPTIONS: '--no-warnings',
           // Ensure node_modules can be found
           NODE_PATH: path.join(projectRoot, 'node_modules'),

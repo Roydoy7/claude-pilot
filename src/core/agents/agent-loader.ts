@@ -21,6 +21,7 @@ import * as fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { app } from 'electron';
 import { MCP_SERVER_REGISTRY, type McpServer } from './mcp-server-registry.js';
+import { loadLocalToolsServer } from './local-tools.js';
 
 export interface AgentDefinition {
   id: string;
@@ -165,6 +166,11 @@ function resolveMcpServers(mcpTools: string[]): Record<string, McpServer> {
     }
 
     const serverKey = parts[1];
+    if (serverKey === 'local') {
+      throw new Error(
+        `Server key 'local' is reserved for agent-local tools (agent-defs/<id>/tools/) and must not appear in tools.md: ${toolName}`,
+      );
+    }
     if (servers[serverKey]) {
       continue;
     }
@@ -203,6 +209,12 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
   const skillDirents = await fs.readdir(skillsDir, { withFileTypes: true }).catch(() => []);
   const defaultSkills = skillDirents.filter((entry) => entry.isDirectory()).map((entry) => path.join(skillsDir, entry.name));
 
+  const mcpServers = resolveMcpServers(mcpTools);
+  const localTools = await loadLocalToolsServer(dir, id);
+  if (localTools.server) {
+    mcpServers['local'] = localTools.server;
+  }
+
   return {
     id,
     displayName,
@@ -211,13 +223,39 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
     prompts: promptsContent.split('\n').map((line) => line.trim()).filter((line): line is string => !!line),
     tools,
     safeTools,
-    mcpServers: resolveMcpServers(mcpTools),
-    autoApprovedMcpTools: safeMcpTools,
+    mcpServers,
+    autoApprovedMcpTools: [...safeMcpTools, ...localTools.safeToolNames],
     defaultSkills,
   };
 }
 
 let cachedDefinitions: AgentDefinition[] | null = null;
+let devWatcherStarted = false;
+
+/**
+ * Dev-mode hot reload: watch agent-defs and drop the definitions cache on any
+ * change, so the next new session picks up edited definitions and tool
+ * frontmatter. Only runs in a non-packaged Electron process - never in
+ * production and never under plain node (tests).
+ */
+function startDevWatcher(agentDefsPath: string): void {
+  if (devWatcherStarted) {
+    return;
+  }
+  devWatcherStarted = true;
+  if (app?.isPackaged || !process.versions.electron) {
+    return;
+  }
+  import('chokidar')
+    .then(({ watch }) => {
+      watch(agentDefsPath, { ignoreInitial: true }).on('all', () => {
+        cachedDefinitions = null;
+      });
+    })
+    .catch((err: unknown) => {
+      console.error('[agent-loader] failed to start dev agent-defs watcher:', err);
+    });
+}
 
 /**
  * Load all agent definitions from agent-defs (cached after first call)
@@ -228,6 +266,7 @@ export async function getAgentDefinitions(): Promise<AgentDefinition[]> {
   }
 
   const agentDefsPath = getAgentDefsPath();
+  startDevWatcher(agentDefsPath);
   const dirents = await fs.readdir(agentDefsPath, { withFileTypes: true });
   const agentIds = dirents.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 

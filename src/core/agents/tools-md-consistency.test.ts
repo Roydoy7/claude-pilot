@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { MCP_SERVER_REGISTRY } from './mcp-server-registry.js';
+import { parseToolFileName, parseToolFrontmatter } from './tool-frontmatter.js';
 
 const AGENT_DEFS_DIR = path.resolve(__dirname, '..', 'agent-defs');
 
@@ -82,6 +83,14 @@ describe('tools.md MCP tool name consistency', () => {
 
         const serverKey = parts[1];
         const toolPart = parts.slice(2).join('__');
+
+        // 'local' is reserved for agent-local tools (agent-defs/<id>/tools/);
+        // listing them in tools.md would double-register them.
+        if (serverKey === 'local') {
+          failures.push(`${agentId}: reserved server key 'local' must not appear in tools.md ('${toolName}')`);
+          continue;
+        }
+
         const serverConfig = MCP_SERVER_REGISTRY[serverKey];
 
         if (!serverConfig) {
@@ -98,6 +107,41 @@ describe('tools.md MCP tool name consistency', () => {
               `${agentId}: tool '${toolPart}' does not exist on server '${serverKey}' (has: ${actualTools.join(', ')})`,
             );
           }
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+});
+
+describe('agent-local tools consistency', () => {
+  it('every tools/ script has a valid name and parseable frontmatter, with unique tool names', async () => {
+    const agentIds = await listAgentIds();
+    const failures: string[] = [];
+
+    for (const agentId of agentIds) {
+      const toolsDir = path.join(AGENT_DEFS_DIR, agentId, 'tools');
+      const dirents = await fs.readdir(toolsDir, { withFileTypes: true }).catch(() => null);
+      if (dirents === null) {
+        continue;
+      }
+
+      const seenNames = new Set<string>();
+      for (const entry of dirents) {
+        if (!entry.isFile() || entry.name.startsWith('_')) {
+          continue;
+        }
+        try {
+          const { name } = parseToolFileName(entry.name);
+          if (seenNames.has(name)) {
+            failures.push(`${agentId}: duplicate local tool name '${name}'`);
+          }
+          seenNames.add(name);
+          const content = await fs.readFile(path.join(toolsDir, entry.name), 'utf-8');
+          parseToolFrontmatter(content, path.join(toolsDir, entry.name));
+        } catch (err) {
+          failures.push(`${agentId}/${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }
