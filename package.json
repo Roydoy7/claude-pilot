@@ -30,18 +30,16 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.185",
-    "@anthropic-ai/sdk": "^0.105.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.201",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@mohtasham/md-to-docx": "^2.4.0",
-    "@tanstack/react-virtual": "^3.13.12",
     "@types/xml2js": "^0.4.14",
     "adm-zip": "^0.5.16",
     "chokidar": "^5.0.0",
     "diff": "^9.0.0",
     "docx": "^9.5.1",
     "exceljs": "^4.4.0",
-    "markitdown-ts": "^0.0.10",
     "officegen": "^0.6.5",
     "open": "^11.0.0",
     "pdf-lib": "^1.17.1",
@@ -53,13 +51,15 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
-    "react-virtualized-auto-sizer": "^2.0.3",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.35.1",
     "xml2js": "^0.6.2",
     "yahoo-finance2": "^3.15.3",
     "zod": "^4.4.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
