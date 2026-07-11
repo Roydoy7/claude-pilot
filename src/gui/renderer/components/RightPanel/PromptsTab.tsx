@@ -112,27 +112,20 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
   };
 
   return (
-    <div className="prompts-tab" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
+    <div className="prompts-tab">
       {/* Header */}
-      <div style={{ padding: '1rem 1rem 12px 1rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <h3 className="tab-title" style={{ margin: 0 }}>{t.rightPanel.promptsTab.title}</h3>
-        <p className="panel-tab-description" style={{ margin: '8px 0 0' }}>
+      <div className="prompts-header">
+        <h3 className="tab-title">{t.rightPanel.promptsTab.title}</h3>
+        <p className="panel-tab-description">
           {t.rightPanel.promptsTab.description}
         </p>
       </div>
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '8px', padding: '12px 1rem', flexShrink: 0 }}>
+      <div className="prompts-actions">
         <button
           className="new-template-button"
           onClick={handleNew}
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -143,15 +136,9 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
           {t.rightPanel.promptsTab.newTemplate}
         </button>
         <button
-          className="btn btn-secondary"
+          className="btn btn-danger-ghost prompts-clear-button"
           onClick={handleDeleteAll}
           disabled={templates.length === 0}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-          }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
@@ -164,18 +151,19 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
       </div>
 
       {/* Template List - fills remaining space */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem' }}>
+      <div className="prompts-list-scroll">
         {templates.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="prompts-list">
             {templates.map((template) => (
               <div
                 key={template.id}
                 className="prompt-item"
                 onClick={() => handleApply(template)}
               >
-                <span className="prompt-item-name" title={template.name}>
-                  {template.name}
-                </span>
+                <div className="prompt-item-copy">
+                  <span className="prompt-item-name" title={template.name}>{template.name}</span>
+                  <span className="prompt-item-preview">{template.content}</span>
+                </div>
                 <div className="prompt-item-actions">
                   <button
                     className="item-action-btn"
@@ -205,16 +193,7 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
             ))}
           </div>
         ) : (
-          <div
-            style={{
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)',
-              fontSize: '0.875rem',
-            }}
-          >
+          <div className="prompts-empty">
             {t.rightPanel.promptsTab.noTemplates}
           </div>
         )}

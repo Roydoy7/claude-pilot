@@ -35,7 +35,14 @@ export function RightPanel({ sessionId, onClose, onApplyTemplate, width }: Right
 
   return (
     <div className="right-panel" style={width ? { width: `${width}px` } : undefined}>
-      {/* Tab Bar */}
+      <div className="right-panel-header">
+        <span className="right-panel-title">{t.rightPanel.context}</span>
+        <button className="right-panel-close" onClick={onClose} title={t.rightPanel.closePanel} aria-label={t.rightPanel.closePanel}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
       <div className="tab-bar">
         <button
           className="tab-button"
@@ -43,7 +50,9 @@ export function RightPanel({ sessionId, onClose, onApplyTemplate, width }: Right
           onClick={() => setActiveTab('workspace')}
           title={t.rightPanel.workspace}
         >
-          <span>📁</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" />
+          </svg>
           <span>{t.rightPanel.workspace}</span>
         </button>
         <button
@@ -67,15 +76,10 @@ export function RightPanel({ sessionId, onClose, onApplyTemplate, width }: Right
           onClick={() => setActiveTab('skills')}
           title={t.rightPanel.skills}
         >
-          <span>🧩</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8.5 3H5a2 2 0 0 0-2 2v3.5a2.5 2.5 0 1 1 0 5V19a2 2 0 0 0 2 2h5.5a2.5 2.5 0 1 1 5 0H19a2 2 0 0 0 2-2v-5.5a2.5 2.5 0 1 1 0-5V5a2 2 0 0 0-2-2h-5.5a2.5 2.5 0 1 1-5 0Z" />
+          </svg>
           <span>{t.rightPanel.skills}</span>
-        </button>
-        <button
-          className="tab-button close-button"
-          onClick={onClose}
-          title={t.rightPanel.closePanel}
-        >
-          <span>❌</span>
         </button>
       </div>
 

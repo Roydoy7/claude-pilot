@@ -106,51 +106,40 @@ export function TemplateEditorModal({ template, isNew, onClose, onSave, onCreate
   return (
     <div className="modal-overlay" onKeyDown={handleKeyDown}>
       <div
-        className="modal"
-        style={{ width: '80%', maxWidth: '900px', height: '80%', maxHeight: '700px' }}
+        className="modal template-editor-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="modal-header">
           <h3 className="modal-title">{isNew ? 'New Template' : 'Edit Template'}</h3>
-          <button className="modal-close" onClick={onClose} style={{ fontSize: '20px' }}>
-            ×
+          <button className="modal-close" onClick={onClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
 
         {/* Name input */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+        <div className="template-name-row">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Template name..."
             className="form-input"
-            style={{ width: '100%' }}
           />
         </div>
 
         {/* Toolbar */}
-        <div
-          style={{
-            padding: '8px 20px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="template-editor-toolbar">
           <button
             className={showPreview ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
             onClick={() => setShowPreview(!showPreview)}
           >
-            {showPreview ? '📝 Edit' : '👁 Preview'}
+            {showPreview ? 'Edit' : 'Preview'}
           </button>
 
           {!showPreview && (
             <>
-              <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border)' }} />
+              <div className="template-toolbar-divider" />
 
               <button
                 className="editor-tool-btn"
@@ -220,7 +209,7 @@ export function TemplateEditorModal({ template, isNew, onClose, onSave, onCreate
         </div>
 
         {/* Content area */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div className="template-editor-content">
           {!showPreview ? (
             <textarea
               ref={textareaRef}
@@ -234,31 +223,10 @@ Supports Markdown:
 - - Lists
 - ```code blocks```
 - [links](url)"
-              style={{
-                width: '100%',
-                height: '100%',
-                padding: '16px 20px',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                backgroundColor: 'var(--bg-primary)',
-                border: 'none',
-                color: 'var(--text-primary)',
-                resize: 'none',
-                fontFamily: 'var(--font-mono)',
-              }}
+              className="template-editor-textarea"
             />
           ) : (
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                padding: '16px 20px',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                overflowY: 'auto',
-                color: 'var(--text-primary)',
-              }}
-            >
+            <div className="template-editor-preview">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}

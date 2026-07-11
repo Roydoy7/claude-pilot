@@ -83,9 +83,6 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
 
   return (
     <div className="workspace-tab panel-scroll">
-      <h3 className="tab-title">{t.rightPanel.workspaceTab.title}</h3>
-
-      {/* Description */}
       <p className="panel-tab-description">
         {t.rightPanel.workspaceTab.description}
       </p>
@@ -102,12 +99,13 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
             <h4 className="panel-section-title">
               {t.rightPanel.workspaceTab.workingDirectory}
             </h4>
-            <div className="panel-card">
-              <div className="mono" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                {cwd || t.sessionConfig.noDirectorySelected}
-              </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            <div className="workspace-current-path">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" /></svg>
+              <div className="workspace-current-copy">
+                <div className="workspace-current-value mono" title={cwd}>{cwd || t.sessionConfig.noDirectorySelected}</div>
+                <div className="workspace-current-help">
                 {t.rightPanel.workspaceTab.setDuringCreation}
+                </div>
               </div>
             </div>
           </div>
@@ -123,25 +121,24 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
               className="add-workspace-button"
               onClick={handleAddDirectory}
               disabled={loading}
-              style={{ marginBottom: '0.75rem' }}
             >
               {t.rightPanel.workspaceTab.addDirectory}
             </button>
 
             {/* Directory List */}
             {additionalDirectories.length === 0 ? (
-              <div className="panel-empty">
+              <div className="workspace-empty-inline">
                 {t.rightPanel.workspaceTab.noAdditionalDirectories}
               </div>
             ) : (
               <div className="workspace-list">
                 {additionalDirectories.map((path, index) => (
                   <div key={index} className="workspace-item">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>
+                    <div className="workspace-item-copy">
+                      <span className="workspace-item-label">
                         {t.rightPanel.workspaceTab.directoryLabel(index + 1)}
                       </span>
-                      <span className="workspace-path mono" title={path} style={{ fontSize: '0.85rem' }}>
+                      <span className="workspace-path mono" title={path}>
                         {path}
                       </span>
                     </div>
@@ -150,7 +147,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
                       onClick={() => handleRemoveDirectory(path)}
                       title={t.rightPanel.workspaceTab.removeDirectory}
                     >
-                      ×
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
                     </button>
                   </div>
                 ))}

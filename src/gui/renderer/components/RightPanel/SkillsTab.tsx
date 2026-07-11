@@ -30,17 +30,17 @@ function SkillCard({ skill, isInstalled, onInstall, onUninstall, loading, t }: S
   const metadata = skill.metadata;
 
   return (
-    <div className="panel-card" style={{ marginBottom: '0.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: '600', fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+    <div className="skill-item">
+      <div className="skill-item-layout">
+        <div className="skill-item-copy">
+          <div className="skill-item-name">
             {metadata.name}
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+          <div className="skill-item-description">
             {metadata.description}
           </div>
           {metadata.tags && metadata.tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <div className="skill-item-tags">
               {metadata.tags.map((tag) => (
                 <span key={tag} className="tag">
                   {tag}
@@ -49,7 +49,7 @@ function SkillCard({ skill, isInstalled, onInstall, onUninstall, loading, t }: S
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+        <div className="skill-item-action">
           {isInstalled ? (
             <button className="btn btn-danger-ghost btn-sm" onClick={onUninstall} disabled={loading}>
               {loading ? '...' : t.uninstall}
@@ -188,19 +188,12 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
   // Show message if no session selected
   if (!sessionId) {
     return (
-      <div style={{ padding: '0.75rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+      <div className="skills-tab">
+        <h3 className="tab-title">
           {t.rightPanel.skillsTab.title}
         </h3>
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '2rem 1rem',
-            color: 'var(--text-secondary)',
-            fontSize: '0.8rem',
-          }}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📂</div>
+        <div className="skills-empty">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" /></svg>
           <div>{t.rightPanel.skillsTab.selectSession}</div>
         </div>
       </div>
@@ -208,28 +201,18 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
   }
 
   return (
-    <div style={{ padding: '0.75rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="skills-tab">
       {/* Header */}
-      <div style={{ marginBottom: '0.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+      <div className="skills-header">
+        <div className="skills-title-row">
+          <h3 className="tab-title">
             {t.rightPanel.skillsTab.title}
           </h3>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.375rem',
-              fontSize: '0.7rem',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-            }}
-          >
+          <label className="skills-global-toggle">
             <input
               type="checkbox"
               checked={globalEnabled}
               onChange={(e) => handleGlobalToggle(e.target.checked)}
-              style={{ cursor: 'pointer' }}
             />
             {t.rightPanel.skillsTab.enableSkills}
           </label>
@@ -256,7 +239,7 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
 
       {/* Error Message */}
       {error && (
-        <div className="alert-error" style={{ marginBottom: '0.5rem' }}>
+        <div className="alert-error skills-error">
           {error}
           <button
             onClick={() => setError(null)}
@@ -274,20 +257,13 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="skills-content">
         {view === 'installed' ? (
           // Installed Skills View
           <>
             {installedSkills.length === 0 ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: '2rem 1rem',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.8rem',
-                }}
-              >
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🧩</div>
+              <div className="skills-empty">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 3H5a2 2 0 0 0-2 2v3.5a2.5 2.5 0 1 1 0 5V19a2 2 0 0 0 2 2h5.5a2.5 2.5 0 1 1 5 0H19a2 2 0 0 0 2-2v-5.5a2.5 2.5 0 1 1 0-5V5a2 2 0 0 0-2-2h-5.5a2.5 2.5 0 1 1-5 0Z" /></svg>
                 <div>{t.rightPanel.skillsTab.noSkillsInstalled}</div>
                 <div style={{ marginTop: '0.25rem' }}>
                   {t.rightPanel.skillsTab.browseMarketplace}
