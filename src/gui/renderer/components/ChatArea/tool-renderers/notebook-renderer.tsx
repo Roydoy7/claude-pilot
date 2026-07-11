@@ -92,10 +92,10 @@ export const multiEditRenderer: ToolConfig = {
                 borderLeft: '2px solid var(--border)',
               }}
             >
-              <div style={{ color: '#ef4444', fontSize: '0.7rem' }}>
+              <div style={{ color: 'var(--error)', fontSize: '0.7rem' }}>
                 - {(edit.old_string?.length > 50 ? edit.old_string.substring(0, 50) + '...' : edit.old_string) || '(empty)'}
               </div>
-              <div style={{ color: '#10b981', fontSize: '0.7rem' }}>
+              <div style={{ color: 'var(--success)', fontSize: '0.7rem' }}>
                 + {(edit.new_string?.length > 50 ? edit.new_string.substring(0, 50) + '...' : edit.new_string) || '(empty)'}
               </div>
             </div>
@@ -113,7 +113,7 @@ export const multiEditRenderer: ToolConfig = {
             border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
           }}
         >
-          <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+          <span style={{ color: response.error ? 'var(--error)' : 'var(--success)' }}>
             {response.error ? `❌ ${response.error}` : '✅ All edits applied successfully'}
           </span>
         </div>
@@ -201,8 +201,8 @@ export const notebookEditRenderer: ToolConfig = {
               <span style={{ color: 'var(--text-secondary)' }}>⚙️ Mode: </span>
               <span
                 style={{
-                  color: args.edit_mode === 'delete' ? '#ef4444' :
-                         args.edit_mode === 'insert' ? '#10b981' : '#3b82f6',
+                  color: args.edit_mode === 'delete' ? 'var(--error)' :
+                         args.edit_mode === 'insert' ? 'var(--success)' : 'var(--accent)',
                 }}
               >
                 {String(args.edit_mode)}
@@ -222,7 +222,7 @@ export const notebookEditRenderer: ToolConfig = {
             border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
           }}
         >
-          <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+          <span style={{ color: response.error ? 'var(--error)' : 'var(--success)' }}>
             {response.error ? `❌ ${response.error}` : '✅ Notebook updated'}
           </span>
         </div>

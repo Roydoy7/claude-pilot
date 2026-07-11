@@ -88,7 +88,7 @@ export function MarkdownEditor({
             {'</>'}
           </button>
           {/* Separator */}
-          <span style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-color, #dee2e6)', margin: '0 4px' }}></span>
+          <span style={{ width: '1px', height: '18px', backgroundColor: 'var(--border)', margin: '0 4px' }}></span>
           {extraToolbarButtons}
         </div>
         <button

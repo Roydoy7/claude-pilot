@@ -60,7 +60,7 @@ const styles = {
     border: '1px solid var(--border)',
   },
   contentError: {
-    borderColor: '#ef4444',
+    borderColor: 'var(--error)',
     backgroundColor: 'rgba(239, 68, 68, 0.05)',
   },
   header: {
@@ -72,10 +72,10 @@ const styles = {
     fontSize: '0.7rem',
   },
   headerSuccess: {
-    color: '#10b981',
+    color: 'var(--success)',
   },
   headerError: {
-    color: '#ef4444',
+    color: 'var(--error)',
   },
   markdown: {
     lineHeight: 1.5,

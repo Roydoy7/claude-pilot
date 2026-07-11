@@ -175,7 +175,7 @@ export const pdfRenderer: ToolConfig = {
           }}
         >
           {isError ? (
-            <div style={{ color: '#ef4444' }}>
+            <div style={{ color: 'var(--error)' }}>
               <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Error:</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {displayOutput}

@@ -299,7 +299,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
                   {(message.usage.cache_read_input_tokens || 0) > 0 && (
                     <span
                       title={t.message.tokens.cacheHit(message.usage.cache_read_input_tokens || 0)}
-                      style={{ color: '#10b981', fontWeight: '600' }}
+                      style={{ color: 'var(--success)', fontWeight: '600' }}
                     >
                       ⚡{message.usage.cache_read_input_tokens}
                     </span>
@@ -307,7 +307,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
                   {(message.usage.cache_creation_input_tokens || 0) > 0 && (
                     <span
                       title={t.message.tokens.cacheWrite(message.usage.cache_creation_input_tokens || 0)}
-                      style={{ color: '#f59e0b' }}
+                      style={{ color: 'var(--warning)' }}
                     >
                       📝{message.usage.cache_creation_input_tokens}
                       {/* Show TTL breakdown if available */}
@@ -342,7 +342,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isSaving ? '#4caf50' : 'var(--text-secondary)',
+                color: isSaving ? 'var(--success)' : 'var(--text-secondary)',
               }}
               onMouseEnter={(e) => {
                 if (!isSaving) {
@@ -354,7 +354,7 @@ export const Message = memo(function Message({ message }: MessageProps) {
               onMouseLeave={(e) => {
                 e.currentTarget.style.opacity = '0.7';
                 e.currentTarget.style.backgroundColor = isSaving ? 'rgba(76,175,80,0.2)' : 'var(--bg-secondary)';
-                e.currentTarget.style.color = isSaving ? '#4caf50' : 'var(--text-secondary)';
+                e.currentTarget.style.color = isSaving ? 'var(--success)' : 'var(--text-secondary)';
               }}
             >
               {isSaving ? (

@@ -123,8 +123,8 @@ export function CopyButton({ text }: { text: string }) {
       style={{
         padding: '0.125rem 0.375rem',
         fontSize: '0.65rem',
-        backgroundColor: copied ? '#10b981' : 'var(--bg-secondary)',
-        color: copied ? '#ffffff' : 'var(--text-secondary)',
+        backgroundColor: copied ? 'var(--success)' : 'var(--bg-secondary)',
+        color: copied ? 'var(--on-accent)' : 'var(--text-secondary)',
         border: '0px solid var(--border)',
         borderRadius: '3px',
         cursor: 'pointer',
@@ -203,8 +203,8 @@ export function ProgressLog({ progress, hasResponse, showProgress, setShowProgre
               entry.type === 'end' ? '✅' :
               entry.type === 'error' ? '❌' : '•';
             const typeColor =
-              entry.type === 'stderr' || entry.type === 'error' ? '#f59e0b' :
-              entry.type === 'end' ? '#10b981' :
+              entry.type === 'stderr' || entry.type === 'error' ? 'var(--warning)' :
+              entry.type === 'end' ? 'var(--success)' :
               'var(--text-secondary)';
 
             return (

@@ -413,7 +413,7 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
           align-items: center;
           justify-content: center;
           animation: terminalPulse 1.5s ease-in-out infinite;
-          color: var(--accent-secondary, #10b981);
+          color: var(--success);
         }
 
         .status-icon-queue {

@@ -80,32 +80,32 @@ const PERMISSION_MODE_CONFIGS: Record<PermissionMode, PermissionModeConfig> = {
   default: {
     icon: PermissionIcons.shield,
     color: 'var(--text-secondary)',
-    bgColor: 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))',
+    bgColor: 'var(--bg-tertiary)',
   },
   acceptEdits: {
     icon: PermissionIcons.edit,
-    color: '#4caf50',
-    bgColor: 'rgba(76, 175, 80, 0.12)',
+    color: 'var(--success)',
+    bgColor: 'var(--success-subtle)',
   },
   bypassPermissions: {
     icon: PermissionIcons.zap,
-    color: '#ff9800',
-    bgColor: 'rgba(255, 152, 0, 0.12)',
+    color: 'var(--warning)',
+    bgColor: 'var(--warning-subtle)',
   },
   plan: {
     icon: PermissionIcons.clipboard,
-    color: '#2196f3',
-    bgColor: 'rgba(33, 150, 243, 0.12)',
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-subtle)',
   },
   dontAsk: {
     icon: PermissionIcons.volumeX,
-    color: '#9c27b0',
-    bgColor: 'rgba(156, 39, 176, 0.12)',
+    color: 'var(--warning)',
+    bgColor: 'var(--warning-subtle)',
   },
   auto: {
     icon: PermissionIcons.cpu,
-    color: '#009688',
-    bgColor: 'rgba(0, 150, 136, 0.12)',
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-subtle)',
   },
 };
 
@@ -196,15 +196,15 @@ export function PermissionModeSelector({ permissionMode, onPermissionModeChange,
             left: 0,
             marginBottom: '4px',
             minWidth: '280px',
-            backgroundColor: 'var(--bg-primary, #ffffff)',
-            border: '1px solid var(--border-color, #dee2e6)',
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border)',
             borderRadius: '8px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             zIndex: 1000,
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color, #dee2e6)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
             {t.inputArea.permissionMode.label}
           </div>
           {PERMISSION_MODES.map((mode) => {
@@ -222,13 +222,13 @@ export function PermissionModeSelector({ permissionMode, onPermissionModeChange,
                   width: '100%',
                   padding: '10px 12px',
                   border: 'none',
-                  backgroundColor: isSelected ? 'var(--bg-tertiary, rgba(0, 0, 0, 0.05))' : 'transparent',
+                  backgroundColor: isSelected ? 'var(--bg-tertiary)' : 'transparent',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-secondary, #f8f9fa)';
+                  if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
                 }}
                 onMouseLeave={(e) => {
                   if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';

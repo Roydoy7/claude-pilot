@@ -438,8 +438,8 @@ export function InputArea({
                   padding: '4px 8px',
                   fontSize: '11px',
                   fontWeight: 500,
-                  color: contextUsage.percentUsed >= 90 ? '#ef4444' : contextUsage.percentUsed >= 75 ? '#f59e0b' : 'var(--text-secondary)',
-                  backgroundColor: contextUsage.percentUsed >= 90 ? 'rgba(239, 68, 68, 0.12)' : contextUsage.percentUsed >= 75 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))',
+                  color: contextUsage.percentUsed >= 90 ? 'var(--error)' : contextUsage.percentUsed >= 75 ? 'var(--warning)' : 'var(--text-secondary)',
+                  backgroundColor: contextUsage.percentUsed >= 90 ? 'rgba(239, 68, 68, 0.12)' : contextUsage.percentUsed >= 75 ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-tertiary)',
                   borderRadius: '4px',
                 }}
               >
@@ -447,14 +447,14 @@ export function InputArea({
                 <div style={{
                   width: '40px',
                   height: '4px',
-                  backgroundColor: 'var(--border-color, rgba(128, 128, 128, 0.3))',
+                  backgroundColor: 'var(--border)',
                   borderRadius: '2px',
                   overflow: 'hidden',
                 }}>
                   <div style={{
                     width: `${Math.min(100, contextUsage.percentUsed)}%`,
                     height: '100%',
-                    backgroundColor: contextUsage.percentUsed >= 90 ? '#ef4444' : contextUsage.percentUsed >= 75 ? '#f59e0b' : '#10b981',
+                    backgroundColor: contextUsage.percentUsed >= 90 ? 'var(--error)' : contextUsage.percentUsed >= 75 ? 'var(--warning)' : 'var(--success)',
                     borderRadius: '2px',
                     transition: 'width 0.3s ease',
                   }} />
@@ -472,7 +472,7 @@ export function InputArea({
               title={isExpanded ? 'Collapse input' : 'Expand input'}
               disabled={disabled}
               style={{
-                color: isExpanded ? 'var(--primary, #6366f1)' : undefined,
+                color: isExpanded ? 'var(--accent)' : undefined,
               }}
             >
               {isExpanded ? (
@@ -510,7 +510,7 @@ export function InputArea({
               disabled={!isProcessing}
               title="Stop Response"
               style={{
-                backgroundColor: isProcessing ? 'var(--error, #dc3545)' : 'var(--bg-tertiary)',
+                backgroundColor: isProcessing ? 'var(--error)' : 'var(--bg-tertiary)',
                 color: isProcessing ? 'white' : 'var(--text-secondary)',
                 opacity: isProcessing ? 1 : 0.5,
                 cursor: isProcessing ? 'pointer' : 'not-allowed',

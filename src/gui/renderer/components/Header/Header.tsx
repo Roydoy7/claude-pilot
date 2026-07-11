@@ -132,7 +132,7 @@ export function Header({
             onClick={handleOpenSettings}
             title="Authentication required"
             style={{
-              color: '#f59e0b',
+              color: 'var(--warning)',
             }}
           >
             <svg

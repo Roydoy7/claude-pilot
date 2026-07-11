@@ -77,7 +77,7 @@ export const taskRenderer: ToolConfig = {
           {!!args.subagent_type && (
             <div style={{ marginBottom: '0.25rem' }}>
               <span style={{ color: 'var(--text-secondary)' }}>🤖 Agent: </span>
-              <span style={{ color: '#3b82f6', fontWeight: '500' }}>{String(args.subagent_type)}</span>
+              <span style={{ color: 'var(--accent)', fontWeight: '500' }}>{String(args.subagent_type)}</span>
             </div>
           )}
           <div>
@@ -99,7 +99,7 @@ export const taskRenderer: ToolConfig = {
             overflow: 'auto',
           }}
         >
-          <pre style={{ ...codeStyle, color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
+          <pre style={{ ...codeStyle, color: response.error ? 'var(--error)' : 'var(--text-primary)' }}>
             {response.error || response.output}
           </pre>
         </div>
@@ -164,9 +164,9 @@ export const todoWriteRenderer: ToolConfig = {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
           {todos.map((todo, index) => {
             const statusColor =
-              todo.status === 'completed' ? '#10b981' :
-              todo.status === 'in_progress' ? '#3b82f6' :
-              '#6b7280';
+              todo.status === 'completed' ? 'var(--success)' :
+              todo.status === 'in_progress' ? 'var(--accent)' :
+              'var(--text-tertiary)';
             const statusIcon =
               todo.status === 'completed' ? '✅' :
               todo.status === 'in_progress' ? '🔄' :
@@ -179,7 +179,7 @@ export const todoWriteRenderer: ToolConfig = {
                   padding: '0.375rem 0.5rem',
                   backgroundColor: 'var(--bg-tertiary)',
                   borderRadius: '4px',
-                  border: `1px solid ${todo.status === 'in_progress' ? '#3b82f6' : 'var(--border)'}`,
+                  border: `1px solid ${todo.status === 'in_progress' ? 'var(--accent)' : 'var(--border)'}`,
                   fontSize: '0.75rem',
                 }}
               >
@@ -232,10 +232,10 @@ function getTaskStatusIcon(status: string): string {
 
 function getTaskStatusColor(status: string): string {
   switch (status) {
-    case 'completed': return '#10b981';
-    case 'in_progress': return '#3b82f6';
-    case 'deleted': return '#6b7280';
-    default: return '#6b7280';
+    case 'completed': return 'var(--success)';
+    case 'in_progress': return 'var(--accent)';
+    case 'deleted': return 'var(--text-tertiary)';
+    default: return 'var(--text-tertiary)';
   }
 }
 
@@ -300,7 +300,7 @@ export const taskCreateRenderer: ToolConfig = {
           </div>
         )}
         {response?.error && (
-          <pre style={{ ...codeStyle, color: '#ef4444' }}>{response.error}</pre>
+          <pre style={{ ...codeStyle, color: 'var(--error)' }}>{response.error}</pre>
         )}
       </div>
     );
@@ -355,7 +355,7 @@ export const taskGetRenderer: ToolConfig = {
     if (response?.error) {
       return (
         <div style={contentContainerStyle}>
-          <pre style={{ ...codeStyle, color: '#ef4444' }}>{response.error}</pre>
+          <pre style={{ ...codeStyle, color: 'var(--error)' }}>{response.error}</pre>
         </div>
       );
     }
@@ -474,7 +474,7 @@ export const taskUpdateRenderer: ToolConfig = {
         )}
         {result && (
           <div>
-            <span style={{ color: result.success ? '#10b981' : '#ef4444' }}>
+            <span style={{ color: result.success ? 'var(--success)' : 'var(--error)' }}>
               {result.success ? '✅ Updated' : '❌ Failed'}
             </span>
             {result.updatedFields.length > 0 && (
@@ -483,7 +483,7 @@ export const taskUpdateRenderer: ToolConfig = {
           </div>
         )}
         {errorMessage && (
-          <pre style={{ ...codeStyle, color: '#ef4444' }}>{errorMessage}</pre>
+          <pre style={{ ...codeStyle, color: 'var(--error)' }}>{errorMessage}</pre>
         )}
       </div>
     );
@@ -536,7 +536,7 @@ export const taskListRenderer: ToolConfig = {
     if (response?.error) {
       return (
         <div style={contentContainerStyle}>
-          <pre style={{ ...codeStyle, color: '#ef4444' }}>{response.error}</pre>
+          <pre style={{ ...codeStyle, color: 'var(--error)' }}>{response.error}</pre>
         </div>
       );
     }
@@ -561,7 +561,7 @@ export const taskListRenderer: ToolConfig = {
                 padding: '0.375rem 0.5rem',
                 backgroundColor: 'var(--bg-tertiary)',
                 borderRadius: '4px',
-                border: `1px solid ${task.status === 'in_progress' ? '#3b82f6' : 'var(--border)'}`,
+                border: `1px solid ${task.status === 'in_progress' ? 'var(--accent)' : 'var(--border)'}`,
                 fontSize: '0.75rem',
               }}
             >

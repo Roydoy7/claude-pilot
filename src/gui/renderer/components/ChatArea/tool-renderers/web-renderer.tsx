@@ -180,7 +180,7 @@ export const webFetchRenderer: ToolConfig = {
               href={String(args.url)}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#3b82f6', textDecoration: 'underline' }}
+              style={{ color: 'var(--accent)', textDecoration: 'underline' }}
             >
               {String(args.url)}
             </a>
@@ -206,7 +206,7 @@ export const webFetchRenderer: ToolConfig = {
             overflow: 'auto',
           }}
         >
-          <pre style={{ ...codeStyle, color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
+          <pre style={{ ...codeStyle, color: response.error ? 'var(--error)' : 'var(--text-primary)' }}>
             {response.error || response.output}
           </pre>
         </div>
@@ -284,13 +284,13 @@ export const webSearchRenderer: ToolConfig = {
           {allowedDomains.length > 0 && (
             <div style={{ marginBottom: blockedDomains.length > 0 ? '0.25rem' : 0 }}>
               <span style={{ color: 'var(--text-secondary)' }}>✅ Only: </span>
-              <span style={{ color: '#10b981' }}>{allowedDomains.join(', ')}</span>
+              <span style={{ color: 'var(--success)' }}>{allowedDomains.join(', ')}</span>
             </div>
           )}
           {blockedDomains.length > 0 && (
             <div>
               <span style={{ color: 'var(--text-secondary)' }}>🚫 Exclude: </span>
-              <span style={{ color: '#ef4444' }}>{blockedDomains.join(', ')}</span>
+              <span style={{ color: 'var(--error)' }}>{blockedDomains.join(', ')}</span>
             </div>
           )}
         </div>
@@ -310,7 +310,7 @@ export const webSearchRenderer: ToolConfig = {
               overflow: 'auto',
             }}
           >
-            <pre style={{ ...codeStyle, color: '#ef4444' }}>
+            <pre style={{ ...codeStyle, color: 'var(--error)' }}>
               {response.error}
             </pre>
           </div>
@@ -371,7 +371,7 @@ export const webSearchRenderer: ToolConfig = {
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
-                            color: '#3b82f6',
+                            color: 'var(--accent)',
                             textDecoration: 'none',
                             fontWeight: 500,
                             display: 'block',
@@ -385,7 +385,7 @@ export const webSearchRenderer: ToolConfig = {
                         </a>
                         <div
                           style={{
-                            color: '#10b981',
+                            color: 'var(--success)',
                             fontSize: '0.65rem',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',

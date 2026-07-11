@@ -190,7 +190,7 @@ export const convertRenderer: ToolConfig = {
           }}
         >
           {isError ? (
-            <div style={{ color: '#ef4444' }}>
+            <div style={{ color: 'var(--error)' }}>
               <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Error:</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {displayOutput}
@@ -344,7 +344,7 @@ export const markitdownRenderer: ToolConfig = {
           }}
         >
           {response.error ? (
-            <div style={{ color: '#ef4444' }}>
+            <div style={{ color: 'var(--error)' }}>
               <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>❌ Conversion Failed:</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {response.error}
@@ -352,7 +352,7 @@ export const markitdownRenderer: ToolConfig = {
             </div>
           ) : (
             <div style={{ color: 'var(--text-primary)' }}>
-              <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#10b981' }}>✅ Conversion Complete:</div>
+              <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: 'var(--success)' }}>✅ Conversion Complete:</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {response.output}
               </pre>
@@ -483,18 +483,18 @@ export const markdownToWordRenderer: ToolConfig = {
           </div>
           <div style={{ marginBottom: '0.25rem' }}>
             <span style={{ color: 'var(--text-secondary)' }}>🎨 Template: </span>
-            <span style={{ color: '#2b579a' }}>{templateNames[template] || template}</span>
+            <span style={{ color: 'var(--accent)' }}>{templateNames[template] || template}</span>
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <span>
               <span style={{ color: 'var(--text-secondary)' }}>📑 TOC: </span>
-              <span style={{ color: args.includeTableOfContents ? '#10b981' : 'var(--text-secondary)' }}>
+              <span style={{ color: args.includeTableOfContents ? 'var(--success)' : 'var(--text-secondary)' }}>
                 {args.includeTableOfContents ? '✓ Yes' : 'No'}
               </span>
             </span>
             <span>
               <span style={{ color: 'var(--text-secondary)' }}>🔢 Page #: </span>
-              <span style={{ color: args.includePageNumbers !== false ? '#10b981' : 'var(--text-secondary)' }}>
+              <span style={{ color: args.includePageNumbers !== false ? 'var(--success)' : 'var(--text-secondary)' }}>
                 {args.includePageNumbers !== false ? '✓ Yes' : 'No'}
               </span>
             </span>
@@ -517,7 +517,7 @@ export const markdownToWordRenderer: ToolConfig = {
           }}
         >
           {response.error ? (
-            <div style={{ color: '#ef4444' }}>
+            <div style={{ color: 'var(--error)' }}>
               <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>❌ Conversion Failed:</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {response.error}
@@ -525,7 +525,7 @@ export const markdownToWordRenderer: ToolConfig = {
             </div>
           ) : (
             <div style={{ color: 'var(--text-primary)' }}>
-              <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#2b579a' }}>📘 Word Document Created:</div>
+              <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: 'var(--accent)' }}>📘 Word Document Created:</div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {response.output}
               </pre>

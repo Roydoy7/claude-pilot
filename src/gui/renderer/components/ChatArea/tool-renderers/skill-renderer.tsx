@@ -25,7 +25,7 @@ export function SkillIcon(): ReactNode {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ color: '#8b5cf6' }}
+      style={{ color: 'var(--accent)' }}
     >
       <path d="M12 2L2 7l10 5 10-5-10-5z" />
       <path d="M2 17l10 5 10-5" />
@@ -94,7 +94,7 @@ export const skillRenderer: ToolConfig = {
           gap: '0.5rem',
           borderLeft: '3px solid #8b5cf6',
         }}>
-          <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
+          <span style={{ color: 'var(--accent)', fontWeight: '600' }}>
             /{skillName}
           </span>
           {skillArgs && (

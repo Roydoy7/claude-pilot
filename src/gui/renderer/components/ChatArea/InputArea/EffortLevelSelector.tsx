@@ -69,7 +69,7 @@ export function EffortLevelSelector({ effortLevel, supportedLevels, onEffortLeve
           lineHeight: 1,
           whiteSpace: 'nowrap',
           color: 'var(--text-secondary)',
-          backgroundColor: 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))',
+          backgroundColor: 'var(--bg-tertiary)',
           border: 'none',
           borderRadius: '4px',
           cursor: onEffortLevelChange ? 'pointer' : 'default',
@@ -91,15 +91,15 @@ export function EffortLevelSelector({ effortLevel, supportedLevels, onEffortLeve
             left: 0,
             marginBottom: '4px',
             minWidth: '140px',
-            backgroundColor: 'var(--bg-primary, #ffffff)',
-            border: '1px solid var(--border-color, #dee2e6)',
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border)',
             borderRadius: '8px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             zIndex: 1000,
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color, #dee2e6)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
             {t.inputArea.effortLevelSelector?.label}
           </div>
           {supportedLevels.map((level) => {
@@ -115,7 +115,7 @@ export function EffortLevelSelector({ effortLevel, supportedLevels, onEffortLeve
                   width: '100%',
                   padding: '8px 12px',
                   border: 'none',
-                  backgroundColor: isSelected ? 'var(--bg-tertiary, rgba(0, 0, 0, 0.05))' : 'transparent',
+                  backgroundColor: isSelected ? 'var(--bg-tertiary)' : 'transparent',
                   cursor: 'pointer',
                   textAlign: 'left',
                   fontSize: '12px',
@@ -124,7 +124,7 @@ export function EffortLevelSelector({ effortLevel, supportedLevels, onEffortLeve
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-secondary, #f8f9fa)';
+                  if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
                 }}
                 onMouseLeave={(e) => {
                   if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';

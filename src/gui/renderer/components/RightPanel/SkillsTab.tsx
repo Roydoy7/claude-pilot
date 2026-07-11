@@ -77,7 +77,7 @@ function SkillCard({ skill, isInstalled, onInstall, onUninstall, loading, t }: S
                 borderRadius: '4px',
                 border: '1px solid #ef4444',
                 backgroundColor: 'transparent',
-                color: '#ef4444',
+                color: 'var(--error)',
                 cursor: loading ? 'wait' : 'pointer',
                 opacity: loading ? 0.5 : 1,
               }}
@@ -94,7 +94,7 @@ function SkillCard({ skill, isInstalled, onInstall, onUninstall, loading, t }: S
                 borderRadius: '4px',
                 border: 'none',
                 backgroundColor: 'var(--accent)',
-                color: '#fff',
+                color: 'var(--on-accent)',
                 cursor: loading ? 'wait' : 'pointer',
                 opacity: loading ? 0.5 : 1,
               }}
@@ -289,7 +289,7 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
               borderRadius: '4px',
               border: '1px solid var(--border)',
               backgroundColor: view === 'installed' ? 'var(--accent)' : 'transparent',
-              color: view === 'installed' ? '#fff' : 'var(--text-secondary)',
+              color: view === 'installed' ? 'var(--on-accent)' : 'var(--text-secondary)',
               cursor: 'pointer',
             }}
           >
@@ -304,7 +304,7 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
               borderRadius: '4px',
               border: '1px solid var(--border)',
               backgroundColor: view === 'marketplace' ? 'var(--accent)' : 'transparent',
-              color: view === 'marketplace' ? '#fff' : 'var(--text-secondary)',
+              color: view === 'marketplace' ? 'var(--on-accent)' : 'var(--text-secondary)',
               cursor: 'pointer',
             }}
           >
@@ -322,7 +322,7 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
             borderRadius: '4px',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
             border: '1px solid #ef4444',
-            color: '#ef4444',
+            color: 'var(--error)',
             fontSize: '0.75rem',
           }}
         >
@@ -333,7 +333,7 @@ export function SkillsTab({ sessionId }: SkillsTabProps) {
               marginLeft: '0.5rem',
               background: 'none',
               border: 'none',
-              color: '#ef4444',
+              color: 'var(--error)',
               cursor: 'pointer',
             }}
           >

@@ -95,8 +95,8 @@ export function SettingSourcesToggle({ settingSources, onSettingSourcesChange, d
           fontWeight: 500,
           lineHeight: 1,
           whiteSpace: 'nowrap',
-          color: settingSources.length === ALL_SETTING_SOURCES.length ? 'var(--text-secondary)' : '#2196f3',
-          backgroundColor: settingSources.length === ALL_SETTING_SOURCES.length ? 'var(--bg-tertiary, rgba(128, 128, 128, 0.1))' : 'rgba(33, 150, 243, 0.12)',
+          color: settingSources.length === ALL_SETTING_SOURCES.length ? 'var(--text-secondary)' : 'var(--accent)',
+          backgroundColor: settingSources.length === ALL_SETTING_SOURCES.length ? 'var(--bg-tertiary)' : 'rgba(33, 150, 243, 0.12)',
           border: 'none',
           borderRadius: '4px',
           cursor: onSettingSourcesChange ? 'pointer' : 'default',
@@ -120,15 +120,15 @@ export function SettingSourcesToggle({ settingSources, onSettingSourcesChange, d
             left: 0,
             marginBottom: '4px',
             minWidth: '280px',
-            backgroundColor: 'var(--bg-primary, #ffffff)',
-            border: '1px solid var(--border-color, #dee2e6)',
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border)',
             borderRadius: '8px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             zIndex: 1000,
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color, #dee2e6)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
             {t.inputArea.settingSources?.label || 'Setting Sources'}
           </div>
           {ALL_SETTING_SOURCES.map((source) => {
@@ -154,7 +154,7 @@ export function SettingSourcesToggle({ settingSources, onSettingSourcesChange, d
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isDisabled) e.currentTarget.style.backgroundColor = 'var(--bg-secondary, #f8f9fa)';
+                  if (!isDisabled) e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
@@ -167,8 +167,8 @@ export function SettingSourcesToggle({ settingSources, onSettingSourcesChange, d
                   width: '14px',
                   height: '14px',
                   borderRadius: '3px',
-                  border: `1.5px solid ${isSelected ? '#2196f3' : 'var(--border-color, #dee2e6)'}`,
-                  backgroundColor: isSelected ? '#2196f3' : 'transparent',
+                  border: `1.5px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                  backgroundColor: isSelected ? 'var(--accent)' : 'transparent',
                   flexShrink: 0,
                 }}>
                   {isSelected && (
@@ -178,7 +178,7 @@ export function SettingSourcesToggle({ settingSources, onSettingSourcesChange, d
                   )}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 500, color: isSelected ? '#2196f3' : 'var(--text-primary)', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', marginBottom: '2px' }}>
                     {sourceInfo.name}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>

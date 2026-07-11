@@ -245,9 +245,9 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
                       justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#dc354520';
-                      e.currentTarget.style.borderColor = '#dc354540';
-                      e.currentTarget.style.color = '#dc3545';
+                      e.currentTarget.style.backgroundColor = 'var(--error-subtle)';
+                      e.currentTarget.style.borderColor = 'var(--error)';
+                      e.currentTarget.style.color = 'var(--error)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';

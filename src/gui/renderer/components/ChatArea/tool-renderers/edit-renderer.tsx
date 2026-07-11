@@ -86,11 +86,11 @@ function renderDiffLines(diffLines: DiffLine[]): ReactNode {
 
         if (line.type === 'added') {
           bgColor = 'rgba(16,185,129,0.2)';
-          textColor = '#059669';
+          textColor = 'var(--success)';
           prefix = '+';
         } else if (line.type === 'removed') {
           bgColor = 'rgba(239,68,68,0.2)';
-          textColor = '#dc2626';
+          textColor = 'var(--error)';
           prefix = '-';
         }
 
@@ -155,7 +155,7 @@ function SideBySideDiffView({ oldStr, newStr }: { oldStr: string; newStr: string
             let textColor = 'inherit';
             if (line.type === 'removed') {
               bgColor = 'rgba(239,68,68,0.2)';
-              textColor = '#dc2626';
+              textColor = 'var(--error)';
             } else if (line.type === 'empty') {
               bgColor = 'rgba(128,128,128,0.1)';
             }
@@ -176,7 +176,7 @@ function SideBySideDiffView({ oldStr, newStr }: { oldStr: string; newStr: string
             let textColor = 'inherit';
             if (line.type === 'added') {
               bgColor = 'rgba(16,185,129,0.2)';
-              textColor = '#059669';
+              textColor = 'var(--success)';
             } else if (line.type === 'empty') {
               bgColor = 'rgba(128,128,128,0.1)';
             }
@@ -218,7 +218,7 @@ function EditDiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
             border: '1px solid var(--border)',
             borderRadius: '3px',
             backgroundColor: viewMode === 'unified' ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: viewMode === 'unified' ? '#ffffff' : 'var(--text-secondary)',
+            color: viewMode === 'unified' ? 'var(--on-accent)' : 'var(--text-secondary)',
             fontSize: '0.65rem',
             cursor: 'pointer',
           }}
@@ -232,7 +232,7 @@ function EditDiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
             border: '1px solid var(--border)',
             borderRadius: '3px',
             backgroundColor: viewMode === 'sideBySide' ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: viewMode === 'sideBySide' ? '#ffffff' : 'var(--text-secondary)',
+            color: viewMode === 'sideBySide' ? 'var(--on-accent)' : 'var(--text-secondary)',
             fontSize: '0.65rem',
             cursor: 'pointer',
           }}
@@ -264,7 +264,7 @@ export function EditIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ color: '#f59e0b' }}
+      style={{ color: 'var(--warning)' }}
     >
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -355,7 +355,7 @@ export const editRenderer: ToolConfig = {
             <span style={{ color: 'var(--text-secondary)' }}>📄 File: </span>
             <span style={{ color: 'var(--text-primary)' }}>{String(args.file_path)}</span>
             {!!args.replace_all && (
-              <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontSize: '0.7rem' }}>(replace all)</span>
+              <span style={{ marginLeft: '0.5rem', color: 'var(--warning)', fontSize: '0.7rem' }}>(replace all)</span>
             )}
           </div>
           {(args.old_string !== undefined || args.new_string !== undefined) && (
@@ -376,7 +376,7 @@ export const editRenderer: ToolConfig = {
             border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
           }}
         >
-          <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+          <span style={{ color: response.error ? 'var(--error)' : 'var(--success)' }}>
             {response.error ? `❌ ${response.error}` : '✅ Edit applied successfully'}
           </span>
         </div>

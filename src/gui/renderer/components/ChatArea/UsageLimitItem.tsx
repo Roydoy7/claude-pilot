@@ -80,7 +80,7 @@ export const UsageLimitItem = memo(function UsageLimitItem({ item }: UsageLimitI
             backgroundColor: 'rgba(234, 179, 8, 0.1)',
             border: '1px solid rgba(234, 179, 8, 0.3)',
             borderRadius: '6px',
-            color: '#ca8a04',
+            color: 'var(--warning)',
             fontSize: '0.75rem',
           }}
         >

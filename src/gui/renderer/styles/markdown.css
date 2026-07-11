@@ -59,7 +59,7 @@
 .message-ai .message-bubble p,
 .message-ai .message-bubble li,
 .message-ai .message-bubble span:not(.hljs-keyword):not(.hljs-string):not(.hljs-comment):not(.hljs-number):not(.hljs-built_in):not(.hljs-attr):not(.hljs-literal):not(.hljs-type):not(.hljs-name):not(.hljs-section):not(.hljs-symbol):not(.hljs-bullet):not(.hljs-variable):not(.hljs-template-variable):not(.hljs-quote):not(.hljs-selector-tag):not(.hljs-title):not(.hljs-builtin-name) {
-  color: var(--ai-bubble-text);
+  color: var(--text-primary);
 }
 
 /* Override highlight.js background for message bubbles */

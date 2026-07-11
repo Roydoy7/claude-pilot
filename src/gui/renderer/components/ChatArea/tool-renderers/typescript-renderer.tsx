@@ -82,7 +82,7 @@ export const typescriptRenderer: ToolConfig = {
 
       return (
         <div style={contentContainerStyle}>
-          <pre style={{ ...codeStyle, color: '#3b82f6' }}>
+          <pre style={{ ...codeStyle, color: 'var(--accent)' }}>
             {String(args.code)}
           </pre>
           {packages.length > 0 && (
@@ -108,7 +108,7 @@ export const typescriptRenderer: ToolConfig = {
           overflow: 'auto',
         }}
       >
-        <pre style={{ ...codeStyle, color: isError ? '#ef4444' : 'var(--text-primary)' }}>
+        <pre style={{ ...codeStyle, color: isError ? 'var(--error)' : 'var(--text-primary)' }}>
           {displayOutput}
         </pre>
       </div>

@@ -188,7 +188,7 @@ export const readRenderer: ToolConfig = {
             📊 Lines {fileInfo.startLine}-{(fileInfo.startLine || 1) + (fileInfo.numLines || 0) - 1} of {fileInfo.totalLines}
           </div>
         )}
-        <pre style={{ ...codeStyle, color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
+        <pre style={{ ...codeStyle, color: response.error ? 'var(--error)' : 'var(--text-primary)' }}>
           {displayContent}
         </pre>
       </div>
@@ -289,7 +289,7 @@ export const writeRenderer: ToolConfig = {
             border: response.error ? '1px solid #ef4444' : '1px solid #10b981',
           }}
         >
-          <span style={{ color: response.error ? '#ef4444' : '#10b981' }}>
+          <span style={{ color: response.error ? 'var(--error)' : 'var(--success)' }}>
             {response.error ? `❌ ${response.error}` : '✅ File created successfully'}
           </span>
         </div>
@@ -379,7 +379,7 @@ export const bashRenderer: ToolConfig = {
           onClick={() => hasOutput && setShowDetails?.(!showDetails)}
           style={{ ...codeStyle, color: 'var(--text-primary)', lineHeight: '1.5', cursor: hasOutput ? 'pointer' : 'default' }}
         >
-          <span style={{ color: '#10b981' }}>$</span> {formattedCmd}
+          <span style={{ color: 'var(--success)' }}>$</span> {formattedCmd}
           {hasOutput && (
             <span style={{ marginLeft: '0.5rem', opacity: 0.5, fontSize: '0.65rem' }}>
               {showDetails ? '▾' : '▸'}
@@ -390,7 +390,7 @@ export const bashRenderer: ToolConfig = {
         {showDetails && (displayOutput || wasInterrupted) && (
           <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
             {wasInterrupted && (
-              <div style={{ color: '#f59e0b', fontSize: '0.65rem', marginBottom: '0.25rem' }}>
+              <div style={{ color: 'var(--warning)', fontSize: '0.65rem', marginBottom: '0.25rem' }}>
                 ⚠️ Command was interrupted
               </div>
             )}
@@ -399,7 +399,7 @@ export const bashRenderer: ToolConfig = {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.25rem' }}>
                   <CopyButton text={displayOutput} />
                 </div>
-                <pre style={{ ...codeStyle, color: isError ? '#ef4444' : 'var(--text-secondary)', lineHeight: '1.5' }}>
+                <pre style={{ ...codeStyle, color: isError ? 'var(--error)' : 'var(--text-secondary)', lineHeight: '1.5' }}>
                   {displayOutput}
                 </pre>
               </>
@@ -410,10 +410,10 @@ export const bashRenderer: ToolConfig = {
         {showDetails && hasStderr && (
           <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-              <span style={{ color: '#f59e0b', fontSize: '0.65rem' }}>stderr:</span>
+              <span style={{ color: 'var(--warning)', fontSize: '0.65rem' }}>stderr:</span>
               <CopyButton text={stderrContent} />
             </div>
-            <pre style={{ ...codeStyle, color: '#f59e0b', lineHeight: '1.5', opacity: 0.8 }}>
+            <pre style={{ ...codeStyle, color: 'var(--warning)', lineHeight: '1.5', opacity: 0.8 }}>
               {stderrContent}
             </pre>
           </div>
@@ -503,7 +503,7 @@ export const globRenderer: ToolConfig = {
         {metadata && (
           <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
             📊 Found {metadata.numFiles} files in {metadata.durationMs}ms
-            {metadata.truncated && <span style={{ color: '#f59e0b' }}> (truncated)</span>}
+            {metadata.truncated && <span style={{ color: 'var(--warning)' }}> (truncated)</span>}
           </div>
         )}
         {filenames.length > 0 ? (
@@ -521,7 +521,7 @@ export const globRenderer: ToolConfig = {
             })}
           </div>
         ) : (
-          <pre style={{ ...codeStyle, color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
+          <pre style={{ ...codeStyle, color: response.error ? 'var(--error)' : 'var(--text-primary)' }}>
             {displayContent}
           </pre>
         )}
@@ -593,7 +593,7 @@ export const grepRenderer: ToolConfig = {
         <div key="details" style={contentContainerStyle}>
           <div style={{ marginBottom: args.path ? '0.25rem' : 0 }}>
             <span style={{ color: 'var(--text-secondary)' }}>🔍 Pattern: </span>
-            <code style={{ color: '#f59e0b', backgroundColor: 'var(--bg-secondary)', padding: '0.125rem 0.25rem', borderRadius: '2px' }}>
+            <code style={{ color: 'var(--warning)', backgroundColor: 'var(--bg-secondary)', padding: '0.125rem 0.25rem', borderRadius: '2px' }}>
               {String(args.pattern)}
             </code>
           </div>
@@ -624,7 +624,7 @@ export const grepRenderer: ToolConfig = {
             overflow: 'auto',
           }}
         >
-          <pre style={{ ...codeStyle, color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
+          <pre style={{ ...codeStyle, color: response.error ? 'var(--error)' : 'var(--text-primary)' }}>
             {response.error || response.output}
           </pre>
         </div>
@@ -684,7 +684,7 @@ export const lsRenderer: ToolConfig = {
           overflow: 'auto',
         }}
       >
-        <pre style={{ ...codeStyle, color: response.error ? '#ef4444' : 'var(--text-primary)' }}>
+        <pre style={{ ...codeStyle, color: response.error ? 'var(--error)' : 'var(--text-primary)' }}>
           {response.error || response.output}
         </pre>
       </div>

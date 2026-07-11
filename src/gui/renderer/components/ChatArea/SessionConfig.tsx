@@ -230,7 +230,7 @@ export function SessionConfig({
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
                 backgroundColor: 'var(--accent)',
-                color: '#ffffff',
+                color: 'var(--on-accent)',
                 cursor: 'pointer',
                 flexShrink: 0,
               }}

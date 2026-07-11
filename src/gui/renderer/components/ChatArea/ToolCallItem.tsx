@@ -209,30 +209,14 @@ export function ToolCallItem({
           {canonicalToolName === 'Bash' && response && ((): React.ReactNode => {
             const isError = isMcpToolError(response);
             return (
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: '600',
-                  color: isError ? '#ef4444' : '#10b981',
-                  padding: '0.05rem 0.075rem',
-                  borderRadius: '3px',
-                }}
-              >
-                {isError ? 'FAIL' : 'SUCCESS'}
+              <span className="status-badge" data-status={isError ? 'error' : 'success'}>
+                {isError ? t.common.status.failed : t.common.status.completed}
               </span>
             );
           })()}
           {canonicalToolName === 'Bash' && wasRejected && !response && (
-            <span
-              style={{
-                fontSize: '0.7rem',
-                fontWeight: '600',
-                color: '#f59e0b',
-                padding: '0.05rem 0.075rem',
-                borderRadius: '3px',
-              }}
-            >
-              REJECTED
+            <span className="status-badge" data-status="rejected">
+              {t.common.status.rejected}
             </span>
           )}
         </div>
@@ -250,31 +234,15 @@ export function ToolCallItem({
           >
             {/* Status badge */}
             {wasRejected && !response && (
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: '600',
-                  color: '#f59e0b',
-                  padding: '0.05rem 0.075rem',
-                  borderRadius: '3px',
-                }}
-              >
-                REJECTED
+              <span className="status-badge" data-status="rejected">
+                {t.common.status.rejected}
               </span>
             )}
             {response && ((): React.ReactNode => {
               const isError = isMcpToolError(response);
               return (
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    fontWeight: '600',
-                    color: isError ? '#ef4444' : '#10b981',
-                    padding: '0.05rem 0.075rem',
-                    borderRadius: '3px',
-                  }}
-                >
-                  {isError ? 'FAIL' : 'SUCCESS'}
+                <span className="status-badge" data-status={isError ? 'error' : 'success'}>
+                  {isError ? t.common.status.failed : t.common.status.completed}
                 </span>
               );
             })()}

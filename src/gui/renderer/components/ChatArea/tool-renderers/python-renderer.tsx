@@ -107,7 +107,7 @@ export const pythonRenderer: ToolConfig = {
               📋 {description}
             </div>
           )}
-          <pre style={{ ...codeStyle, color: '#3b82f6' }}>
+          <pre style={{ ...codeStyle, color: 'var(--accent)' }}>
             {String(args.code)}
           </pre>
           {requirements.length > 0 && (
@@ -134,7 +134,7 @@ export const pythonRenderer: ToolConfig = {
           overflow: 'auto',
         }}
       >
-        <pre style={{ ...codeStyle, color: isError ? '#ef4444' : 'var(--text-primary)' }}>
+        <pre style={{ ...codeStyle, color: isError ? 'var(--error)' : 'var(--text-primary)' }}>
           {displayOutput}
         </pre>
       </div>

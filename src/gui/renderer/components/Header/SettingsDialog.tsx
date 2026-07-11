@@ -219,10 +219,10 @@ export function SettingsDialog({
         <div
           style={{
             padding: '1rem',
-            backgroundColor: 'var(--warning-bg, #fef3c7)',
-            border: '1px solid var(--warning-border, #f59e0b)',
+            backgroundColor: 'var(--warning-subtle)',
+            border: '1px solid var(--warning)',
             borderRadius: '8px',
-            color: 'var(--warning-text, #92400e)',
+            color: 'var(--warning)',
             fontSize: '0.875rem',
           }}
         >
@@ -245,7 +245,7 @@ export function SettingsDialog({
               border: '1px solid var(--border)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', marginBottom: '0.75rem' }}>
               <span>✓</span>
               <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
                 {t.settings?.account?.authenticated || 'Authenticated'} ({getAuthSourceLabel(authStatus.apiKeySource)})
@@ -268,7 +268,7 @@ export function SettingsDialog({
                   border: '1px solid #dc2626',
                   borderRadius: '6px',
                   backgroundColor: 'transparent',
-                  color: '#dc2626',
+                  color: 'var(--error)',
                   cursor: 'pointer',
                 }}
               >
@@ -285,7 +285,7 @@ export function SettingsDialog({
               border: '1px solid var(--border)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--error)', marginBottom: '1rem' }}>
               <span>⚠</span>
               <span style={{ fontSize: '0.875rem' }}>{t.settings?.account?.notAuthenticated || 'Not authenticated'}</span>
             </div>
@@ -301,7 +301,7 @@ export function SettingsDialog({
                   border: '1px solid var(--accent)',
                   borderRadius: '6px',
                   backgroundColor: isLoggingIn ? 'var(--bg-tertiary)' : 'var(--accent)',
-                  color: '#ffffff',
+                  color: 'var(--on-accent)',
                   cursor: isLoggingIn ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -326,7 +326,7 @@ export function SettingsDialog({
             </div>
 
             {loginError && (
-              <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--error)', marginTop: '0.75rem' }}>
                 {t.common.messages.error}: {loginError}
               </div>
             )}
@@ -363,7 +363,7 @@ export function SettingsDialog({
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
                 backgroundColor: selectedAgentId === agent.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: selectedAgentId === agent.id ? '#ffffff' : 'var(--text-primary)',
+                color: selectedAgentId === agent.id ? 'var(--on-accent)' : 'var(--text-primary)',
                 cursor: 'pointer',
               }}
             >
@@ -415,7 +415,7 @@ export function SettingsDialog({
               border: '1px solid var(--border)',
               borderRadius: '6px',
               backgroundColor: 'var(--accent)',
-              color: '#ffffff',
+              color: 'var(--on-accent)',
               cursor: 'pointer',
               flexShrink: 0,
             }}
@@ -457,7 +457,7 @@ export function SettingsDialog({
                 fontWeight: 500,
                 border: 'none',
                 backgroundColor: theme === 'light' ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: theme === 'light' ? '#ffffff' : 'var(--text-primary)',
+                color: theme === 'light' ? 'var(--on-accent)' : 'var(--text-primary)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -476,7 +476,7 @@ export function SettingsDialog({
                 border: 'none',
                 borderLeft: '1px solid var(--border)',
                 backgroundColor: theme === 'dark' ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: theme === 'dark' ? '#ffffff' : 'var(--text-primary)',
+                color: theme === 'dark' ? 'var(--on-accent)' : 'var(--text-primary)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -617,7 +617,7 @@ export function SettingsDialog({
                   border: 'none',
                   borderRadius: '6px',
                   backgroundColor: activeCategory === category.id ? 'var(--accent)' : 'transparent',
-                  color: activeCategory === category.id ? '#ffffff' : 'var(--text-primary)',
+                  color: activeCategory === category.id ? 'var(--on-accent)' : 'var(--text-primary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
