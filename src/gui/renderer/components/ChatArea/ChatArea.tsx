@@ -189,22 +189,23 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
   }, [sessionId]);
 
   // Handle tool approval - delegate to SessionAgent
-  const handleToolApprove = async (toolCallId: string) => {
+  // Stable identity (useCallback) so memoized message rows skip re-renders
+  const handleToolApprove = useCallback(async (toolCallId: string) => {
     if (!currentAgentRef.current) {
       return;
     }
 
     await currentAgentRef.current.approveTools([toolCallId]);
-  };
+  }, []);
 
   // Handle tool rejection - delegate to SessionAgent
-  const handleToolReject = async (toolCallId: string, reason?: string) => {
+  const handleToolReject = useCallback(async (toolCallId: string, reason?: string) => {
     if (!currentAgentRef.current) {
       return;
     }
 
     await currentAgentRef.current.rejectTools([toolCallId], reason);
-  };
+  }, []);
 
   const handleCancelRequest = async () => {
     if (!currentSessionId) {
@@ -496,6 +497,9 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
     <div className="chat-area">
       {sessionStarted ? (
         <MessageList
+          // Remount per session so the list re-runs its scroll-to-bottom
+          // initialization and drops the previous session's scroll state
+          key={currentSessionId ?? 'new-session'}
           items={items}
           onToolApprove={handleToolApprove}
           onToolReject={handleToolReject}

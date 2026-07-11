@@ -494,6 +494,16 @@
   overflow-x: hidden;
 }
 
+/* One chat item in the natively-scrolled list. content-visibility lets the
+   browser skip rendering offscreen rows (native, JS-free virtualization);
+   contain-intrinsic-size 'auto' remembers the real size once rendered so
+   the scrollbar stays accurate. */
+.message-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+  padding-bottom: 1rem;
+}
+
 /* ========================================
    Session Config (Role Cards)
    ======================================== */

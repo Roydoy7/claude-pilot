@@ -1,13 +1,18 @@
 /**
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
- * MessageList Component - Virtualized scrollable list of messages and tool calls
- * Uses @tanstack/react-virtual for efficient rendering of long message lists
+ * MessageList Component - Natively scrolled list of messages and tool calls.
+ *
+ * Deliberately NOT JS-virtualized: dynamic-height virtualization needs
+ * runtime measurement + scrollTop correction, which fights user scrolling
+ * and causes jitter on long replies. Instead, offscreen rows are skipped
+ * by the browser via CSS content-visibility (see .message-row), rows are
+ * memoized so scrolling never re-renders markdown, and native CSS scroll
+ * anchoring keeps the viewport stable.
  */
 
 import type React from 'react';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { Message } from './Message';
 import { ToolCallItem } from './ToolCallItem';
 import { StatusItem } from './StatusItem';
@@ -25,7 +30,6 @@ interface MessageListProps {
 }
 
 const SCROLL_THRESHOLD = 150; // Distance from bottom to consider "at bottom"
-const DEFAULT_ITEM_HEIGHT = 100; // Estimated height for items before measurement
 
 /**
  * Check if an item should be rendered (not empty)
@@ -79,6 +83,23 @@ function renderItem(
   return null;
 }
 
+/**
+ * Memoized row: item objects keep their identity across re-renders, so a
+ * shallow-compare memo means scrolling and streaming updates never re-parse
+ * the markdown of unchanged messages.
+ */
+const MessageRow = memo(function MessageRow({
+  item,
+  onToolApprove,
+  onToolReject,
+}: {
+  item: MessageListItem;
+  onToolApprove?: (toolCallId: string) => void;
+  onToolReject?: (toolCallId: string) => void;
+}) {
+  return <>{renderItem(item, onToolApprove, onToolReject)}</>;
+});
+
 export function MessageList({
   items,
   onToolApprove,
@@ -86,23 +107,14 @@ export function MessageList({
 }: MessageListProps) {
   const { t } = useLanguage();
   const parentRef = useRef<HTMLDivElement>(null);
+  const bottomAnchorRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const isAutoScrollEnabled = useRef(true);
   const lastItemCount = useRef(items.length);
 
-  // Filter out empty items before virtualization
+  // Filter out empty items
   const filteredItems = useMemo(() => items.filter(shouldRenderItem), [items]);
-
-  // TanStack Virtual virtualizer with dynamic measurement
-  const virtualizer = useVirtualizer({
-    count: filteredItems.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => DEFAULT_ITEM_HEIGHT,
-    overscan: 5,
-    // Use item ID as key for stable measurements
-    getItemKey: (index) => filteredItems[index]?.id ?? index,
-  });
 
   // Check if user is at bottom
   const checkIfAtBottom = useCallback(() => {
@@ -113,21 +125,57 @@ export function MessageList({
     return distanceFromBottom < SCROLL_THRESHOLD;
   }, []);
 
-  // Scroll to bottom
-  const scrollToBottom = useCallback((_smooth = false) => {
-    if (!parentRef.current || filteredItems.length === 0) return;
-
-    // Use virtualizer's scrollToIndex for accurate scrolling
-    virtualizer.scrollToIndex(filteredItems.length - 1, {
-      align: 'end',
-      behavior: 'auto',
-    });
+  // Scroll to bottom. Uses the bottom anchor element: with
+  // content-visibility, scrollHeight is estimate-based for unrendered rows,
+  // so scrollTo(scrollHeight) can land mid-list; scrollIntoView forces the
+  // browser to render and position the real end of the list.
+  const scrollToBottom = useCallback((smooth = false) => {
+    bottomAnchorRef.current?.scrollIntoView({ block: 'end', behavior: smooth ? 'smooth' : 'auto' });
 
     // Re-enable auto-scroll and clear indicators
     isAutoScrollEnabled.current = true;
     setShowScrollButton(false);
     setHasNewMessages(false);
-  }, [filteredItems.length, virtualizer]);
+  }, []);
+
+  // Keep re-asserting scroll-to-bottom until layout settles:
+  // content-visibility rows near the end get their real size only after
+  // the first positioning, and native scroll anchoring then pins the
+  // viewport to the top of the last message instead of the true end.
+  const settleRafId = useRef<number | null>(null);
+  const settleToBottom = useCallback(() => {
+    if (settleRafId.current !== null) {
+      cancelAnimationFrame(settleRafId.current);
+    }
+
+    let framesLeft = 30;
+    let stableFrames = 0;
+    let lastScrollHeight = -1;
+
+    const settle = () => {
+      scrollToBottom(false);
+
+      const scrollHeight = parentRef.current?.scrollHeight ?? 0;
+      stableFrames = scrollHeight === lastScrollHeight ? stableFrames + 1 : 0;
+      lastScrollHeight = scrollHeight;
+      framesLeft--;
+
+      settleRafId.current = stableFrames < 3 && framesLeft > 0
+        ? requestAnimationFrame(settle)
+        : null;
+    };
+
+    settleRafId.current = requestAnimationFrame(settle);
+  }, [scrollToBottom]);
+
+  // Cancel any in-flight settling on unmount
+  useEffect(() => {
+    return () => {
+      if (settleRafId.current !== null) {
+        cancelAnimationFrame(settleRafId.current);
+      }
+    };
+  }, []);
 
   // Handle user scroll events
   const handleScroll = useCallback(() => {
@@ -148,6 +196,7 @@ export function MessageList({
   // Auto-scroll on new items
   useEffect(() => {
     // Detect new items
+    const wasEmpty = lastItemCount.current === 0;
     const hasNewItem = filteredItems.length > lastItemCount.current;
     lastItemCount.current = filteredItems.length;
 
@@ -156,20 +205,23 @@ export function MessageList({
       setHasNewMessages(true);
     }
 
-    // Auto-scroll if enabled
+    // Auto-scroll if enabled. The first fill (history loaded into an empty
+    // list) needs the settling loop; streaming increments only need one shot.
     if (isAutoScrollEnabled.current && hasNewItem) {
-      requestAnimationFrame(() => {
-        scrollToBottom(false);
-      });
+      if (wasEmpty) {
+        settleToBottom();
+      } else {
+        requestAnimationFrame(() => {
+          scrollToBottom(false);
+        });
+      }
     }
-  }, [filteredItems.length, checkIfAtBottom, scrollToBottom]);
+  }, [filteredItems.length, checkIfAtBottom, scrollToBottom, settleToBottom]);
 
-  // Scroll to bottom on mount
+  // Scroll to bottom on mount (session opened with already-cached items)
   useEffect(() => {
     if (filteredItems.length > 0) {
-      requestAnimationFrame(() => {
-        scrollToBottom(false);
-      });
+      settleToBottom();
     }
   }, []); // Only on mount
 
@@ -196,44 +248,19 @@ export function MessageList({
     );
   }
 
-  const virtualItems = virtualizer.getVirtualItems();
-
   return (
     <div
       className="message-list"
       ref={parentRef}
       onScroll={handleScroll}
     >
-      {/* Virtual list container - position:relative here so absolute children respect padding */}
-      <div
-        style={{
-          height: virtualizer.getTotalSize(),
-          position: 'relative',
-        }}
-      >
-        {/* Render only visible items */}
-        {virtualItems.map((virtualItem) => {
-          const item = filteredItems[virtualItem.index];
-          return (
-            <div
-              key={item.id}
-              data-index={virtualItem.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualItem.start}px)`,
-                boxSizing: 'border-box',
-                paddingBottom: '1rem',
-              }}
-            >
-              {renderItem(item, onToolApprove, onToolReject)}
-            </div>
-          );
-        })}
-      </div>
+      {filteredItems.map((item) => (
+        <div key={item.id} className="message-row">
+          <MessageRow item={item} onToolApprove={onToolApprove} onToolReject={onToolReject} />
+        </div>
+      ))}
+      {/* Bottom anchor for precise scroll-to-end */}
+      <div ref={bottomAnchorRef} />
 
       {/* Scroll to bottom button - positioned at bottom of visible area */}
       {showScrollButton && (
