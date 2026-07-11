@@ -287,7 +287,6 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
         flexDirection: 'column',
         gap: '0.25rem',
         marginBottom: '0.5rem',
-        marginLeft: '3rem', // Align with tool call icons
         fontSize: '0.875rem',
         color: 'var(--text-secondary)',
       }}

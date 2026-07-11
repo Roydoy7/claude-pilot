@@ -2,8 +2,7 @@
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
  * ToolCallItem Component - Standalone tool call display item
- * Displays tool calls as independent items in the message list
- * Features: No avatar, left indentation
+ * Displays tool calls as unified execution rows in the message list
  */
 
 import { useState } from 'react';
