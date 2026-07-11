@@ -81,6 +81,15 @@
   font-size: 0.9em;
 }
 
+/* Inline code only - block code lives inside pre and must stay bare
+   (styling it too produces a box-in-box) */
+.message-bubble :not(pre) > code {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  padding: 0.125em 0.3em;
+  border-radius: var(--radius-sm);
+}
+
 /* Override hljs background inside message bubbles */
 .message-bubble .hljs,
 .message-bubble pre code {

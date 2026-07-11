@@ -64,6 +64,11 @@ body {
   outline-offset: 2px;
 }
 
+/* Text selection carries the brand tint */
+::selection {
+  background-color: var(--accent-subtle);
+}
+
 /* Button reset */
 button {
   font-family: inherit;
