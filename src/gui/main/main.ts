@@ -7,6 +7,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
+import { registerBrowserIpcHandlers } from './browser-ipc-handlers';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -19,6 +20,7 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
 
@@ -37,6 +39,7 @@ function createWindow() {
 
   // Register IPC handlers
   registerIpcHandlers(mainWindow);
+  registerBrowserIpcHandlers(mainWindow);
 }
 
 app.whenReady().then(() => {

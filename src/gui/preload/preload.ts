@@ -247,6 +247,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
       invokeChannel(IpcChannels.agents.list),
   },
 
+  // Browser
+  browser: {
+    navigate: (url: string) =>
+      invokeChannel(IpcChannels.browser.navigate, url),
+
+    goBack: () =>
+      invokeChannel(IpcChannels.browser.goBack),
+
+    goForward: () =>
+      invokeChannel(IpcChannels.browser.goForward),
+
+    reload: () =>
+      invokeChannel(IpcChannels.browser.reload),
+
+    screenshot: () =>
+      invokeChannel(IpcChannels.browser.screenshot),
+
+    getContent: (selector?: string) =>
+      invokeChannel(IpcChannels.browser.getContent, selector),
+
+    click: (x: number, y: number) =>
+      invokeChannel(IpcChannels.browser.click, x, y),
+
+    type: (text: string) =>
+      invokeChannel(IpcChannels.browser.type, text),
+
+    executeJS: (code: string) =>
+      invokeChannel(IpcChannels.browser.executeJS, code),
+
+    getUrl: () =>
+      invokeChannel(IpcChannels.browser.getUrl),
+
+    // Main process asks the renderer to open the Browser tab (e.g. when an
+    // agent invokes a browser tool while the pane is closed)
+    onShowRequest: (callback: () => void) => {
+      ipcRenderer.on('browser:show', () => callback());
+    },
+
+    // Tab commands (switch/new/close) issued by agent browser tools
+    onCommand: (callback: (command: { type: 'switch' | 'new' | 'close'; tabId?: number; url?: string }) => void) => {
+      ipcRenderer.on('browser:command', (_event, command) => callback(command));
+    },
+  },
+
   // Dialogs
   dialog: {
     confirm: (message: string): Promise<boolean> =>

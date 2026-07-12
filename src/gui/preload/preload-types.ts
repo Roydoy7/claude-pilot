@@ -406,6 +406,22 @@ export interface ElectronAPI {
     list: () => Promise<AgentSummary[]>;
   };
 
+  // Embedded browser pane
+  browser: {
+    navigate: (url: string) => Promise<{ success: boolean; error?: string }>;
+    goBack: () => Promise<{ success: boolean }>;
+    goForward: () => Promise<{ success: boolean }>;
+    reload: () => Promise<{ success: boolean }>;
+    screenshot: () => Promise<{ success: boolean; data?: string; error?: string }>;
+    getContent: (selector?: string) => Promise<{ success: boolean; content?: string; error?: string }>;
+    click: (x: number, y: number) => Promise<{ success: boolean; error?: string }>;
+    type: (text: string) => Promise<{ success: boolean; error?: string }>;
+    executeJS: (code: string) => Promise<{ success: boolean; result?: string; error?: string }>;
+    getUrl: () => Promise<{ success: boolean; url?: string }>;
+    onShowRequest: (callback: () => void) => void;
+    onCommand: (callback: (command: { type: 'switch' | 'new' | 'close'; tabId?: number; url?: string }) => void) => void;
+  };
+
   // Dialogs
   dialog: {
     confirm: (message: string) => Promise<boolean>;
