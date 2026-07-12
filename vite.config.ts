@@ -51,6 +51,7 @@ export default defineConfig({
                 'bufferutil', // Optional dependency of ws (WebSocket)
                 'utf-8-validate', // Optional dependency of ws (WebSocket)
                 'sharp', // Native image processing module
+                '@napi-rs/canvas', // Native canvas module (skia .node binary)
               ],
             },
           },
