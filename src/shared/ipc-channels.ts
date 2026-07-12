@@ -143,6 +143,18 @@ export const IpcChannels = {
   agents: {
     list: 'agents:list',
   },
+  browser: {
+    navigate: 'browser:navigate',
+    goBack: 'browser:goBack',
+    goForward: 'browser:goForward',
+    reload: 'browser:reload',
+    screenshot: 'browser:screenshot',
+    getContent: 'browser:getContent',
+    click: 'browser:click',
+    type: 'browser:type',
+    executeJS: 'browser:executeJS',
+    getUrl: 'browser:getUrl',
+  },
   dialog: {
     confirm: 'dialog:confirm',
   },
@@ -248,6 +260,18 @@ export interface ChannelMap {
 
   // Agents
   'agents:list': { args: []; result: AgentSummary[] };
+
+  // Browser
+  'browser:navigate': { args: [url: string]; result: { success: boolean; error?: string } };
+  'browser:goBack': { args: []; result: { success: boolean } };
+  'browser:goForward': { args: []; result: { success: boolean } };
+  'browser:reload': { args: []; result: { success: boolean } };
+  'browser:screenshot': { args: []; result: { success: boolean; data?: string; error?: string } };
+  'browser:getContent': { args: [selector?: string]; result: { success: boolean; content?: string; error?: string } };
+  'browser:click': { args: [x: number, y: number]; result: { success: boolean; error?: string } };
+  'browser:type': { args: [text: string]; result: { success: boolean; error?: string } };
+  'browser:executeJS': { args: [code: string]; result: { success: boolean; result?: string; error?: string } };
+  'browser:getUrl': { args: []; result: { success: boolean; url?: string } };
 
   // Dialog
   'dialog:confirm': { args: [message: string]; result: boolean };
