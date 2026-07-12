@@ -14,6 +14,16 @@ mcp__docx__docx
 mcp__python__run
 mcp__typescript__execute
 mcp__claude__ask_claude
+mcp__browser__navigate
+mcp__browser__screenshot
+mcp__browser__read_page
+mcp__browser__click
+mcp__browser__type_text
+mcp__browser__execute_js
+mcp__browser__list_tabs
+mcp__browser__switch_tab
+mcp__browser__open_tab
+mcp__browser__close_tab
 
 #SAFE-MCP-TOOLS
 mcp__convert__convert
@@ -23,3 +33,13 @@ mcp__pptx__pptx
 mcp__xlsx__xlsx
 mcp__docx__docx
 mcp__claude__ask_claude
+mcp__browser__navigate
+mcp__browser__screenshot
+mcp__browser__read_page
+mcp__browser__click
+mcp__browser__execute_js
+mcp__browser__type_text
+mcp__browser__list_tabs
+mcp__browser__switch_tab
+mcp__browser__open_tab
+mcp__browser__close_tab
