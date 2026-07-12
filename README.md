@@ -6,6 +6,7 @@
 
 - **Office 办公助手**：读取、编辑、转换 PDF / Word / Excel / PowerPoint，自动化日常办公流程
 - **金融顾问**：基于 Yahoo Finance 实时数据分析美股、日股，提供报价、基本面、历史价格、市场概览、选股器等（数据均来自实时调用，不使用估算或记忆数据）
+- **浏览器自动化**：内置浏览器工具（`mcp__browser__*`），支持网页导航、截图、点击、输入、多标签管理、JS 执行等
 - **文档格式转换**：集成 LibreOffice（Office 文档）与 Calibre（电子书格式）实现多格式互转
 - **Python / TypeScript 代码执行**：内置 Python 3.13 嵌入式运行时（含 pandas、openpyxl、xlwings 等）与 TypeScript 沙箱执行工具
 - **Skills 系统**：支持从本地或远程市场（GitHub 仓库）安装可复用的技能包
@@ -109,17 +110,77 @@ npm run build
 src/
 ├── core/                 # 与 UI 无关的核心逻辑
 │   ├── agents/           # Agent 加载、MCP server 注册
-│   ├── agent-defs/       # 内置角色定义（office-assist、financial-advisor）
+│   ├── agent-defs/       # 内置角色定义（每个子目录为一个 agent）
+│   │   ├── office-assist/
+│   │   └── financial-advisor/
 │   ├── auth/             # 认证（API Key / OAuth）
 │   ├── settings/         # 应用设置管理
 │   ├── skills/           # Skills 市场与管理
-│   └── tools/            # MCP 工具服务器（docx / xlsx / pptx / pdf / image / convert / finance / python / typescript）
+│   └── tools/            # 共享 MCP 工具服务器（docx / xlsx / pptx / pdf / image / convert / finance / python / typescript / browser）
 ├── gui/
 │   ├── main/              # Electron 主进程
 │   ├── preload/           # 安全 IPC 桥接
 │   └── renderer/          # React 界面
 └── shared/                # 主进程与渲染进程共享的类型/工具
 ```
+
+## Agent 定义
+
+每个 agent 是 `src/core/agent-defs/<id>/` 下的一个目录，包含以下文件：
+
+| 文件 | 说明 |
+|---|---|
+| `description.md` | 第一行为显示名称，其余行为描述 |
+| `system-prompt.md` | Agent 的完整 system prompt |
+| `tools.md` | 声明 agent 可用的工具（见下方格式说明） |
+| `prompts.md` | 每行一条示例提示词，显示在输入框下方 |
+| `skills/<name>/` | 标记目录，指定 agent 默认加载的内置 skills |
+| `tools/<name>.ts|.py` | Agent 私有的本地工具脚本（可选） |
+
+新增一个 `agent-defs/<id>/` 目录即可创建新 agent，无需修改代码中的 agent 列表。
+
+### tools.md 格式
+
+`tools.md` 使用四个区块声明工具：
+
+```markdown
+#TOOLS
+SDK_TOOLS          # 展开为全部 Claude SDK 内置工具（Read/Write/Edit/Glob/Grep/Bash/WebFetch/WebSearch/TaskCreate…/Skill）
+
+#SAFE-TOOLS
+SAFE_TOOLS         # 展开为只读 SDK 工具（不含 Write/Edit/Bash）
+
+#MCP-TOOLS
+mcp__convert__convert
+mcp__browser__navigate
+
+#SAFE-MCP-TOOLS
+mcp__convert__convert
+mcp__browser__navigate
+```
+
+- `#TOOLS` / `#SAFE-TOOLS`：SDK 内置工具列表；`SDK_TOOLS` 和 `SAFE_TOOLS` 是宏，会自动展开
+- `#MCP-TOOLS`：agent 需要的 MCP 工具（格式 `mcp__<server>__<tool>`），loader 根据 server 名在 `mcp-server-registry.ts` 中查找对应服务器
+- `#SAFE-MCP-TOOLS`：无需用户确认即可自动执行的 MCP 工具子集
+
+### 本地工具（agent-defs/\<id\>/tools/）
+
+在 agent 目录的 `tools/` 子目录下放置 `.ts` 或 `.py` 脚本，即可为该 agent 添加私有工具，无需修改 `tools.md`。每个脚本文件对应一个工具，工具名等于文件名（不含扩展名）；以 `_` 开头的文件视为共享辅助模块，不注册为工具。
+
+脚本文件头部使用 frontmatter 注释声明元数据：
+
+```typescript
+// ---
+// description: 工具的描述，用于 Claude 理解其用途
+// safe: true          # 是否无需确认自动执行（可选，默认 false）
+// timeout: 30000      # 超时毫秒数（可选）
+// args:
+//   symbol: string (required) - 股票代码
+//   limit: number (optional, default 10) - 返回条数
+// ---
+```
+
+本地工具自动注册为 `mcp__local__<name>`，不出现在 `tools.md` 中。`financial-advisor` 的所有金融数据工具均通过此机制实现。
 
 ## License
 
