@@ -249,20 +249,26 @@ function makeAgent(): ClaudeAgent {
   return new ClaudeAgent(config, SESSION_ID, '/tmp');
 }
 
+let createdSessionId: string | null = null;
+
 beforeAll(() => {
   // Pre-create the session metadata file so checkpoint/session-id updates
   // during message processing succeed silently.
   const sessionManager = SessionManager.getInstance();
   if (!sessionManager.loadSession(SESSION_ID)) {
     const session = sessionManager.createSession('Fixture session', 'office-assist', ClaudeModel.SONNET_4_6, '/tmp');
-    // Re-key the generated session under our fixed SESSION_ID for reuse across tests.
-    sessionManager.deleteSession(session.id);
+    createdSessionId = session.id;
   }
-  sessionManager.createSession('Fixture session', 'office-assist', ClaudeModel.SONNET_4_6, '/tmp');
 });
 
 afterAll(() => {
-  // Best-effort cleanup; fixture sessions are harmless if left behind.
+  const sessionManager = SessionManager.getInstance();
+  const toDelete = [createdSessionId, SESSION_ID].filter(Boolean) as string[];
+  for (const id of toDelete) {
+    if (sessionManager.loadSession(id)) {
+      sessionManager.deleteSession(id);
+    }
+  }
 });
 
 // --- Tests ----------------------------------------------------------------
