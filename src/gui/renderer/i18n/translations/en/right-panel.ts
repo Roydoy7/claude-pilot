@@ -10,7 +10,18 @@ export const rightPanelEn = {
   workspace: 'Workspace',
   prompts: 'Prompts',
   skills: 'Skills',
+  browser: 'Browser',
   closePanel: 'Close Panel',
+
+  // Browser Tab
+  browserTab: {
+    back: 'Back',
+    forward: 'Forward',
+    reload: 'Reload',
+    go: 'Go',
+    newTab: 'New Tab',
+    closeTab: 'Close Tab',
+  },
 
   // Prompts Tab
   promptsTab: {

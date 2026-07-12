@@ -10,7 +10,18 @@ export const rightPanelJa = {
   workspace: 'ワークスペース',
   prompts: 'プロンプト',
   skills: 'スキル',
+  browser: 'ブラウザ',
   closePanel: 'パネルを閉じる',
+
+  // Browser Tab
+  browserTab: {
+    back: '戻る',
+    forward: '進む',
+    reload: '再読み込み',
+    go: '移動',
+    newTab: '新しいタブ',
+    closeTab: 'タブを閉じる',
+  },
 
   // Prompts Tab
   promptsTab: {

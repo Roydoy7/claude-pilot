@@ -316,7 +316,18 @@ export interface Translation {
     workspace: string;
     prompts: string;
     skills: string;
+    browser: string;
     closePanel: string;
+
+    // Browser Tab
+    browserTab: {
+      back: string;
+      forward: string;
+      reload: string;
+      go: string;
+      newTab: string;
+      closeTab: string;
+    };
 
     // Prompts Tab
     promptsTab: {

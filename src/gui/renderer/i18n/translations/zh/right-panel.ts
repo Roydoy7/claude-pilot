@@ -10,7 +10,18 @@ export const rightPanelZh = {
   workspace: '工作区',
   prompts: '提示词',
   skills: '技能',
+  browser: '浏览器',
   closePanel: '关闭面板',
+
+  // Browser Tab
+  browserTab: {
+    back: '后退',
+    forward: '前进',
+    reload: '刷新',
+    go: '转到',
+    newTab: '新建标签页',
+    closeTab: '关闭标签页',
+  },
 
   // Prompts Tab
   promptsTab: {
