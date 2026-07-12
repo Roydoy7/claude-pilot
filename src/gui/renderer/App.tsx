@@ -17,7 +17,7 @@ import type { Session } from '../../core/sessions/session-manager.js';
 const PANEL_WIDTH_KEY = 'rightPanelWidth';
 const DEFAULT_PANEL_WIDTH = 360;
 const MIN_PANEL_WIDTH = 304;
-const MAX_PANEL_WIDTH = 520;
+const MAX_PANEL_WIDTH = 800;
 
 function App() {
   const agentDefinitions = useAgentDefinitions();
@@ -35,6 +35,17 @@ function App() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [showSettingsOnMount, setShowSettingsOnMount] = useState(false);
+
+  // Incremented when the main process asks to show the browser pane
+  // (an agent invoked a browser tool while the pane was closed)
+  const [showBrowserSignal, setShowBrowserSignal] = useState(0);
+
+  useEffect(() => {
+    window.electronAPI.browser.onShowRequest(() => {
+      setIsPanelVisible(true);
+      setShowBrowserSignal((n) => n + 1);
+    });
+  }, []);
 
   // Initialize service and load sessions
   useEffect(() => {
@@ -194,6 +205,7 @@ function App() {
                   onClose={togglePanel}
                   onApplyTemplate={handleApplyTemplate}
                   width={panelWidth}
+                  showBrowserSignal={showBrowserSignal}
                 />
               </>
             )}
