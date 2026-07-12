@@ -20,6 +20,8 @@ import {
   type PDFObject,
 } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
+import { createCanvas } from '@napi-rs/canvas';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { getErrorMessage } from '../errors.js';
 
 // Configure pdf-parse worker for Node.js/Electron environment
@@ -74,6 +76,11 @@ interface PDFExecutionResult {
   // File results
   outputFile?: string;
   outputFiles?: string[];
+
+  // Render results
+  imageBase64?: string;
+  renderedWidth?: number;
+  renderedHeight?: number;
 
   // Status
   pageCount?: number;
@@ -202,6 +209,10 @@ function formatResultForLLM(result: PDFExecutionResult): string {
         });
       }
     });
+  }
+
+  if (result.renderedWidth !== undefined && result.renderedHeight !== undefined) {
+    lines.push(`**Rendered Size**: ${result.renderedWidth} x ${result.renderedHeight} px`);
   }
 
   if (result.outputFile) {
@@ -1044,11 +1055,107 @@ async function splitPDF(
 }
 
 /**
+ * Render a single PDF page to PNG
+ * Uses pdfjs-dist + @napi-rs/canvas (prebuilt skia binaries, no native build step)
+ */
+async function renderPage(
+  file: string,
+  pageNum: number,
+  maxDimensionPx: number,
+  output?: string
+): Promise<PDFExecutionResult> {
+  const startTime = Date.now();
+
+  try {
+    const buffer = await fs.readFile(file);
+    const loadingTask = getDocument({
+      data: new Uint8Array(buffer),
+      // Standard 14 PDF fonts (Helvetica etc.) are not embedded in PDFs;
+      // pdfjs needs this font data to render their glyphs correctly.
+      // Node build reads via fs, so this must be a plain path ending with '/'
+      standardFontDataUrl:
+        path
+          .join(process.cwd(), 'node_modules', 'pdfjs-dist', 'standard_fonts')
+          .replace(/\\/g, '/') + '/',
+      disableFontFace: true,
+      disableAutoFetch: true,
+      verbosity: 0,
+    });
+    const pdfDocument = await loadingTask.promise;
+
+    try {
+      const pageCount = pdfDocument.numPages;
+      if (pageNum < 1 || pageNum > pageCount) {
+        return {
+          success: false,
+          operation: 'render',
+          file,
+          pageCount,
+          error: `Page ${pageNum} is out of range (1-${pageCount})`,
+          executionTime: Date.now() - startTime,
+        };
+      }
+
+      const page = await pdfDocument.getPage(pageNum);
+      const baseViewport = page.getViewport({ scale: 1.0 });
+      const scale = Math.min(
+        maxDimensionPx / Math.max(baseViewport.width, baseViewport.height),
+        4.0
+      );
+      const viewport = page.getViewport({ scale });
+
+      const canvas = createCanvas(
+        Math.round(viewport.width),
+        Math.round(viewport.height)
+      );
+      const context = canvas.getContext('2d');
+      context.fillStyle = 'white';
+      context.fillRect(0, 0, viewport.width, viewport.height);
+
+      await page.render({
+        canvas: canvas as unknown as HTMLCanvasElement,
+        viewport,
+      }).promise;
+
+      const pngBuffer = canvas.toBuffer('image/png');
+
+      let outputFile: string | undefined;
+      if (output) {
+        outputFile = output;
+        await fs.writeFile(outputFile, pngBuffer);
+      }
+
+      return {
+        success: true,
+        operation: 'render',
+        file,
+        pageCount,
+        outputFile,
+        imageBase64: pngBuffer.toString('base64'),
+        renderedWidth: canvas.width,
+        renderedHeight: canvas.height,
+        executionTime: Date.now() - startTime,
+      };
+    } finally {
+      await loadingTask.destroy();
+    }
+  } catch (error) {
+    return {
+      success: false,
+      operation: 'render',
+      file,
+      error: `Failed to render PDF page: ${getErrorMessage(error)}`,
+      executionTime: Date.now() - startTime,
+    };
+  }
+}
+
+/**
  * PDF tool schema
  */
 const pdfToolSchema = {
   operation: z
-    .enum(['create', 'get-info', 'extracttext', 'search', 'merge', 'split'])
+    .enum(['create', 'get-info', 'extracttext', 'search', 'merge', 'split', 'render'])
     .describe('Operation to perform on PDF file'),
   file: z
     .string()
@@ -1074,6 +1181,16 @@ const pdfToolSchema = {
     .string()
     .optional()
     .describe('Text content for create operation'),
+  page: z
+    .number()
+    .int()
+    .optional()
+    .describe('Single page number (1-based) for render operation. Defaults to 1'),
+  maxDimension: z
+    .number()
+    .int()
+    .optional()
+    .describe('Max width/height in pixels for render operation output image. Defaults to 1800'),
 };
 
 /**
@@ -1089,10 +1206,11 @@ export function createPdfMcpServer() {
         'process',
         'Perform PDF operations: create new PDFs, get info/metadata, extract text from pages, search text, merge multiple PDFs, split pages into separate files. ' +
         'Always use operation="info" first to understand document structure. ' +
-        'For extracttext and search, specify pages parameter (e.g., "1-5" or "1,3,5") to limit processing.',
+        'For extracttext and search, specify pages parameter (e.g., "1-5" or "1,3,5") to limit processing. ' +
+        'Use operation="render" to render a single page as a PNG image for visual analysis of scanned or image-heavy documents.',
         pdfToolSchema,
         async (args) => {
-          const { operation, file, pages, query, output, sources, content } = args;
+          const { operation, file, pages, query, output, sources, content, page, maxDimension } = args;
           // workingDirectory is auto-injected by PreToolUse hook from session cwd
           const workingDirectory = (args as Record<string, unknown>).workingDirectory as string | undefined;
 
@@ -1180,6 +1298,20 @@ export function createPdfMcpServer() {
               );
               break;
 
+            case 'render':
+              if (!file) {
+                return {
+                  content: [{ type: 'text' as const, text: 'Error: Render operation requires file parameter' }],
+                };
+              }
+              result = await renderPage(
+                resolveFilePath(file),
+                page ?? 1,
+                maxDimension ?? 1800,
+                output ? resolveFilePath(output) : undefined
+              );
+              break;
+
             default:
               return {
                 content: [{ type: 'text' as const, text: `Error: Unsupported operation: ${operation}` }],
@@ -1187,6 +1319,15 @@ export function createPdfMcpServer() {
           }
 
           const resultText = formatResultForLLM(result);
+
+          if (result.imageBase64) {
+            return {
+              content: [
+                { type: 'text' as const, text: resultText },
+                { type: 'image' as const, data: result.imageBase64, mimeType: 'image/png' as const },
+              ],
+            };
+          }
 
           return {
             content: [
