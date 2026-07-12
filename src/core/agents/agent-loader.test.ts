@@ -34,7 +34,7 @@ describe('getAgentDefinitions', () => {
     const officeAssist = await getAgentDefinition('office-assist');
 
     expect(Object.keys(officeAssist.mcpServers).sort()).toEqual(
-      ['claude', 'convert', 'docx', 'image', 'pdf', 'pptx', 'python', 'typescript', 'xlsx'].sort(),
+      ['browser', 'claude', 'convert', 'docx', 'image', 'pdf', 'pptx', 'python', 'typescript', 'xlsx'].sort(),
     );
     expect(officeAssist.autoApprovedMcpTools).toContain('mcp__convert__convert');
   });
@@ -50,7 +50,7 @@ describe('getAgentDefinitions', () => {
   it('registers agent-local tools from tools/ as the local MCP server', async () => {
     const financialAdvisor = await getAgentDefinition('financial-advisor');
 
-    expect(Object.keys(financialAdvisor.mcpServers).sort()).toEqual(['claude', 'local', 'python', 'typescript'].sort());
+    expect(Object.keys(financialAdvisor.mcpServers).sort()).toEqual(['browser', 'claude', 'local', 'python', 'typescript'].sort());
     expect(financialAdvisor.mcpServers['local']?.name).toBe('local');
     expect(financialAdvisor.autoApprovedMcpTools).toContain('mcp__local__get_quote');
     expect(financialAdvisor.autoApprovedMcpTools).toContain('mcp__local__get_sec_xbrl_facts');

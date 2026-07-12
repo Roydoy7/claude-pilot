@@ -49,10 +49,12 @@ const PUSH_EVENT_CHANNELS = new Set(['agent.streamEvent', 'agent.toolApprovalReq
 // they have no per-channel preload exposure to verify.
 const GENERIC_INVOKE_GROUPS = new Set(['skills']);
 
-const ipcHandlersSrc = readFileSync(
+const ipcHandlersSrc = [
   path.resolve(__dirname, '../gui/main/ipc-handlers.ts'),
-  'utf-8'
-);
+  path.resolve(__dirname, '../gui/main/browser-ipc-handlers.ts'),
+]
+  .map((p) => readFileSync(p, 'utf-8'))
+  .join('\n');
 const preloadSrc = readFileSync(path.resolve(__dirname, '../gui/preload/preload.ts'), 'utf-8');
 
 const channels = flattenChannels(IpcChannels);
