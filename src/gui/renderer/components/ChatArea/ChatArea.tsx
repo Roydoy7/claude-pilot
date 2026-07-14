@@ -75,7 +75,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [settingSources, setSettingSources] = useState<SettingSource[]>(['user', 'project', 'local']);
-  const [slashCommands, setSlashCommands] = useState<string[]>(['/compact','/init']);
+  const [slashCommands, setSlashCommands] = useState<string[]>(['/compact','/init','/clear']);
   const [suggestionContent, setSuggestionContent] = useState<string | undefined>(undefined);
 
   // Session configuration state (for new sessions)
@@ -313,7 +313,10 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
   // Handle slash command selection - send as message
   const handleSlashCommandSelect = async (command: string) => {
-    // Send the slash command as a message
+    if (command === '/clear') {
+      setItems([]);
+      return;
+    }
     await handleSendMessage(command);
   };
 

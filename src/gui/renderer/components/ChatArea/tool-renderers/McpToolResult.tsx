@@ -22,9 +22,15 @@ interface McpToolResultProps {
 
 type JsonRecord = Record<string, unknown>;
 
+interface ImageBlock {
+  data: string;
+  mimeType: string;
+}
+
 interface ParsedOutput {
   text: string;
   data?: unknown;
+  images?: ImageBlock[];
 }
 
 /**
@@ -46,6 +52,8 @@ function parseOutput(output: string): ParsedOutput {
 
   let text = output;
 
+  let images: ImageBlock[] | undefined;
+
   try {
     const parsed = JSON.parse(output);
     if (Array.isArray(parsed)) {
@@ -54,6 +62,12 @@ function parseOutput(output: string): ParsedOutput {
         .map((item: { text?: string }) => item.text || '')
         .join('\n');
       if (extracted) text = extracted;
+
+      const imageBlocks = parsed.filter(
+        (item: { type?: string; data?: string; mimeType?: string }) =>
+          item.type === 'image' && typeof item.data === 'string' && typeof item.mimeType === 'string'
+      ) as ImageBlock[];
+      if (imageBlocks.length > 0) images = imageBlocks;
     }
     if (typeof parsed === 'object' && parsed !== null && 'text' in parsed && typeof parsed.text === 'string') {
       text = parsed.text;
@@ -63,7 +77,7 @@ function parseOutput(output: string): ParsedOutput {
   }
 
   const data = tryParseJson(text);
-  return data === undefined ? { text } : { text: JSON.stringify(data, null, 2), data };
+  return data === undefined ? { text, images } : { text: JSON.stringify(data, null, 2), data, images };
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -191,6 +205,16 @@ export function McpToolResult({
         <div className="tool-result-markdown mcp-result-body">
           {parsed.data !== undefined ? <StructuredResult data={parsed.data} /> : <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>}
         </div>
+
+        {/* Image blocks (e.g. screenshots) */}
+        {parsed.images && parsed.images.map((img, idx) => (
+          <img
+            key={idx}
+            src={`data:${img.mimeType};base64,${img.data}`}
+            alt="Tool result"
+            style={{ maxWidth: '100%', borderRadius: 4, marginTop: 8 }}
+          />
+        ))}
       </div>
     </div>
   );
