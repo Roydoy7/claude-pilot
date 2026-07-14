@@ -48,10 +48,12 @@ export default defineConfig({
                 'xml2js',
                 'jsdom', // Used by markitdown-ts (has worker files that don't bundle well)
                 'canvas', // Optional dependency of jsdom
+                'pdf-parse', // Loads PDF.js Node globals and worker assets at runtime
                 'bufferutil', // Optional dependency of ws (WebSocket)
                 'utf-8-validate', // Optional dependency of ws (WebSocket)
                 'sharp', // Native image processing module
                 '@napi-rs/canvas', // Native canvas module (skia .node binary)
+                '@nut-tree-fork/nut-js', // Native desktop automation (libnut .node binary)
               ],
             },
           },

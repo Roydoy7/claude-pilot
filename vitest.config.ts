@@ -10,6 +10,7 @@ import path from 'path';
 export default defineConfig({
   test: {
     environment: 'node',
+    pool: 'forks',
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
