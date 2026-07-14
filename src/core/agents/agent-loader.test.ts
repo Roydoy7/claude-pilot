@@ -25,7 +25,9 @@ describe('getAgentDefinitions', () => {
     expect(officeAssist.tools).toContain('Read');
     expect(officeAssist.tools).toContain('Write');
     expect(officeAssist.tools).toContain('Bash');
+    expect(officeAssist.tools).toContain('Agent');
     expect(officeAssist.safeTools).toContain('Read');
+    expect(officeAssist.safeTools).toContain('Agent(office-quality-reviewer)');
     expect(officeAssist.safeTools).not.toContain('Write');
     expect(officeAssist.safeTools).not.toContain('Bash');
   });
@@ -47,8 +49,19 @@ describe('getAgentDefinitions', () => {
     const officeAssist = await getAgentDefinition('office-assist');
 
     expect(officeAssist.defaultSkills.map((p) => path.basename(p)).sort()).toEqual(
-      ['docx-processor', 'excel-processor', 'pptx-processor'].sort(),
+      ['docx-processor', 'excel-processor', 'office-quality', 'pdf-processor', 'pptx-processor'].sort(),
     );
+  });
+
+  it('lists bundled Claude subagents from agents/', async () => {
+    const officeAssist = await getAgentDefinition('office-assist');
+    const financialAdvisor = await getAgentDefinition('financial-advisor');
+
+    expect(officeAssist.defaultSubagents.map((p) => path.basename(p))).toEqual([
+      'office-quality-reviewer.md',
+    ]);
+    expect(financialAdvisor.defaultSubagents).toEqual([]);
+    expect(financialAdvisor.tools).not.toContain('Agent');
   });
 
   it('registers agent-local tools from tools/ as the local MCP server', async () => {

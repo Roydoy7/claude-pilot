@@ -9,8 +9,8 @@
  * - tools.md        : #TOOLS / #SAFE-TOOLS / #MCP-TOOLS / #SAFE-MCP-TOOLS sections,
  *                      one tool name per line. SDK_TOOLS/SAFE_TOOLS are macros that
  *                      expand to the built-in SDK tool sets below.
- * - skills/<name>/  : marker directories naming the agent's default built-in skills
- *                      (skill content lives in src/core/custom-skills/<name>/)
+ * - skills/<name>/  : default built-in skills copied to {cwd}/.claude/skills/
+ * - agents/*.md     : Claude subagent definitions installed to {cwd}/.claude/agents/
  *
  * Agent ids are simply the folder names under agent-defs - there is no
  * hardcoded list of agents anywhere else in the codebase.
@@ -35,6 +35,8 @@ export interface AgentDefinition {
   autoApprovedMcpTools: string[];
   /** Absolute paths to this agent's default skill directories */
   defaultSkills: string[];
+  /** Absolute paths to this agent's default Claude subagent definitions */
+  defaultSubagents: string[];
 }
 
 /**
@@ -209,6 +211,12 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
   const skillDirents = await fs.readdir(skillsDir, { withFileTypes: true }).catch(() => []);
   const defaultSkills = skillDirents.filter((entry) => entry.isDirectory()).map((entry) => path.join(skillsDir, entry.name));
 
+  const subagentsDir = path.join(dir, 'agents');
+  const subagentDirents = await fs.readdir(subagentsDir, { withFileTypes: true }).catch(() => []);
+  const defaultSubagents = subagentDirents
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .map((entry) => path.join(subagentsDir, entry.name));
+
   const mcpServers = resolveMcpServers(mcpTools);
   const localTools = await loadLocalToolsServer(dir, id);
   if (localTools.server) {
@@ -226,6 +234,7 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
     mcpServers,
     autoApprovedMcpTools: [...safeMcpTools, ...localTools.safeToolNames],
     defaultSkills,
+    defaultSubagents,
   };
 }
 

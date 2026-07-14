@@ -1,13 +1,14 @@
 /**
  * Copyright (c) 2025 Ray <roydoy7@gmail.com>
  *
- * Skill Manager - Manages skill marketplaces and installation
+ * Skill Manager - Manages skill marketplaces and agent resource installation
  *
  * Skill sources:
  * 1. Built-in marketplace: src/core/custom-skills/ (virtual marketplace, local files)
  * 2. GitHub marketplaces: Remote repositories (e.g., anthropics/skills)
  *
  * All skills are installed to: {cwd}/.claude/skills/{skill-name}/
+ * Bundled Claude subagents are installed to: {cwd}/.claude/agents/{agent-name}.md
  * Claude Agent SDK automatically discovers and loads these skills.
  */
 
@@ -629,6 +630,29 @@ export class SkillManager {
         // Log but don't fail - continue with other skills
         console.warn(`Failed to install default skill ${skillName}:`, error);
       }
+    }
+
+    return installed;
+  }
+
+  /**
+   * Install this host agent's bundled Claude subagents into the project scope.
+   * Files are copied individually so unrelated user-defined subagents remain intact.
+   */
+  async installSubagentsForAgent(agentId: string, cwd: string): Promise<string[]> {
+    const agentDef = await getAgentDefinition(agentId);
+    const targetDir = path.join(cwd, '.claude', 'agents');
+    const installed: string[] = [];
+
+    if (agentDef.defaultSubagents.length === 0) {
+      return installed;
+    }
+
+    await fs.mkdir(targetDir, { recursive: true });
+    for (const sourcePath of agentDef.defaultSubagents) {
+      const targetPath = path.join(targetDir, path.basename(sourcePath));
+      await fs.copyFile(sourcePath, targetPath);
+      installed.push(targetPath);
     }
 
     return installed;
