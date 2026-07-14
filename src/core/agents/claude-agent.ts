@@ -147,6 +147,21 @@ export type StreamEvent =
   | { type: 'message'; content: string; timestamp: number; isCompactSummary?: boolean }
   | { type: 'done'; usage?: UsageMetadata; terminalReason?: TerminalReason };
 
+/** Claude's rate-limit payload uses Unix seconds, while Date expects milliseconds. */
+export function normalizeEpochMilliseconds(value: number): number {
+  return Math.abs(value) < 1_000_000_000_000 ? value * 1000 : value;
+}
+
+function isUsageLimitText(value: string): boolean {
+  const text = value.toLowerCase();
+  return (
+    text.includes('limit reached') ||
+    text.includes('session limit') ||
+    text.includes('rate limit') ||
+    text.includes('usage limit')
+  );
+}
+
 /**
  * History message for conversation
  */
@@ -507,6 +522,7 @@ export class ClaudeAgent {
     let finalUsage: UsageMetadata | undefined;
     let terminalReason: TerminalReason | undefined;
     let isCompacting = false;
+    let usageLimitReported = false;
 
     try {
       for await (const chunk of queryInstance) {
@@ -795,10 +811,16 @@ export class ClaudeAgent {
               }
             } else {
               const errors = 'errors' in resultMessage ? resultMessage.errors : [];
-              yield {
-                type: 'error',
-                error: `Execution ${resultMessage.subtype}: ${errors.join(', ')}`,
-              };
+              const errorText = errors.join(', ');
+              if (!usageLimitReported && isUsageLimitText(errorText)) {
+                usageLimitReported = true;
+                yield { type: 'usage_limit', message: errorText || 'Usage limit reached' };
+              } else if (!usageLimitReported) {
+                yield {
+                  type: 'error',
+                  error: `Execution ${resultMessage.subtype}: ${errorText}`,
+                };
+              }
             }
             break;
           }
@@ -1006,10 +1028,11 @@ export class ClaudeAgent {
           case 'rate_limit_event': {
             if (chunk.rate_limit_info.status === 'rejected') {
               const resetsAt = chunk.rate_limit_info.resetsAt;
+              usageLimitReported = true;
               yield {
                 type: 'usage_limit',
                 message: resetsAt
-                  ? `Usage limit reached. Resets at ${new Date(resetsAt).toLocaleString()}`
+                  ? `Usage limit reached. Resets at ${new Date(normalizeEpochMilliseconds(resetsAt)).toLocaleString()}`
                   : 'Usage limit reached',
               };
             }
@@ -1049,11 +1072,7 @@ export class ClaudeAgent {
         this.isCancelled();
 
       // Check if this is a usage limit error
-      const isUsageLimitError =
-        errorMessage.toLowerCase().includes('limit reached') ||
-        errorMessage.toLowerCase().includes('resets') ||
-        errorMessage.toLowerCase().includes('rate limit') ||
-        errorMessage.toLowerCase().includes('usage limit');
+      const isUsageLimitError = isUsageLimitText(errorMessage) || errorMessage.toLowerCase().includes('resets');
 
       if (isUserCancellation) {
         yield { type: 'cancelled', reason: errorMessage };
