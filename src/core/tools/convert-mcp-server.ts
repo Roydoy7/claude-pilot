@@ -180,6 +180,16 @@ interface ConvertExecutionResult {
   engine?: string;
 }
 
+const CONVERSION_ROUTES = [
+  'Word: DOCX/DOC/ODT/RTF/HTML/TXT -> PDF, TXT, HTML, ODT, DOCX',
+  'Spreadsheet: XLSX/XLS/ODS/CSV -> PDF, CSV, HTML, XLSX, ODS',
+  'Presentation: PPTX/PPT/ODP -> PDF, PNG, JPG, ODP, PPTX',
+  'Markdown extraction: PDF/DOCX/PPTX/XLSX/XLS/HTML/HTM -> Markdown',
+  'Editable PDF recovery: PDF -> DOCX',
+  'PDF page images: use mcp__pdf__process with operation="render" or "to-images" (not this tool)',
+  'Ebooks: Calibre-supported document/ebook inputs -> Calibre-supported outputs; Calibre must be installed',
+] as const;
+
 /**
  * Find LibreOffice executable
  */
@@ -654,7 +664,7 @@ function getOutputExtension(format: string): string {
 /**
  * Convert document - main conversion logic
  */
-async function convertDocument(
+export async function convertDocument(
   inputFile: string,
   outputFile: string,
   inputFormat?: string,
@@ -806,7 +816,11 @@ async function convertDocument(
         outputFile,
         inputFormat: fromFormat,
         outputFormat: toFormat,
-        error: `PDF can only be converted to DOCX format. For other formats, first convert PDF to DOCX, then convert DOCX to ${toFormat}.`,
+        error:
+          `Unsupported conversion: PDF -> ${toFormat}. ` +
+          'This convert tool supports PDF -> DOCX and PDF -> Markdown. ' +
+          'For PDF page images, call mcp__pdf__process with operation="to-images" for all/selected pages, ' +
+          'or operation="render" for one page. Do not convert through DOCX: DOCX -> PNG/JPG is not supported.',
         executionTime: Date.now() - startTime,
       };
     }
@@ -895,7 +909,11 @@ async function convertDocument(
 /**
  * List supported formats
  */
-function listFormats(): ConvertExecutionResult & { inputFormats?: string[]; outputFormats?: string[] } {
+function listFormats(): ConvertExecutionResult & {
+  inputFormats?: string[];
+  outputFormats?: string[];
+  conversionRoutes?: string[];
+} {
   const startTime = Date.now();
 
   return {
@@ -904,6 +922,7 @@ function listFormats(): ConvertExecutionResult & { inputFormats?: string[]; outp
     inputFile: '',
     inputFormats: [...INPUT_FORMATS],
     outputFormats: [...OUTPUT_FORMATS],
+    conversionRoutes: [...CONVERSION_ROUTES],
     executionTime: Date.now() - startTime,
   };
 }
@@ -911,7 +930,13 @@ function listFormats(): ConvertExecutionResult & { inputFormats?: string[]; outp
 /**
  * Format result for LLM - uses Markdown list for proper line breaks
  */
-function formatResultForLLM(result: ConvertExecutionResult & { inputFormats?: string[]; outputFormats?: string[] }): string {
+function formatResultForLLM(
+  result: ConvertExecutionResult & {
+    inputFormats?: string[];
+    outputFormats?: string[];
+    conversionRoutes?: string[];
+  }
+): string {
   const lines: string[] = [];
 
   lines.push(`# Document Conversion Result`);
@@ -932,6 +957,12 @@ function formatResultForLLM(result: ConvertExecutionResult & { inputFormats?: st
     lines.push('## Supported Output Formats');
     lines.push('');
     lines.push(result.outputFormats?.join(', ') || 'None');
+    lines.push('');
+    lines.push('## Valid Conversion Routes');
+    lines.push('');
+    for (const route of result.conversionRoutes ?? []) {
+      lines.push(`- ${route}`);
+    }
     lines.push('');
     lines.push('## Conversion Engines');
     lines.push('');
@@ -984,34 +1015,40 @@ function createConvertMcpServer() {
     tools: [
       tool(
         'convert',
-        `Document format conversion tool with specialized engines for different format types.
+        `Convert documents only when the requested source -> target pair appears below.
 
-Conversion engines:
+VALID ROUTES:
+- Word: DOCX/DOC/ODT/RTF/HTML/TXT -> PDF, TXT, HTML, ODT, DOCX
+- Spreadsheet: XLSX/XLS/ODS/CSV -> PDF, CSV, HTML, XLSX, ODS
+- Presentation: PPTX/PPT/ODP -> PDF, PNG, JPG, ODP, PPTX
+- Markdown extraction: PDF/DOCX/PPTX/XLSX/XLS/HTML/HTM -> Markdown
+- Editable PDF recovery: PDF -> DOCX
+- Ebooks: Calibre-supported inputs and outputs when Calibre is installed
 
-1. **LibreOffice** (headless) - For Office documents:
-   - Word: DOCX/DOC/ODT/RTF/HTML/TXT → PDF, TXT, HTML, ODT, DOCX
-   - Excel: XLSX/XLS/ODS/CSV → PDF, CSV, HTML, XLSX, ODS
-   - PowerPoint: PPTX/PPT/ODP → PDF, PNG, JPG, ODP, PPTX
-   - High-quality output with formatting preserved
+IMPORTANT PDF IMAGE RULE:
+- PDF -> PNG/JPG is NOT handled by this tool.
+- For one PDF page image, use mcp__pdf__process operation="render".
+- For all or selected PDF pages, use mcp__pdf__process operation="to-images".
+- Never suggest PDF -> DOCX -> PNG/JPG; DOCX -> PNG/JPG is unsupported.
 
-2. **Calibre** (ebook-convert) - For ebook formats:
-   - Formats: EPUB, MOBI, AZW, AZW3, FB2, CBZ, CBR, LIT, PRC, PDB, etc.
-   - Calibre installation required: https://calibre-ebook.com
-
-3. **markitdown** - For converting to Markdown:
-   - Input: PDF, DOCX, PPTX, XLSX, HTML
-
-4. **pdf2docx** - For PDF to DOCX conversion
-
-Operations:
-- convert: Convert a document from one format to another
-- list-formats: List all supported input/output formats`,
+Use operation="list-formats" to return the matrix and installed-engine status. Input and output format lists do not imply that every pair is supported.`,
         {
-          operation: z.enum(['convert', 'list-formats']).describe('The operation to perform'),
-          file: z.string().optional().describe('Input file path (required for convert operation)'),
-          output: z.string().optional().describe('Output file path. If not specified, uses input filename with new extension'),
-          from: z.string().optional().describe('Input format (auto-detected from extension if not specified)'),
-          to: z.string().optional().describe('Output format (auto-detected from output extension if not specified)'),
+          operation: z
+            .enum(['convert', 'list-formats'])
+            .describe('Use convert for one valid source->target route; use list-formats to inspect the conversion matrix'),
+          file: z.string().optional().describe('Source document path; required for operation="convert"'),
+          output: z
+            .string()
+            .optional()
+            .describe('Destination path whose extension identifies the target format; provide output or to'),
+          from: z
+            .string()
+            .optional()
+            .describe('Source format without a dot; normally omit and detect it from the input extension'),
+          to: z
+            .string()
+            .optional()
+            .describe('Target format without a dot; the source->target pair must appear in VALID ROUTES'),
           pdfFontSize: z.number().optional().describe('Font size for PDF output when using Calibre (default: 12). Use smaller values like 10 or 11 if fonts appear too large.'),
           workingDirectory: z.string().optional().describe('Working directory for relative paths'),
         },
@@ -1032,7 +1069,11 @@ Operations:
             return workingDirectory ? path.join(workingDirectory, filePath) : filePath;
           };
 
-          let result: ConvertExecutionResult & { inputFormats?: string[]; outputFormats?: string[] };
+          let result: ConvertExecutionResult & {
+            inputFormats?: string[];
+            outputFormats?: string[];
+            conversionRoutes?: string[];
+          };
 
           switch (operation) {
             case 'list-formats':
