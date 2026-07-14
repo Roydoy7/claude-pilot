@@ -220,6 +220,15 @@ export function applyMessageEvent(
  * Handle an 'error' event: append a visible error message.
  */
 export function applyErrorEvent(items: MessageListItem[], event: { error: string; details?: string }): MessageListItem[] {
+  const errorText = event.error.toLowerCase();
+  const isLimitError =
+    errorText.includes('limit reached') ||
+    errorText.includes('session limit') ||
+    errorText.includes('rate limit') ||
+    errorText.includes('usage limit');
+  if (isLimitError && items.some((item) => item.type === 'usage_limit')) {
+    return items;
+  }
   const errorMessageItem: MessageListItem = {
     type: 'message',
     id: `error-${Date.now()}`,
@@ -246,13 +255,24 @@ export function applyCancelledEvent(items: MessageListItem[]): MessageListItem[]
  * Handle a 'usage_limit' event: append an inline usage-limit indicator.
  */
 export function applyUsageLimitEvent(items: MessageListItem[], event: { message: string }): MessageListItem[] {
+  const isLimitMessage = (item: MessageListItem): boolean => {
+    if (item.type !== 'message' || item.role !== 'assistant' || typeof item.content !== 'string') return false;
+    const text = item.content.toLowerCase();
+    return (
+      text.includes('limit reached') ||
+      text.includes('session limit') ||
+      text.includes('rate limit') ||
+      text.includes('usage limit')
+    );
+  };
+  const withoutDuplicates = items.filter((item) => item.type !== 'usage_limit' && !isLimitMessage(item));
   const usageLimitItem: MessageListItem = {
     type: 'usage_limit',
     id: `usage-limit-${Date.now()}`,
     timestamp: Date.now(),
     usageLimitMessage: event.message,
   };
-  return addItemKeepingStatusAtEnd(items, usageLimitItem);
+  return addItemKeepingStatusAtEnd(withoutDuplicates, usageLimitItem);
 }
 
 /**
@@ -261,9 +281,19 @@ export function applyUsageLimitEvent(items: MessageListItem[], event: { message:
  * message.
  */
 export function applyDone(items: MessageListItem[], usage?: UsageMetadata): MessageListItem[] {
+  const hasUsageLimit = items.some((item) => item.type === 'usage_limit');
   const filtered = items.filter((item) => {
     if (item.type === 'message' && item.role === 'assistant') {
       if (typeof item.content === 'string') {
+        if (hasUsageLimit) {
+          const text = item.content.toLowerCase();
+          if (
+            text.includes('limit reached') ||
+            text.includes('session limit') ||
+            text.includes('rate limit') ||
+            text.includes('usage limit')
+          ) return false;
+        }
         return item.content.trim().length > 0;
       }
       if (Array.isArray(item.content)) {

@@ -283,6 +283,30 @@ describe('SessionAgent - message, error, cancelled, usage_limit', () => {
       expect.objectContaining({ type: 'usage_limit', usageLimitMessage: 'Usage limit reached' }),
     ]);
   });
+
+  it('collapses streamed limit text and a later limit error into one limit item', () => {
+    const { emit, displayItemsHistory } = createHarness(nextSessionId());
+
+    emit({ type: 'message', content: "You've hit your session limit · resets 1:20am", timestamp: 1000 });
+    emit({ type: 'usage_limit', message: 'Usage limit reached' });
+    emit({ type: 'error', error: "Claude Code returned an error result: You've hit your session limit" });
+
+    const items = displayItemsHistory[displayItemsHistory.length - 1];
+    expect(items).toEqual([
+      expect.objectContaining({ type: 'usage_limit', usageLimitMessage: 'Usage limit reached' }),
+    ]);
+  });
+
+  it('removes limit text that arrives after the usage_limit event when the turn completes', () => {
+    const { emit, displayItemsHistory } = createHarness(nextSessionId());
+
+    emit({ type: 'usage_limit', message: 'Usage limit reached' });
+    emit({ type: 'message', content: "You've hit your session limit · resets 1:20am", timestamp: 1000 });
+    emit({ type: 'done' });
+
+    const items = displayItemsHistory[displayItemsHistory.length - 1];
+    expect(items).toEqual([expect.objectContaining({ type: 'usage_limit' })]);
+  });
 });
 
 describe('SessionAgent - done', () => {
