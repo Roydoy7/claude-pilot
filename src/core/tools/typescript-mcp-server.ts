@@ -277,7 +277,10 @@ async function executeTypeScriptCode(
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
-  const tempFile = path.join(tempDir, `ts_exec_${randomUUID()}.ts`);
+  // Use the explicit ESM TypeScript extension. A plain `.ts` file is treated as
+  // CommonJS when the nearest package.json has no `"type": "module"`, causing
+  // tsx/esbuild to reject top-level await even though the runtime supports it.
+  const tempFile = path.join(tempDir, `ts_exec_${randomUUID()}.mts`);
 
   try {
     // Write code to temporary file
@@ -538,20 +541,17 @@ const pdfBytes = await pdfDoc.save();
 fs.writeFileSync('output.pdf', pdfBytes);
 \`\`\`
 
-## Important: Avoid Top-level Await
+## Async Code and Modules
 
-**DO NOT use top-level await directly.** Wrap async code in an IIFE:
+Code is executed as an ES module, so top-level await is supported directly:
 
 \`\`\`typescript
-// ❌ WRONG - will cause error
 const data = await fetchData();
-
-// ✅ CORRECT - wrap in async IIFE
-(async () => {
-  const data = await fetchData();
-  console.log(data);
-})();
+console.log(data);
 \`\`\`
+
+Use ES module \`import\` syntax. CommonJS globals such as \`require\`, \`__dirname\`,
+and \`__filename\` are not available automatically.
 
 ## Important: Escape Special Quotes in Strings
 
@@ -573,7 +573,10 @@ const text = 'He said "Hello"';
 - Use packages parameter for packages not listed above
 - Working directory defaults to current project root`,
         {
-          code: z.string().describe('TypeScript code to execute'),
+          code: z.string().describe(
+            'TypeScript code to execute as an ES module. Top-level await and ESM imports are supported; ' +
+            'CommonJS globals such as require, __dirname, and __filename are not available automatically.'
+          ),
           packages: z.array(z.string()).optional().describe(
             'List of npm packages to install before execution (e.g., ["lodash", "@types/lodash", "axios"]). ' +
             'Packages will be checked and installed if missing.'
