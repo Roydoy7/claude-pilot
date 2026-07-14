@@ -20,19 +20,18 @@ import {
   type PDFObject,
 } from 'pdf-lib';
 import { PDFParse } from 'pdf-parse';
-import { createCanvas } from '@napi-rs/canvas';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { getErrorMessage } from '../errors.js';
 
 // Configure pdf-parse worker for Node.js/Electron environment
-// pdf-parse v2.x uses pdfjs-dist which requires a worker file
-// Use file:// URL for local worker file path
+// Use the worker published by pdf-parse itself. This remains stable whether npm
+// hoists or nests pdf-parse's internal pdfjs-dist dependency.
 const workerPath = path.join(
   process.cwd(),
   'node_modules',
-  'pdfjs-dist',
-  'legacy',
-  'build',
+  'pdf-parse',
+  'dist',
+  'pdf-parse',
+  'web',
   'pdf.worker.mjs'
 );
 PDFParse.setWorker(pathToFileURL(workerPath).href);
@@ -81,6 +80,7 @@ interface PDFExecutionResult {
   imageBase64?: string;
   renderedWidth?: number;
   renderedHeight?: number;
+  renderedPages?: number[];
 
   // Status
   pageCount?: number;
@@ -213,6 +213,10 @@ function formatResultForLLM(result: PDFExecutionResult): string {
 
   if (result.renderedWidth !== undefined && result.renderedHeight !== undefined) {
     lines.push(`**Rendered Size**: ${result.renderedWidth} x ${result.renderedHeight} px`);
+  }
+
+  if (result.renderedPages) {
+    lines.push(`**Rendered Pages**: ${result.renderedPages.join(', ')}`);
   }
 
   if (result.outputFile) {
@@ -1054,9 +1058,84 @@ async function splitPDF(
   }
 }
 
+interface RenderedPdfPage {
+  pageNumber: number;
+  pngBuffer: Buffer;
+  width: number;
+  height: number;
+}
+
+async function renderPdfPages(
+  buffer: Buffer,
+  selectPages: (pageCount: number) => number[],
+  maxDimensionPx: number
+): Promise<{ pageCount: number; selectedPages: number[]; pages: RenderedPdfPage[] }> {
+  const parser = new PDFParse({
+    data: buffer,
+    isEvalSupported: false,
+  });
+
+  try {
+    const documentInfo = await parser.getInfo();
+    const pageCount = documentInfo.total;
+    const selectedPages = [
+      ...new Set(selectPages(pageCount).filter((page) => page >= 1 && page <= pageCount)),
+    ].sort((a, b) => a - b);
+
+    if (selectedPages.length === 0) {
+      return { pageCount, selectedPages, pages: [] };
+    }
+
+    // Determine each page's aspect ratio first so maxDimension remains a true
+    // width-or-height limit while using pdf-parse's desiredWidth rendering API.
+    const pageInfo = await parser.getInfo({
+      parsePageInfo: true,
+      partial: selectedPages,
+    });
+    const pagesByDesiredWidth = new Map<number, number[]>();
+    for (const page of pageInfo.pages) {
+      const desiredWidth = Math.max(
+        1,
+        Math.round(maxDimensionPx * (page.width / Math.max(page.width, page.height)))
+      );
+      const group = pagesByDesiredWidth.get(desiredWidth) ?? [];
+      group.push(page.pageNumber);
+      pagesByDesiredWidth.set(desiredWidth, group);
+    }
+
+    const renderedByPage = new Map<number, RenderedPdfPage>();
+    for (const [desiredWidth, pageNumbers] of pagesByDesiredWidth) {
+      const screenshots = await parser.getScreenshot({
+        partial: pageNumbers,
+        desiredWidth,
+        imageBuffer: true,
+        imageDataUrl: false,
+      });
+      for (const page of screenshots.pages) {
+        renderedByPage.set(page.pageNumber, {
+          pageNumber: page.pageNumber,
+          pngBuffer: Buffer.from(page.data),
+          width: Math.round(page.width),
+          height: Math.round(page.height),
+        });
+      }
+    }
+
+    return {
+      pageCount,
+      selectedPages,
+      pages: selectedPages
+        .map((pageNumber) => renderedByPage.get(pageNumber))
+        .filter((page): page is RenderedPdfPage => page !== undefined),
+    };
+  } finally {
+    await parser.destroy();
+  }
+}
+
 /**
- * Render a single PDF page to PNG
- * Uses pdfjs-dist + @napi-rs/canvas (prebuilt skia binaries, no native build step)
+ * Render a single PDF page to PNG and return it for immediate visual analysis.
+ * Uses PDFParse.getScreenshot(), which owns the matching PDF.js and Canvas integration.
  */
 async function renderPage(
   file: string,
@@ -1068,77 +1147,37 @@ async function renderPage(
 
   try {
     const buffer = await fs.readFile(file);
-    const loadingTask = getDocument({
-      data: new Uint8Array(buffer),
-      // Standard 14 PDF fonts (Helvetica etc.) are not embedded in PDFs;
-      // pdfjs needs this font data to render their glyphs correctly.
-      // Node build reads via fs, so this must be a plain path ending with '/'
-      standardFontDataUrl:
-        path
-          .join(process.cwd(), 'node_modules', 'pdfjs-dist', 'standard_fonts')
-          .replace(/\\/g, '/') + '/',
-      disableFontFace: true,
-      disableAutoFetch: true,
-      verbosity: 0,
-    });
-    const pdfDocument = await loadingTask.promise;
-
-    try {
-      const pageCount = pdfDocument.numPages;
-      if (pageNum < 1 || pageNum > pageCount) {
-        return {
-          success: false,
-          operation: 'render',
-          file,
-          pageCount,
-          error: `Page ${pageNum} is out of range (1-${pageCount})`,
-          executionTime: Date.now() - startTime,
-        };
-      }
-
-      const page = await pdfDocument.getPage(pageNum);
-      const baseViewport = page.getViewport({ scale: 1.0 });
-      const scale = Math.min(
-        maxDimensionPx / Math.max(baseViewport.width, baseViewport.height),
-        4.0
-      );
-      const viewport = page.getViewport({ scale });
-
-      const canvas = createCanvas(
-        Math.round(viewport.width),
-        Math.round(viewport.height)
-      );
-      const context = canvas.getContext('2d');
-      context.fillStyle = 'white';
-      context.fillRect(0, 0, viewport.width, viewport.height);
-
-      await page.render({
-        canvas: canvas as unknown as HTMLCanvasElement,
-        viewport,
-      }).promise;
-
-      const pngBuffer = canvas.toBuffer('image/png');
-
-      let outputFile: string | undefined;
-      if (output) {
-        outputFile = output;
-        await fs.writeFile(outputFile, pngBuffer);
-      }
-
+    const rendered = await renderPdfPages(buffer, () => [pageNum], maxDimensionPx);
+    if (rendered.pages.length === 0) {
       return {
-        success: true,
+        success: false,
         operation: 'render',
         file,
-        pageCount,
-        outputFile,
-        imageBase64: pngBuffer.toString('base64'),
-        renderedWidth: canvas.width,
-        renderedHeight: canvas.height,
+        pageCount: rendered.pageCount,
+        error: `Page ${pageNum} is out of range (1-${rendered.pageCount})`,
         executionTime: Date.now() - startTime,
       };
-    } finally {
-      await loadingTask.destroy();
     }
+    const [{ pngBuffer, width, height }] = rendered.pages;
+
+    let outputFile: string | undefined;
+    if (output) {
+      outputFile = output;
+      await fs.writeFile(outputFile, pngBuffer);
+    }
+
+    return {
+      success: true,
+      operation: 'render',
+      file,
+      pageCount: rendered.pageCount,
+      outputFile,
+      imageBase64: pngBuffer.toString('base64'),
+      renderedWidth: width,
+      renderedHeight: height,
+      renderedPages: [pageNum],
+      executionTime: Date.now() - startTime,
+    };
   } catch (error) {
     return {
       success: false,
@@ -1151,11 +1190,75 @@ async function renderPage(
 }
 
 /**
+ * Convert selected PDF pages to individual PNG files in one pass.
+ */
+export async function renderPdfToImages(
+  file: string,
+  pages: string | undefined,
+  outputDirectory: string | undefined,
+  maxDimensionPx: number
+): Promise<PDFExecutionResult> {
+  const startTime = Date.now();
+
+  try {
+    const buffer = await fs.readFile(file);
+    const rendered = await renderPdfPages(
+      buffer,
+      (pageCount) => parsePageNumbers(pages, pageCount),
+      maxDimensionPx
+    );
+    if (rendered.pages.length === 0) {
+      return {
+        success: false,
+        operation: 'to-images',
+        file,
+        pageCount: rendered.pageCount,
+        error: `No valid pages selected (document range is 1-${rendered.pageCount})`,
+        executionTime: Date.now() - startTime,
+      };
+    }
+
+    const parsed = path.parse(file);
+    const targetDir = outputDirectory || path.join(parsed.dir, `${parsed.name}_images`);
+    await fs.mkdir(targetDir, { recursive: true });
+
+    const pageDigits = Math.max(3, String(rendered.pageCount).length);
+    const outputFiles: string[] = [];
+    for (const page of rendered.pages) {
+      const outputFile = path.join(
+        targetDir,
+        `${parsed.name}_page_${String(page.pageNumber).padStart(pageDigits, '0')}.png`
+      );
+      await fs.writeFile(outputFile, page.pngBuffer);
+      outputFiles.push(outputFile);
+    }
+
+    return {
+      success: true,
+      operation: 'to-images',
+      file,
+      pageCount: rendered.pageCount,
+      outputFiles,
+      renderedPages: rendered.selectedPages,
+      executionTime: Date.now() - startTime,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      operation: 'to-images',
+      file,
+      error: `Failed to convert PDF to images: ${getErrorMessage(error)}`,
+      executionTime: Date.now() - startTime,
+    };
+  }
+}
+
+/**
  * PDF tool schema
  */
 const pdfToolSchema = {
   operation: z
-    .enum(['create', 'get-info', 'extracttext', 'search', 'merge', 'split', 'render'])
+    .enum(['create', 'get-info', 'extracttext', 'search', 'merge', 'split', 'render', 'to-images'])
     .describe('Operation to perform on PDF file'),
   file: z
     .string()
@@ -1172,7 +1275,11 @@ const pdfToolSchema = {
   output: z
     .string()
     .optional()
-    .describe('Output file path for split, merge, or create operations'),
+    .describe('Output file path for split, merge, create, or single-page render operations'),
+  outputDirectory: z
+    .string()
+    .optional()
+    .describe('Output directory for to-images. Defaults to <pdf-name>_images beside the PDF'),
   sources: z
     .array(z.string())
     .optional()
@@ -1189,8 +1296,10 @@ const pdfToolSchema = {
   maxDimension: z
     .number()
     .int()
+    .min(256)
+    .max(4096)
     .optional()
-    .describe('Max width/height in pixels for render operation output image. Defaults to 1800'),
+    .describe('Max width/height in pixels for render or to-images output. Range: 256-4096; default: 1800'),
 };
 
 /**
@@ -1204,13 +1313,14 @@ export function createPdfMcpServer() {
     tools: [
       tool(
         'process',
-        'Perform PDF operations: create new PDFs, get info/metadata, extract text from pages, search text, merge multiple PDFs, split pages into separate files. ' +
-        'Always use operation="info" first to understand document structure. ' +
+        'Perform PDF operations: create new PDFs, get info/metadata, extract text from pages, search text, merge multiple PDFs, split pages, and convert selected pages to PNG images. ' +
+        'Always use operation="get-info" first to understand document structure. ' +
         'For extracttext and search, specify pages parameter (e.g., "1-5" or "1,3,5") to limit processing. ' +
-        'Use operation="render" to render a single page as a PNG image for visual analysis of scanned or image-heavy documents.',
+        'Use operation="render" to return one page as a PNG image for immediate visual analysis. ' +
+        'Use operation="to-images" to convert all or selected pages to numbered PNG files in one pass; set pages to limit large documents.',
         pdfToolSchema,
         async (args) => {
-          const { operation, file, pages, query, output, sources, content, page, maxDimension } = args;
+          const { operation, file, pages, query, output, outputDirectory, sources, content, page, maxDimension } = args;
           // workingDirectory is auto-injected by PreToolUse hook from session cwd
           const workingDirectory = (args as Record<string, unknown>).workingDirectory as string | undefined;
 
@@ -1309,6 +1419,20 @@ export function createPdfMcpServer() {
                 page ?? 1,
                 maxDimension ?? 1800,
                 output ? resolveFilePath(output) : undefined
+              );
+              break;
+
+            case 'to-images':
+              if (!file) {
+                return {
+                  content: [{ type: 'text' as const, text: 'Error: to-images operation requires file parameter' }],
+                };
+              }
+              result = await renderPdfToImages(
+                resolveFilePath(file),
+                pages,
+                outputDirectory ? resolveFilePath(outputDirectory) : undefined,
+                maxDimension ?? 1800
               );
               break;
 
