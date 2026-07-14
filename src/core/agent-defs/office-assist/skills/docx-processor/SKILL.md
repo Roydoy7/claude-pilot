@@ -1,103 +1,72 @@
 ---
 name: docx-processor
-description: |
-  Guide for creating Word documents (.docx).
-  Use when:
-  - Creating reports, documents, or long-form content
-  - Generating Word files with TypeScript (docx library)
+description: Create, edit, inspect, and convert professional Word documents (.docx). Use for reports, letters, policies, manuals, forms, contracts, template-based documents, formatting-preserving edits, document automation, and DOCX quality review.
 ---
 
-# DOCX Creation Guide
+# DOCX Processing
 
-## Key Principle: Write in Sections
+## Choose the workflow
 
-**NEVER generate entire long documents in a single code block.** A single syntax error will fail the entire output.
+1. Inspect an existing document with `mcp__docx__docx` using `get-info` before changing it.
+2. Use the TypeScript `docx` library to create a new document from structured content.
+3. Use Word desktop automation for layout-sensitive edits to an existing document.
+4. Edit OOXML only for narrow, well-understood changes that desktop automation cannot perform reliably.
+5. Use `mcp__convert__convert` for DOCX/PDF/TXT/HTML conversion.
 
-### Recommended Approach
+Never imply that the `docx` library can load an arbitrary existing DOCX and append to it. Never overwrite the source unless the user explicitly requests it.
 
-1. **Create document structure first** (empty sections)
-2. **Add content section by section** (each in separate code execution)
-3. **Save incrementally** to verify each step works
+## Build new documents safely
 
-## Section-by-Section Pattern
-
-```typescript
-// Step 1: Create base document with structure
-(async () => {
-  const { Document, Packer, Paragraph, HeadingLevel } = await import('docx');
-  const fs = await import('fs');
-
-  const doc = new Document({
-    sections: [{
-      children: [
-        new Paragraph({ text: 'Report Title', heading: HeadingLevel.TITLE }),
-        new Paragraph({ text: 'Section 1 placeholder' }),
-        new Paragraph({ text: 'Section 2 placeholder' }),
-      ]
-    }]
-  });
-
-  const buffer = await Packer.toBuffer(doc);
-  fs.writeFileSync('report.docx', buffer);
-  console.log('Base document created');
-})();
-```
+Separate content from rendering. Draft and validate sections as data, then perform one deterministic final render. Split helper functions by component instead of repeatedly reopening the generated DOCX.
 
 ```typescript
-// Step 2: Add Section 1 content (separate execution)
-(async () => {
-  // Read existing, add content, save
-  // ... section 1 content
-})();
+import {
+  Document, HeadingLevel, Packer, Paragraph, TextRun,
+} from 'docx';
+import { writeFile } from 'node:fs/promises';
+
+const sections = [
+  { heading: 'Executive Summary', paragraphs: ['State the decision and key evidence.'] },
+  { heading: 'Findings', paragraphs: ['Present findings in a logical order.'] },
+];
+
+const children = sections.flatMap(({ heading, paragraphs }) => [
+  new Paragraph({ text: heading, heading: HeadingLevel.HEADING_1 }),
+  ...paragraphs.map((text) => new Paragraph({ children: [new TextRun(text)] })),
+]);
+
+const doc = new Document({ sections: [{ children }] });
+await writeFile('report.docx', await Packer.toBuffer(doc));
 ```
 
-## Benefits of Incremental Writing
+For long documents, keep section content in JSON or TypeScript data, validate each section independently, and render only after the full structure is coherent.
 
-| Approach | Risk | Recovery |
-|----------|------|----------|
-| All at once | High - one error fails everything | Must regenerate entire document |
-| Section by section | Low - error affects only one section | Fix and retry that section only |
+## Apply professional document design
 
-## Long Content Strategy
+- Select page size, margins, language, and fonts for the audience and locale.
+- Define reusable title, heading, body, caption, quote, and table styles.
+- Use heading levels semantically; do not simulate headings with bold text.
+- Keep body typography restrained and readable. Use spacing and hierarchy before decoration.
+- Add headers, footers, page numbers, metadata, and a table of contents when the document warrants them.
+- Keep tables readable across page breaks; repeat header rows and avoid crowded cells.
+- Use numbered and bulleted lists through document numbering, not typed symbols.
+- Preserve template styles and branding when a source template exists.
+- Add descriptive alternative text or captions for meaningful images when supported.
 
-For documents with 5+ pages:
+Adapt density to the artifact. A formal Japanese application form may need precise borders and compact fields; a narrative report needs comfortable reading rhythm and clear hierarchy.
 
-1. **Outline first** - Create headings and structure
-2. **Fill sections** - Add content to each section separately
-3. **Review and adjust** - Fix formatting issues incrementally
+## Edit existing documents conservatively
 
-## Error Prevention
+- Copy the source to a new output path first.
+- Preserve styles, section breaks, headers, footers, fields, comments, tracked changes, and embedded objects unless the task targets them.
+- Prefer text replacement inside existing runs only when formatting boundaries are understood.
+- Use desktop Word for pagination, tracked changes, comments, fields, or complex template interaction.
+- Reinspect structure after editing and report any feature that could not be preserved.
 
-- Test each section's code before moving to next
-- Use simple text first, add formatting later
-- Keep each code block focused on one section
+## Validate before delivery
 
-## Quick Example: Report with Multiple Sections
-
-```typescript
-// Use arrays to build content, easier to debug
-(async () => {
-  const { Document, Packer, Paragraph, HeadingLevel, TextRun } = await import('docx');
-  const fs = await import('fs');
-
-  // Define sections as data (easier to modify)
-  const sections = [
-    { title: 'Introduction', content: 'Introduction text here...' },
-    { title: 'Methodology', content: 'Method description...' },
-    { title: 'Results', content: 'Results summary...' },
-    { title: 'Conclusion', content: 'Final thoughts...' },
-  ];
-
-  // Build paragraphs from data
-  const children = [];
-  for (const section of sections) {
-    children.push(new Paragraph({ text: section.title, heading: HeadingLevel.HEADING_1 }));
-    children.push(new Paragraph({ text: section.content }));
-  }
-
-  const doc = new Document({ sections: [{ children }] });
-  const buffer = await Packer.toBuffer(doc);
-  fs.writeFileSync('report.docx', buffer);
-  console.log('Report created with', sections.length, 'sections');
-})();
-```
+1. Confirm the output exists and opens successfully.
+2. Run DOCX `get-info` and check expected pages, paragraphs, tables, images, comments, and tracked changes.
+3. Convert the result to PDF and visually inspect representative pages, including the first, last, dense tables, and section transitions.
+4. Check clipped text, blank pages, widows/orphans, broken numbering, table overflow, font substitution, and inconsistent headings.
+5. Confirm that temporary files were not delivered and the original remained unchanged.

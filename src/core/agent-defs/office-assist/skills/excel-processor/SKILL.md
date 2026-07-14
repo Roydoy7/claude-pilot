@@ -1,112 +1,56 @@
 ---
 name: excel-processor
-description: |
-  Guide for Excel file processing.
-  Use when:
-  - Reading or writing Excel files (.xlsx, .xls)
-  - Processing large spreadsheets efficiently
-  - Converting Excel column references (e.g., XA, AA, BZ)
+description: Create, edit, analyze, validate, and convert Excel workbooks for operational and presentation use. Use for XLSX/XLS/CSV data, registers and ledgers, Japanese business forms, applications, estimates and invoices, schedules, checklists, analysis, dashboards, template filling, print-ready sheets, and formatting-preserving workbook changes.
 ---
 
-# Excel File Processing Guide
+# Excel Processing
 
-## Getting File Info
+## Start with intent, not a fixed style
 
-Before processing, use the `xlsx` MCP tool to get file metadata:
+Classify the workbook before designing it:
 
-```
-xlsx tool:
-  operation: "get-info"
-  xlsxFile: "path/to/file.xlsx"
-```
+- Decide whether it is for data exchange, repeated entry, operational tracking, calculation, analysis, management communication, or printing.
+- Identify the audience, update frequency, screen/print use, collaboration needs, and template constraints.
+- Preserve an existing organization-provided format unless the user requests redesign.
 
-This returns: sheet names, row/column counts, formulas presence, and more.
+Read [workbook-modes.md](references/workbook-modes.md) to select the closest common mode. Combine modes when necessary, such as a register with a management summary.
 
-## Large File Handling
+For Japanese business use, read [japan-office-conventions.md](references/japan-office-conventions.md). Do not assume that a minimalist dashboard is better than a dense but usable 帳票.
 
-- Use `xlsx get-info` to obtain file information (size, sheets, rows, columns) before processing
-- NEVER iterate through all cells of an unknown-size Excel file directly
-- For files with 500+ columns or 1000+ rows, prefer pandas over openpyxl cell-by-cell operations
+## Choose the tool path
 
-## Excel Column Reference Conversion
+1. Inspect existing `.xlsx` files with `mcp__xlsx__xlsx` using `get-info` before reading cells.
+2. Use pandas for analysis, filtering, reshaping, joins, and large tabular data.
+3. Use openpyxl for formatting-preserving edits to existing `.xlsx`/`.xlsm` workbooks.
+4. Use ExcelJS for new styled `.xlsx` workbooks when TypeScript is the better fit.
+5. Convert legacy `.xls` to `.xlsx` with `mcp__convert__convert` before structured editing. Do not pass `.xls` to the XLSX inspector.
+6. Use Excel desktop automation when recalculation, macros, external links, advanced charts, or exact Excel rendering matter.
 
-When users specify columns using Excel notation (e.g., XA, XR, AA, BZ):
+Never iterate every cell of an unknown workbook. Inspect dimensions first and load only necessary sheets, columns, and rows. Avoid sending complete large tables back to the model.
 
-```python
-def excel_col_to_num(col: str) -> int:
-    """Convert Excel column letter to 0-based index. A=0, B=1, ..., Z=25, AA=26"""
-    result = 0
-    for char in col.upper():
-        result = result * 26 + (ord(char) - ord('A') + 1)
-    return result - 1
+## Preserve workbook semantics
 
-def num_to_excel_col(n: int) -> str:
-    """Convert 0-based index to Excel column letter."""
-    result = ""
-    n += 1
-    while n > 0:
-        n, remainder = divmod(n - 1, 26)
-        result = chr(65 + remainder) + result
-    return result
-```
+- Treat one record per row and one stable field per column as the default for machine-readable data.
+- Separate raw data, calculations, lookup/master data, and presentation summaries when maintainability matters.
+- Preserve formulas, named ranges, tables, validations, conditional formatting, hidden sheets, print settings, and external links unless the task targets them.
+- Write numbers and dates as typed values, not formatted strings. Apply display formats separately.
+- Keep IDs, postal codes, account codes, and other leading-zero fields as text.
+- Avoid hard-coded totals, tax rates, dates, and business assumptions when they can be inputs or formulas.
+- Do not claim formula results were recalculated by openpyxl or ExcelJS. Open and recalculate in Excel/LibreOffice when current cached values are required.
+- Save to a new file by default.
 
-ALWAYS clarify with user if column reference is ambiguous (column name vs column position).
+## Apply fit-for-purpose design
 
-## Performance Optimization
+Read [visual-and-print-quality.md](references/visual-and-print-quality.md) before creating or redesigning a user-facing workbook.
 
-Use pandas parameters to limit data range:
+Use hierarchy, alignment, number formats, spacing, and restrained color to clarify function. Allow compact layouts, borders, merged cells, and fixed print areas for forms; avoid them in sortable data tables. Make input, formula, reference, and output regions distinguishable without turning the workbook into a color legend.
 
-```python
-# Specify exact columns needed
-df = pd.read_excel(file, usecols=[0, 1, 5, 10], skiprows=29, nrows=1000)
+## Validate before delivery
 
-# Or use column letters
-df = pd.read_excel(file, usecols="A:C,E,G:J")
-```
+Follow [validation-checklist.md](references/validation-checklist.md). At minimum:
 
-## Token Efficiency
-
-- Avoid reading large data and passing back to LLM
-- Limit preview output to essential confirmation messages
-- Avoid printing full dataframes unless debugging
-
-```python
-# Good: Summary only
-print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
-print(df.head(3))
-
-# Bad: Full dataframe
-print(df)  # Avoid this for large files
-```
-
-## Common Operations
-
-### Read with specific sheet
-```python
-df = pd.read_excel(file, sheet_name="Sheet1")
-```
-
-### Write preserving formatting
-```python
-from openpyxl import load_workbook
-
-# Load existing workbook to preserve formatting
-wb = load_workbook(file)
-ws = wb.active
-
-# Modify specific cells
-ws['A1'] = "New Value"
-
-wb.save(file)
-```
-
-### Multiple sheets
-```python
-# Read all sheets
-dfs = pd.read_excel(file, sheet_name=None)  # Returns dict
-
-# Write multiple sheets
-with pd.ExcelWriter(file) as writer:
-    df1.to_excel(writer, sheet_name="Data")
-    df2.to_excel(writer, sheet_name="Summary")
-```
+1. Reopen the saved workbook and verify expected sheets, dimensions, formulas, and styles.
+2. Check formula errors, broken links, accidental type conversion, truncated text, and damaged print areas.
+3. Recalculate with Excel/LibreOffice when formulas changed.
+4. Visually inspect every user-facing sheet in its intended view, including print preview for printed artifacts.
+5. Confirm the source file remains unchanged and report any unsupported feature or fidelity risk.

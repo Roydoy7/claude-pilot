@@ -1,8 +1,10 @@
 #TOOLS
 SDK_TOOLS
+Agent
 
 #SAFE-TOOLS
 SAFE_TOOLS
+Agent(office-quality-reviewer)
 
 #MCP-TOOLS
 mcp__convert__convert

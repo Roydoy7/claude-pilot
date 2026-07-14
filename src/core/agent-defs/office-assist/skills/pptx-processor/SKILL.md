@@ -1,101 +1,83 @@
 ---
 name: pptx-processor
-description: |
-  Guide for creating and editing PowerPoint (.pptx) files.
-  Use when:
-  - Creating new presentations from scratch (using pptxgenjs)
-  - Adding/removing slides or modifying existing PPTX content
+description: Create, edit, inspect, and validate PowerPoint presentations (.pptx) for status reporting, decisions, proposals, analysis, training, manuals, sales, events, and Japanese corporate communication. Use for new decks, template-based presentations, slide changes, data storytelling, visual redesign, and presentation quality review.
 ---
 
-# PPTX Editing Guide
+# PPTX Processing
 
-## Workflows
+## Select the communication mode
 
-### Editing existing PPTX (Recommended)
-1. **pptx tool** `unpack` → extracts to folder
-2. **Read/Grep** → find content to modify
-3. **Edit** → directly edit XML files
-4. **pptx tool** `pack` → reassemble to PPTX
+Determine the presentation's job, audience, delivery setting, speaking context, and reuse needs before selecting a visual style. Read [presentation-modes.md](references/presentation-modes.md) and choose the closest mode. Combine modes intentionally, such as a decision deck with a detailed appendix.
 
-### Creating new from template
-1. **pptx tool** `create-template` → outputs template.pptx + template_xml/
-2. **Read** XML files from template_xml/ to understand structure
-3. **TypeScript + AdmZip** to edit template.pptx
+Do not force every deck into a sparse keynote style. A projected talk, a Japanese internal decision document, a training manual, and a recurring status deck need different information density.
 
-## Critical: Adding/Replacing Slides
+## Choose a safe workflow
 
-When adding slides, **must update THREE files in sync**:
+### Create a new deck
 
-1. `ppt/presentation.xml` - sldIdLst
-2. `ppt/_rels/presentation.xml.rels` - Relationships
-3. `[Content_Types].xml` - Override declarations
+Use PptxGenJS for a presentation created from scratch. Define the slide size, theme fonts, palette, spacing, and reusable layout helpers before creating slides. Build each slide from structured content and reusable components.
 
-**Must clean old references BEFORE adding new ones**.
-
-## Correct Pattern
+Normalize its CommonJS default export before constructing it. The tsx/ESM runtime can expose an additional nested `default` wrapper:
 
 ```typescript
-// === STEP 1: Clean old references (CRITICAL!) ===
-relsXml = relsXml.replace(/<Relationship[^>]*Target="slides\/slide\d+\.xml"[^>]*\/>/g, '');
-contentTypes = contentTypes.replace(/<Override[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g, '');
-presentationXml = presentationXml.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, '<p:sldIdLst></p:sldIdLst>');
+import importedPptxGenJS from 'pptxgenjs';
 
-// Delete old slide files
-for (const entry of zip.getEntries()) {
-  if (/^ppt\/slides\/slide\d+\.xml$/.test(entry.entryName) ||
-      /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/.test(entry.entryName)) {
-    zip.deleteFile(entry.entryName);
-  }
-}
+type PptxGenJSConstructor = typeof importedPptxGenJS;
+const PptxGenJS =
+  (importedPptxGenJS as unknown as { default?: PptxGenJSConstructor }).default ??
+  importedPptxGenJS;
 
-// === STEP 2: Find max rId (after cleaning) ===
-let maxRId = 0;
-for (const m of relsXml.match(/rId(\d+)/g) || []) {
-  const n = parseInt(m.replace('rId', ''), 10);
-  if (n > maxRId) maxRId = n;
-}
-
-// === STEP 3: Add new slides ===
-// For each slide, add to all three places:
-sldIdList += `<p:sldId id="${255 + num}" r:id="rId${rId}"/>`;
-newRels += `<Relationship Id="rId${rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${num}.xml"/>`;
-newTypes += `<Override PartName="/ppt/slides/slide${num}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`;
-
-// === STEP 4: Update files ===
-presentationXml = presentationXml.replace('<p:sldIdLst></p:sldIdLst>', `<p:sldIdLst>${sldIdList}</p:sldIdLst>`);
-relsXml = relsXml.replace('</Relationships>', `${newRels}</Relationships>`);
-contentTypes = contentTypes.replace('</Types>', `${newTypes}</Types>`);
+const pptx = new PptxGenJS();
 ```
 
-## Common Errors
+Do not use `import * as PptxGenJS`, `const PptxGenJS = await import('pptxgenjs')`, or assume the static default import is directly constructable. These can bind a module object rather than the constructor and cause `TypeError: PptxGenJS is not a constructor`. Apply the same `nested default ?? imported value` normalization after a dynamic import.
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| "File needs repair" | Old refs not cleaned | Clean ALL old slide refs before adding new |
-| Duplicate rId | rId conflict | Find maxRId AFTER cleaning old refs |
-| Garbled text | No XML escaping | Use `escapeXml()` for all text |
+### Create from an existing template
 
-## Helper Functions
+1. Run `mcp__pptx__pptx` with `get-info` to inspect dimensions, theme, layouts, and slides.
+2. Run `create-template` only when clearing the selected template slides is intended.
+3. Reuse the template's masters, layouts, theme, and placeholders instead of approximating them.
+4. Preserve branding and validate every produced slide visually.
 
-```typescript
-function escapeXml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-             .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
+### Modify an existing deck
 
-function formatContent(content: string): string {
-  const lines = content.split('\n').filter(l => l.trim());
-  if (lines.length === 0) return '<a:p><a:endParaRPr lang="zh-CN"/></a:p>';
-  return lines.map(l => `<a:p><a:r><a:rPr lang="zh-CN" sz="2400"/><a:t>${escapeXml(l)}</a:t></a:r></a:p>`).join('');
-}
-```
+1. Copy the original to a new output path.
+2. Run `get-info`, then use `unpack` for targeted OOXML edits or PowerPoint desktop automation for layout-sensitive changes.
+3. Modify only the requested slides and relationships.
+4. Run `pack`, reopen the deck, and validate it.
 
-## Free Images for Slides
+### Add slides to an existing deck
 
-Use **Unsplash** for free images (no API key needed):
+Preserve every existing slide reference and file. Prefer PowerPoint desktop automation or a proven template-aware workflow. When editing OOXML, add a unique slide part, presentation entry, relationship, content-type entry, layout relationship, and all media/notes dependencies required by the cloned slide.
 
-```
-https://images.unsplash.com/photo-{PHOTO_ID}?w=600&q=80
-```
+Never delete old slide relationships or files merely to add a slide. Only clear the entire slide list for an explicitly requested full-deck replacement, and do so on a copy.
 
-Browse photos at [unsplash.com](https://unsplash.com), copy the photo ID from URL, then use `mcp__image__process` tool with `download` operation.
+## Design the story and slides
+
+1. State the audience outcome: inform, decide, approve, teach, persuade, or align.
+2. Draft a narrative and slide outline before coding layouts.
+3. Give each slide one primary communication job.
+4. Write takeaway titles when the evidence supports a conclusion; use neutral topic titles for reference or instructional slides.
+5. Choose a layout pattern from [layout-and-visual-system.md](references/layout-and-visual-system.md).
+6. Apply the chart guidance in [charts-and-data-storytelling.md](references/charts-and-data-storytelling.md) when presenting data.
+
+Prefer hierarchy, alignment, contrast, and whitespace over decoration. Keep branding, typography, image treatment, and component behavior consistent while varying composition enough to support the story.
+
+## Handle content responsibly
+
+- Separate facts, assumptions, interpretation, and recommendations.
+- Preserve source notes, dates, units, and definitions for important claims.
+- Use high-resolution, relevant images with appropriate usage rights; do not use arbitrary stock imagery as filler.
+- Keep speaker-dependent slides readable at projection distance; provide an appendix or companion document for necessary detail.
+- Add alternative descriptions or descriptive captions where the delivery format supports accessibility.
+- Escape XML text when performing OOXML edits and preserve whitespace deliberately.
+
+## Validate before delivery
+
+Follow [validation-checklist.md](references/validation-checklist.md). At minimum:
+
+1. Reopen the PPTX and confirm slide count, order, dimensions, and theme.
+2. Convert the deck to PDF, then use PDF `to-images` on all pages for visual inspection.
+3. Check overflow, overlap, clipping, missing media, font substitution, alignment, contrast, and chart readability.
+4. Review the deck as a sequence for narrative gaps, repetitive composition, inconsistent density, and unsupported conclusions.
+5. Confirm the original remains unchanged and remove unpacked or temporary files from delivery.
