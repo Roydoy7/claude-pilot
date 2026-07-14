@@ -498,12 +498,37 @@ function createTypeScriptMcpServer() {
 
 ### Create PowerPoint:
 \`\`\`typescript
-import PptxGenJS from 'pptxgenjs';
+import importedPptxGenJS from 'pptxgenjs';
+
+type PptxGenJSConstructor = typeof importedPptxGenJS;
+const PptxGenJS =
+  (importedPptxGenJS as unknown as { default?: PptxGenJSConstructor }).default ??
+  importedPptxGenJS;
 
 const pptx = new PptxGenJS();
 const slide = pptx.addSlide();
 slide.addText('Hello World', { x: 1, y: 1, fontSize: 24 });
 await pptx.writeFile({ fileName: 'output.pptx' });
+\`\`\`
+
+**PptxGenJS import requirement:** \`pptxgenjs\` is a CommonJS package. Under this
+tsx/ESM executor, its constructor can be wrapped in an additional \`default\` object.
+Always use the normalization pattern shown above before calling \`new\`.
+Do not use \`import * as PptxGenJS\`, assign the complete result of
+\`await import('pptxgenjs')\` to \`PptxGenJS\`, or assume the static default import
+is directly constructable. Those forms can throw
+\`TypeError: PptxGenJS is not a constructor\`.
+
+If a dynamic import is necessary, normalize the possible nested default:
+
+\`\`\`typescript
+const module = await import('pptxgenjs');
+const importedPptxGenJS = module.default;
+type PptxGenJSConstructor = typeof importedPptxGenJS;
+const PptxGenJS =
+  (importedPptxGenJS as unknown as { default?: PptxGenJSConstructor }).default ??
+  importedPptxGenJS;
+const pptx = new PptxGenJS();
 \`\`\`
 
 ### Create Excel:
