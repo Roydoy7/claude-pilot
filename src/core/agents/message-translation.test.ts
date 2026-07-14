@@ -493,4 +493,18 @@ describe('processQueryMessages - rate_limit_event', () => {
 
     expect(events.find((event) => event.type === 'usage_limit')).toBeUndefined();
   });
+
+  it('treats resetsAt as Unix seconds and suppresses the duplicate result error', async () => {
+    const agent = makeAgent();
+    const resetsAtSeconds = Math.floor((Date.now() + 60_000) / 1000);
+    const events = await collectEvents(agent, [
+      makeRateLimitEvent('rejected', resetsAtSeconds),
+      makeResultError(["You've hit your session limit"]),
+    ]);
+
+    const limitEvents = events.filter((event) => event.type === 'usage_limit');
+    expect(limitEvents).toHaveLength(1);
+    expect(events.find((event) => event.type === 'error')).toBeUndefined();
+    expect((limitEvents[0] as { message: string }).message).not.toContain('1970');
+  });
 });
