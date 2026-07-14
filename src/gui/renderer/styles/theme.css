@@ -67,6 +67,8 @@
   --accent-subtle: #edf0ff;
   --accent-text: #3048bd;
   --on-accent: #ffffff;
+  --selection-bg: #b8c5ff;
+  --selection-text: #171b2d;
   --user-bubble: #e9edf9;
   --user-bubble-text: var(--text-primary);
   --shadow: rgba(48, 43, 34, 0.08);
@@ -109,6 +111,8 @@
   --accent-subtle: #222a48;
   --accent-text: #9aacff;
   --on-accent: #111522;
+  --selection-bg: #40538f;
+  --selection-text: #f5f7ff;
   --user-bubble: #242b3c;
   --user-bubble-text: var(--text-primary);
   --shadow: rgba(0, 0, 0, 0.35);

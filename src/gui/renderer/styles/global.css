@@ -64,9 +64,15 @@ body {
   outline-offset: 2px;
 }
 
-/* Text selection carries the brand tint */
+/* Text selection needs stronger contrast than subtle component backgrounds. */
 ::selection {
-  background-color: var(--accent-subtle);
+  color: var(--selection-text);
+  background-color: var(--selection-bg);
+}
+
+::-moz-selection {
+  color: var(--selection-text);
+  background-color: var(--selection-bg);
 }
 
 /* Button reset */
