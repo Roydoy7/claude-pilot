@@ -252,6 +252,24 @@ export function applyCancelledEvent(items: MessageListItem[]): MessageListItem[]
 }
 
 /**
+ * Clear any dangling "needs approval" markers on cancel. Without this, a tool
+ * approval dialog left open when the user hits Stop stays visually pending
+ * forever - the backend already resolved/discarded it, but the UI never
+ * finds out unless we clear it here too.
+ */
+export function clearPendingToolApprovals(items: MessageListItem[]): MessageListItem[] {
+  let changed = false;
+  const next = items.map((item) => {
+    if (item.type === 'tool_call' && item.needsApproval) {
+      changed = true;
+      return { ...item, needsApproval: false };
+    }
+    return item;
+  });
+  return changed ? next : items;
+}
+
+/**
  * Handle a 'usage_limit' event: append an inline usage-limit indicator.
  */
 export function applyUsageLimitEvent(items: MessageListItem[], event: { message: string }): MessageListItem[] {

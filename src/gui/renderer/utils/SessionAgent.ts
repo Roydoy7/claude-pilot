@@ -25,6 +25,7 @@ import {
   applyMessageEvent,
   applyErrorEvent,
   applyCancelledEvent,
+  clearPendingToolApprovals,
   applyUsageLimitEvent,
   applyDone,
   buildDisplayItemsFromHistory,
@@ -217,7 +218,12 @@ export class SessionAgent {
 
       case 'cancelled':
         this.displayItems = applyCancelledEvent(this.displayItems);
+        this.displayItems = clearPendingToolApprovals(this.displayItems);
         this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
+        if (this.pendingApprovals.size > 0) {
+          this.pendingApprovals.clear();
+          this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+        }
         this.notifyDisplayItemsChanged();
         break;
 
