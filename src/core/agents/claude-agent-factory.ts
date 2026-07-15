@@ -68,6 +68,15 @@ export function clearAgentCache(sessionId?: string): void {
 }
 
 /**
+ * Look up a cached agent by session ID without creating one. Used to cancel a
+ * session that's still running in the background after `currentAgent` has
+ * moved on to a different session (see ClaudeAgentService.cancelRequest).
+ */
+export function getAgentBySessionId(sessionId: string): ClaudeAgent | undefined {
+  return getCachedAgent(sessionId);
+}
+
+/**
  * Get cache statistics
  */
 export function getAgentCacheStats(): {

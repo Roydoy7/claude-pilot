@@ -22,6 +22,7 @@ import {
   createAgentFromSession,
   clearAgentCache,
   getAgentCacheStats,
+  getAgentBySessionId,
 } from '../agents/claude-agent-factory.js';
 import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { workspaceManager } from '../config/workspace-manager.js';
@@ -397,25 +398,50 @@ export class ClaudeAgentService {
   }
 
   /**
-   * Cancel the ongoing request
+   * Cancel the ongoing request for a session (defaults to the current one).
+   *
+   * Also drains that session's request queue - without this, a message the
+   * user sent while a turn was running would auto-start via `processQueue()`
+   * right after cancel, making the agent look like it "cancelled itself back on".
+   * Looks the target agent up via the session cache (not just `currentAgent`)
+   * so a background session that's no longer active can still be cancelled
+   * after the user has switched to another session.
    */
-  cancelRequest(sessionId?: string): { success: boolean; error?: string } {
+  async cancelRequest(sessionId?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      if (!this.currentAgent) {
+      const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+      if (!targetSessionId) {
         return {
           success: false,
           error: 'No active agent to cancel',
         };
       }
 
-      if (sessionId && this.currentAgent.getSessionId() !== sessionId) {
+      const queue = this.requestQueue.get(targetSessionId);
+      if (queue && queue.length > 0) {
+        this.requestQueue.set(targetSessionId, []);
+        for (const pending of queue) {
+          pending.request.streamEventCallback?.(targetSessionId, {
+            type: 'cancelled',
+            reason: 'Cancelled by user',
+          });
+          pending.resolve({ success: false, error: 'cancelled', sessionId: targetSessionId });
+        }
+      }
+
+      const targetAgent =
+        this.currentAgent?.getSessionId() === targetSessionId
+          ? this.currentAgent
+          : getAgentBySessionId(targetSessionId);
+
+      if (!targetAgent) {
         return {
           success: false,
-          error: `Session ${sessionId} is not the active session`,
+          error: `No active agent for session ${targetSessionId}`,
         };
       }
 
-      this.currentAgent.cancel();
+      await targetAgent.cancel();
 
       return {
         success: true,
