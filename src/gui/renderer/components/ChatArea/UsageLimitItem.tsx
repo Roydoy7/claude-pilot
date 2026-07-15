@@ -65,14 +65,16 @@ export const UsageLimitItem = memo(function UsageLimitItem({ item }: UsageLimitI
   }
 
   return (
-    <div className="message message-ai" style={{ marginTop: '-0.5rem', marginBottom: '-0.5rem' }}>
+    <div className="message message-ai">
       <div className="message-content">
         <div
           style={{
             display: 'inline-flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             gap: '0.5rem',
             padding: '0.4rem 0.75rem',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
             backgroundColor: 'var(--warning-subtle)',
             border: '1px solid var(--warning)',
             borderRadius: '6px',
@@ -80,8 +82,12 @@ export const UsageLimitItem = memo(function UsageLimitItem({ item }: UsageLimitI
             fontSize: '0.75rem',
           }}
         >
-          <LimitIcon />
-          <span>{item.usageLimitMessage || t.messageList.usageLimitReached}</span>
+          <span style={{ display: 'flex', flexShrink: 0, marginTop: '0.1em' }} aria-hidden="true">
+            <LimitIcon />
+          </span>
+          <span style={{ minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.4 }}>
+            {item.usageLimitMessage || t.messageList.usageLimitReached}
+          </span>
         </div>
       </div>
     </div>

@@ -34,6 +34,7 @@ export const commonZh = {
     completed: '已完成',
     failed: '失败',
     rejected: '已拒绝',
+    cancelled: '已取消',
   },
   time: {
     today: '今天',

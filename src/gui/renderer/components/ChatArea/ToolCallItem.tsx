@@ -148,7 +148,7 @@ export function ToolCallItem({
     return null;
   }
 
-  const { toolCall, toolResponse: response, needsApproval, wasRejected, progress } = item;
+  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress } = item;
 
   // Get tool configuration first (needed for defaultExpanded)
   const toolConfig = getToolConfig(toolCall.name);
@@ -195,15 +195,25 @@ export function ToolCallItem({
               {t.common.status.rejected}
             </span>
           )}
+          {canonicalToolName === 'Bash' && wasCancelled && !response && !wasRejected && (
+            <span className="status-badge" data-status="cancelled">
+              {t.common.status.cancelled}
+            </span>
+          )}
         </div>
 
         {/* Second line: status + action buttons (skip for Bash - status shown after content) */}
-        {canonicalToolName !== 'Bash' && (response || wasRejected || hasDetails) && (
+        {canonicalToolName !== 'Bash' && (response || wasRejected || wasCancelled || hasDetails) && (
           <div className="tool-row-status-line">
             {/* Status badge */}
             {wasRejected && !response && (
               <span className="status-badge" data-status="rejected">
                 {t.common.status.rejected}
+              </span>
+            )}
+            {wasCancelled && !response && !wasRejected && (
+              <span className="status-badge" data-status="cancelled">
+                {t.common.status.cancelled}
               </span>
             )}
             {response && ((): React.ReactNode => {

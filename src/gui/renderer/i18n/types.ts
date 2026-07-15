@@ -38,6 +38,7 @@ export interface Translation {
       completed: string;
       failed: string;
       rejected: string;
+      cancelled: string;
     };
     time: {
       today: string;

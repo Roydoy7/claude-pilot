@@ -34,6 +34,7 @@ export const commonJa = {
     completed: '完了',
     failed: '失敗',
     rejected: '拒否済み',
+    cancelled: 'キャンセル済み',
   },
   time: {
     today: '今日',

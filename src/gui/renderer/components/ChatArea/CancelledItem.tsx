@@ -46,7 +46,7 @@ export const CancelledItem = memo(function CancelledItem({ item }: CancelledItem
   }
 
   return (
-    <div className="message message-ai" style={{ marginTop: '-0.5rem', marginBottom: '-0.5rem' }}>
+    <div className="message message-ai" style={{ marginTop: '0', marginBottom: '-0.5rem' }}>
       <div className="message-content">
         <div
           style={{

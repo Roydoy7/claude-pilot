@@ -168,6 +168,7 @@ export interface MessageListItem {
   toolResponse?: ToolResponse;
   needsApproval?: boolean;
   wasRejected?: boolean;
+  wasCancelled?: boolean;
   progress?: ToolProgressEntry[];
 
   // Status type fields
@@ -364,6 +365,7 @@ export interface ElectronAPI {
       directoryLabel: string;
       tree: FileTreeNode | null;
     }>>;
+    getDirectoryChildren: (directoryPath: string) => Promise<FileTreeNode[]>;
   };
 
   // Cache management

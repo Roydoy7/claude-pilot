@@ -2860,6 +2860,24 @@ body.resizing-panel {
   opacity: 0.3;
 }
 
+.tree-node-loading-circle {
+  stroke-dasharray: 36 20;
+  transform-origin: center;
+  animation: workspace-tree-spin 0.8s linear infinite;
+}
+
+@keyframes workspace-tree-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tree-node-load-error {
+  color: var(--error);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .tree-node-icon {
   color: var(--text-secondary);
   display: flex;
@@ -2978,6 +2996,11 @@ body.resizing-panel {
 .status-badge[data-status='rejected'] {
   color: var(--warning);
   background: var(--warning-subtle);
+}
+
+.status-badge[data-status='cancelled'] {
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
 }
 
 /* ========================================

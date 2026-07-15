@@ -239,16 +239,56 @@ export function applyErrorEvent(items: MessageListItem[], event: { error: string
   return addItemKeepingStatusAtEnd(items, errorMessageItem);
 }
 
+const INTERRUPTED_MARKER = '[Request interrupted by user]';
+
+function stripInterruptedMarker(content: MessageContent): MessageContent | null {
+  if (typeof content === 'string') {
+    const stripped = content.replace(INTERRUPTED_MARKER, '').trim();
+    return stripped.length > 0 ? stripped : null;
+  }
+  if (Array.isArray(content)) {
+    const cleaned = content.map((block) => {
+      if (block.type === 'text' && 'text' in block) {
+        return { ...block, text: block.text.replace(INTERRUPTED_MARKER, '').trim() };
+      }
+      return block;
+    });
+    const hasContent = cleaned.some((b) => b.type !== 'text' || ('text' in b && b.text.length > 0));
+    return hasContent ? (cleaned as MessageContent) : null;
+  }
+  return content;
+}
+
 /**
- * Handle a 'cancelled' event: append an inline cancelled indicator.
+ * Handle a 'cancelled' event: strip the API interruption marker from assistant
+ * messages, mark unresolved tool_calls as cancelled, and append an inline indicator.
  */
 export function applyCancelledEvent(items: MessageListItem[]): MessageListItem[] {
+  const cleaned = items.reduce<MessageListItem[]>((acc, item) => {
+    if (item.type === 'tool_call' && !item.toolResponse && !item.wasRejected) {
+      acc.push({ ...item, wasCancelled: true });
+      return acc;
+    }
+    if (item.type === 'message' && item.role === 'assistant' && item.content) {
+      const strippedContent = stripInterruptedMarker(item.content);
+      if (strippedContent === null) {
+        return acc; // drop the message entirely
+      }
+      if (strippedContent !== item.content) {
+        acc.push({ ...item, content: strippedContent });
+        return acc;
+      }
+    }
+    acc.push(item);
+    return acc;
+  }, []);
+
   const cancelledItem: MessageListItem = {
     type: 'cancelled',
     id: `cancelled-${Date.now()}`,
     timestamp: Date.now(),
   };
-  return addItemKeepingStatusAtEnd(items, cancelledItem);
+  return addItemKeepingStatusAtEnd(cleaned, cancelledItem);
 }
 
 /**

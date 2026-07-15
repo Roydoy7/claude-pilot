@@ -34,6 +34,7 @@ export const commonEn = {
     completed: 'Completed',
     failed: 'Failed',
     rejected: 'Rejected',
+    cancelled: 'Cancelled',
   },
   time: {
     today: 'Today',
