@@ -40,50 +40,45 @@ function handleIpc<C extends keyof ChannelMap>(
   ipcMain.handle(channel, handler);
 }
 
-/**
- * Recursively build a file tree for a directory, skipping hidden entries,
- * node_modules, and __pycache__. Returns null if the path can't be read.
- */
-function buildFileTree(dirPath: string): FileTreeNode | null {
+const SKIPPED_DIRECTORY_ENTRIES = new Set(['node_modules', '__pycache__']);
+
+/** Build only the node itself. Children are fetched when the user expands it. */
+async function buildFileTreeRoot(entryPath: string): Promise<FileTreeNode | null> {
   try {
-    const stat = fs.statSync(dirPath);
-    const name = path.basename(dirPath);
+    const stat = await fs.promises.stat(entryPath);
+    const name = path.basename(entryPath);
 
     if (stat.isFile()) {
-      return { name, path: dirPath, type: 'file' };
+      return { name, path: entryPath, type: 'file' };
     }
 
     if (stat.isDirectory()) {
-      const children: FileTreeNode[] = [];
-      const entries = fs.readdirSync(dirPath);
-
-      for (const entry of entries) {
-        // Skip hidden files and common ignore patterns
-        if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
-          continue;
-        }
-
-        const childNode = buildFileTree(path.join(dirPath, entry));
-        if (childNode) {
-          children.push(childNode);
-        }
-      }
-
-      // Sort: directories first, then files, alphabetically
-      children.sort((a, b) => {
-        if (a.type !== b.type) {
-          return a.type === 'directory' ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name);
-      });
-
-      return { name, path: dirPath, type: 'directory', children };
+      return { name, path: entryPath, type: 'directory' };
     }
   } catch (error) {
-    console.error(`Error reading ${dirPath}:`, error);
+    console.error(`Error reading ${entryPath}:`, error);
     return null;
   }
   return null;
+}
+
+/** Read one directory level without traversing any descendants. */
+async function getDirectoryChildren(dirPath: string): Promise<FileTreeNode[]> {
+  const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+
+  return entries
+    .filter((entry) => !entry.name.startsWith('.') && !SKIPPED_DIRECTORY_ENTRIES.has(entry.name))
+    .map((entry): FileTreeNode => ({
+      name: entry.name,
+      path: path.join(dirPath, entry.name),
+      type: entry.isDirectory() ? 'directory' : 'file',
+    }))
+    .sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'directory' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
 }
 
 /**
@@ -419,20 +414,20 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         directoryType: 'cwd',
         directoryPath: session.cwd,
         directoryLabel: 'Working Directory (cwd)',
-        tree: buildFileTree(session.cwd),
+        tree: await buildFileTreeRoot(session.cwd),
       });
     }
 
     // Add additional directories trees
     const additionalDirs = session.additionalDirectories || [];
-    additionalDirs.forEach((dir, index) => {
+    for (const [index, dir] of additionalDirs.entries()) {
       trees.push({
         directoryType: 'additional',
         directoryPath: dir,
         directoryLabel: `Additional Directory ${index + 1}`,
-        tree: buildFileTree(dir),
+        tree: await buildFileTreeRoot(dir),
       });
-    });
+    }
 
     return trees;
   });
@@ -498,14 +493,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   handleIpc(IpcChannels.workspace.getFileTree, async () => {
     const workspaces = claudeAgentService.getWorkspaces();
 
-    const trees = workspaces.map((workspace: string, index: number) => {
-      const tree = buildFileTree(workspace);
+    const trees = await Promise.all(workspaces.map(async (workspace: string, index: number) => {
+      const tree = await buildFileTreeRoot(workspace);
       return {
         workspaceIndex: index + 1,
         workspacePath: workspace,
         tree,
       };
-    });
+    }));
 
     return trees;
   });
@@ -515,13 +510,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
    * Used by InputArea @ button when session is not yet created
    */
   handleIpc(IpcChannels.workspace.getFileTreeForDirectory, async (_event, directoryPath: string) => {
-    const tree = buildFileTree(directoryPath);
+    const tree = await buildFileTreeRoot(directoryPath);
     return [{
       directoryType: 'cwd' as const,
       directoryPath,
       directoryLabel: 'Working Directory',
       tree,
     }];
+  });
+
+  /** Load one level of a directory for the workspace browser's lazy tree. */
+  handleIpc(IpcChannels.workspace.getDirectoryChildren, async (_event, directoryPath: string) => {
+    return getDirectoryChildren(directoryPath);
   });
 
   /**

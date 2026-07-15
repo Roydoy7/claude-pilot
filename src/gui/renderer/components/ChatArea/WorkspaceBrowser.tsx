@@ -4,7 +4,7 @@
  * WorkspaceBrowser Component - Tree view for session directories (cwd + additionalDirectories)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { FileTreeNode } from '../../../preload/preload-types';
 
@@ -30,6 +30,7 @@ interface TreeNodeProps {
   level: number;
   selectedPaths: Set<string>;
   onToggle: (path: string) => void;
+  onLoadChildren: (path: string) => Promise<FileNode[]>;
 }
 
 // Get file icon based on file extension
@@ -99,20 +100,41 @@ function getFileIcon(fileName: string, isDirectory: boolean) {
   );
 }
 
-function TreeNode({ node, level, selectedPaths, onToggle }: TreeNodeProps) {
+function TreeNode({ node, level, selectedPaths, onToggle, onLoadChildren }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [children, setChildren] = useState<FileNode[] | undefined>(node.children);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const loadingRef = useRef(false);
   const isSelected = selectedPaths.has(node.path);
-  const hasChildren = node.type === 'directory' && node.children && node.children.length > 0;
+  const isDirectory = node.type === 'directory';
+  const hasChildren = isDirectory && children !== undefined && children.length > 0;
+  const mayHaveChildren = isDirectory && (children === undefined || children.length > 0);
 
-  const handleClick = () => {
-    if (node.type === 'directory') {
-      setIsExpanded(!isExpanded);
+  const handleClick = async () => {
+    if (!isDirectory) return;
+
+    const nextExpanded = !isExpanded;
+    setIsExpanded(nextExpanded);
+
+    if (nextExpanded && children === undefined && !loadingRef.current) {
+      loadingRef.current = true;
+      setIsLoading(true);
+      setLoadFailed(false);
+      try {
+        setChildren(await onLoadChildren(node.path));
+      } catch (error) {
+        console.error(`Failed to load directory ${node.path}:`, error);
+        setLoadFailed(true);
+      } finally {
+        loadingRef.current = false;
+        setIsLoading(false);
+      }
     }
   };
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggle(node.path);
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,10 +156,12 @@ function TreeNode({ node, level, selectedPaths, onToggle }: TreeNodeProps) {
             onChange={handleCheckboxChange}
           />
         </span>
-        {hasChildren && (
+        {mayHaveChildren && (
           <span className="tree-node-arrow">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {isExpanded ? (
+              {isLoading ? (
+                <circle className="tree-node-loading-circle" cx="12" cy="12" r="9"></circle>
+              ) : isExpanded ? (
                 <polyline points="6 9 12 15 18 9"></polyline>
               ) : (
                 <polyline points="9 18 15 12 9 6"></polyline>
@@ -145,7 +169,7 @@ function TreeNode({ node, level, selectedPaths, onToggle }: TreeNodeProps) {
             </svg>
           </span>
         )}
-        {!hasChildren && node.type === 'directory' && (
+        {!mayHaveChildren && isDirectory && (
           <span className="tree-node-arrow empty">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" opacity="0.3"></circle>
@@ -155,19 +179,21 @@ function TreeNode({ node, level, selectedPaths, onToggle }: TreeNodeProps) {
         <span className="tree-node-icon">
           {getFileIcon(node.name, node.type === 'directory')}
         </span>
-        <span className="tree-node-name" title={node.path}>
+        <span className="tree-node-name" title={loadFailed ? `${node.path} (failed to read)` : node.path}>
           {node.name}
         </span>
+        {loadFailed && <span className="tree-node-load-error">!</span>}
       </div>
       {hasChildren && isExpanded && (
         <div className="tree-node-children">
-          {node.children!.map((child) => (
+          {children.map((child) => (
             <TreeNode
               key={child.path}
               node={child}
               level={level + 1}
               selectedPaths={selectedPaths}
               onToggle={onToggle}
+              onLoadChildren={onLoadChildren}
             />
           ))}
         </div>
@@ -228,6 +254,10 @@ export function WorkspaceBrowser({ sessionId, cwd, onSelect, onClose }: Workspac
     setSelectedPaths(new Set());
   };
 
+  const loadDirectoryChildren = (path: string) => {
+    return window.electronAPI.workspace.getDirectoryChildren(path);
+  };
+
   return (
     <div className="workspace-browser-overlay" onClick={onClose}>
       <div className="workspace-browser-modal" onClick={(e) => e.stopPropagation()}>
@@ -279,6 +309,7 @@ export function WorkspaceBrowser({ sessionId, cwd, onSelect, onClose }: Workspac
                       level={0}
                       selectedPaths={selectedPaths}
                       onToggle={handleToggle}
+                      onLoadChildren={loadDirectoryChildren}
                     />
                   </div>
                 ) : (

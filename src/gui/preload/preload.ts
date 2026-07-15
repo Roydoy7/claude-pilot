@@ -177,6 +177,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     getFileTreeForDirectory: (directoryPath: string) =>
       invokeChannel(IpcChannels.workspace.getFileTreeForDirectory, directoryPath),
+
+    getDirectoryChildren: (directoryPath: string) =>
+      invokeChannel(IpcChannels.workspace.getDirectoryChildren, directoryPath),
   },
 
   // Cache management

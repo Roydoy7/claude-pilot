@@ -107,6 +107,7 @@ export const IpcChannels = {
     update: 'workspace:update',
     getFileTree: 'workspace:getFileTree',
     getFileTreeForDirectory: 'workspace:getFileTreeForDirectory',
+    getDirectoryChildren: 'workspace:getDirectoryChildren',
   },
   cache: {
     stats: 'cache:stats',
@@ -215,6 +216,7 @@ export interface ChannelMap {
   'workspace:update': { args: [sessionId: string]; result: ChatResponse };
   'workspace:getFileTree': { args: []; result: WorkspaceFileTree[] };
   'workspace:getFileTreeForDirectory': { args: [directoryPath: string]; result: DirectoryFileTree[] };
+  'workspace:getDirectoryChildren': { args: [directoryPath: string]; result: FileTreeNode[] };
 
   // Cache
   'cache:stats': { args: []; result: CacheStats };
