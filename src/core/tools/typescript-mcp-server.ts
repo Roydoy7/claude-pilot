@@ -13,6 +13,13 @@ import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { getErrorMessage } from '../errors.js';
+import { killWithEscalation } from './process-utils.js';
+
+/** The SDK types the tool handler's second argument as `unknown`, but it carries
+ * a per-request AbortSignal at runtime that fires when the user cancels. */
+interface ToolExtra {
+  signal?: AbortSignal;
+}
 
 /**
  * Progress entry for tracking execution history
@@ -49,6 +56,8 @@ interface TypeScriptExecutorConfig {
   timeout?: number;
   packages?: string[];
   onProgress?: ProgressCallback;
+  /** Aborts the running process when the user cancels the agent turn */
+  signal?: AbortSignal;
 }
 
 /**
@@ -236,7 +245,7 @@ async function executeTypeScriptCode(
 ): Promise<TypeScriptExecutionResult> {
   const startTime = Date.now();
   const progressHistory: ProgressEntry[] = [];
-  const { workingDir, timeout = 60000, packages = [], onProgress } = config;
+  const { workingDir, timeout = 60000, packages = [], onProgress, signal } = config;
 
   const addProgress = (entry: ProgressEntry) => {
     progressHistory.push(entry);
@@ -306,17 +315,36 @@ async function executeTypeScriptCode(
       let stdout = '';
       let stderr = '';
       let killed = false;
+      let cancelled = false;
 
       // Set timeout
       const timeoutId = setTimeout(() => {
         killed = true;
-        tsProcess.kill('SIGTERM');
+        killWithEscalation(tsProcess);
         addProgress({
           type: 'error',
           message: `Execution timed out after ${timeout}ms`,
           timestamp: Date.now(),
         });
       }, timeout);
+
+      // User cancellation handler - stop the process as soon as the agent turn is cancelled
+      const onAbort = () => {
+        cancelled = true;
+        killWithEscalation(tsProcess);
+        addProgress({
+          type: 'error',
+          message: 'Execution cancelled by user',
+          timestamp: Date.now(),
+        });
+      };
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
 
       tsProcess.stdout.on('data', (data) => {
         const message = data.toString();
@@ -340,6 +368,7 @@ async function executeTypeScriptCode(
 
       tsProcess.on('close', (exitCode) => {
         clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onAbort);
 
         // Clean up temp file
         try {
@@ -356,7 +385,17 @@ async function executeTypeScriptCode(
           timestamp: Date.now(),
         });
 
-        if (killed) {
+        if (cancelled) {
+          resolve({
+            success: false,
+            stdout: stdout.trim(),
+            stderr: stderr.trim(),
+            exitCode: exitCode ?? -1,
+            error: 'Execution cancelled by user',
+            executionTime,
+            progressHistory,
+          });
+        } else if (killed) {
           resolve({
             success: false,
             stdout: stdout.trim(),
@@ -380,6 +419,7 @@ async function executeTypeScriptCode(
 
       tsProcess.on('error', (error) => {
         clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onAbort);
 
         // Clean up temp file
         try {
@@ -609,11 +649,12 @@ const text = 'He said "Hello"';
           workingDirectory: z.string().optional().describe('Working directory for code execution'),
           timeout: z.number().optional().describe('Execution timeout in milliseconds (default: 60000)'),
         },
-        async ({ code, packages, workingDirectory, timeout }) => {
+        async ({ code, packages, workingDirectory, timeout }, extra) => {
           const result = await executeTypeScriptCode(code, {
             workingDir: workingDirectory,
             packages: packages || [],
             timeout: timeout ?? 60000,
+            signal: (extra as ToolExtra)?.signal,
           });
 
           const resultText = formatResultForLLM(result);

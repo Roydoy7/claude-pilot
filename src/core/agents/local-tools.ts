@@ -60,7 +60,7 @@ export async function loadLocalToolsServer(agentDir: string, agentId: string): P
     }
 
     tools.push(
-      tool(name, frontmatter.description, buildZodShape(frontmatter.args), async (args): Promise<CallToolResult> => {
+      tool(name, frontmatter.description, buildZodShape(frontmatter.args), async (args, extra): Promise<CallToolResult> => {
         try {
           const result = await runToolScript({
             runtime,
@@ -70,13 +70,16 @@ export async function loadLocalToolsServer(agentDir: string, agentId: string): P
             argsJson: JSON.stringify(args),
             timeout: frontmatter.timeout,
             requirements: frontmatter.requirements,
+            signal: (extra as { signal?: AbortSignal })?.signal,
           });
-          if (result.exitCode === 0 && !result.timedOut) {
+          if (result.exitCode === 0 && !result.timedOut && !result.cancelled) {
             return { content: [{ type: 'text', text: result.stdout }] };
           }
-          const failure = result.timedOut
-            ? `Tool "${name}" timed out after ${frontmatter.timeout}ms`
-            : `Tool "${name}" exited with code ${result.exitCode}`;
+          const failure = result.cancelled
+            ? `Tool "${name}" cancelled by user`
+            : result.timedOut
+              ? `Tool "${name}" timed out after ${frontmatter.timeout}ms`
+              : `Tool "${name}" exited with code ${result.exitCode}`;
           const details = [failure, result.stdout, result.stderr].filter((part) => part !== '').join('\n');
           return { content: [{ type: 'text', text: details }], isError: true };
         } catch (err) {

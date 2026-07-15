@@ -36,10 +36,11 @@ function formatTabList(): string {
     .join('\n');
 }
 
-async function waitFor(condition: () => boolean, timeoutMs = 3000): Promise<boolean> {
+async function waitFor(condition: () => boolean, timeoutMs = 3000, signal?: AbortSignal): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (condition()) return true;
+    if (signal?.aborted) return false;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return condition();
@@ -163,7 +164,7 @@ export const browserMcpServer = createSdkMcpServer({
       'switch_tab',
       'Switch the browser to another tab by its ID (see list_tabs). Subsequent browser tools operate on the active tab.',
       { tab_id: z.number().describe('The ID of the tab to activate') },
-      async ({ tab_id }) => {
+      async ({ tab_id }, extra) => {
         const wc = await ensureBrowserWebContents();
         if (!wc) return textResult(BROWSER_UNAVAILABLE);
         const { tabs } = getBrowserTabsState();
@@ -171,7 +172,7 @@ export const browserMcpServer = createSdkMcpServer({
           return textResult(`Error: No tab with ID ${tab_id}.\n${formatTabList()}`);
         }
         sendBrowserCommand({ type: 'switch', tabId: tab_id });
-        const ok = await waitFor(() => getBrowserTabsState().activeTabId === tab_id);
+        const ok = await waitFor(() => getBrowserTabsState().activeTabId === tab_id, 3000, (extra as { signal?: AbortSignal })?.signal);
         return textResult(ok ? `Switched to tab ${tab_id}.\n${formatTabList()}` : `Failed to switch to tab ${tab_id}.`);
       }
     ),
@@ -180,7 +181,7 @@ export const browserMcpServer = createSdkMcpServer({
       'open_tab',
       'Open a new browser tab, optionally navigating to a URL, and make it the active tab.',
       { url: z.string().optional().describe('URL to open in the new tab. Defaults to the home page.') },
-      async ({ url }) => {
+      async ({ url }, extra) => {
         const wc = await ensureBrowserWebContents();
         if (!wc) return textResult(BROWSER_UNAVAILABLE);
         const before = getBrowserTabsState().tabs.length;
@@ -189,7 +190,7 @@ export const browserMcpServer = createSdkMcpServer({
           const { tabs, activeTabId } = getBrowserTabsState();
           const active = tabs.find((tab) => tab.id === activeTabId);
           return tabs.length > before && active?.webContentsId != null;
-        }, 8000);
+        }, 8000, (extra as { signal?: AbortSignal })?.signal);
         return textResult(ok ? `Opened new tab.\n${formatTabList()}` : 'Failed to open new tab.');
       }
     ),
@@ -198,7 +199,7 @@ export const browserMcpServer = createSdkMcpServer({
       'close_tab',
       'Close a browser tab by its ID (see list_tabs). Closing the last tab opens a fresh home tab.',
       { tab_id: z.number().describe('The ID of the tab to close') },
-      async ({ tab_id }) => {
+      async ({ tab_id }, extra) => {
         const wc = await ensureBrowserWebContents();
         if (!wc) return textResult(BROWSER_UNAVAILABLE);
         const { tabs } = getBrowserTabsState();
@@ -206,7 +207,7 @@ export const browserMcpServer = createSdkMcpServer({
           return textResult(`Error: No tab with ID ${tab_id}.\n${formatTabList()}`);
         }
         sendBrowserCommand({ type: 'close', tabId: tab_id });
-        const ok = await waitFor(() => !getBrowserTabsState().tabs.some((tab) => tab.id === tab_id));
+        const ok = await waitFor(() => !getBrowserTabsState().tabs.some((tab) => tab.id === tab_id), 3000, (extra as { signal?: AbortSignal })?.signal);
         return textResult(ok ? `Closed tab ${tab_id}.\n${formatTabList()}` : `Failed to close tab ${tab_id}.`);
       }
     ),

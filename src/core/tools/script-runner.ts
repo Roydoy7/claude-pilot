@@ -26,6 +26,7 @@ import path from 'path';
 import fs from 'fs';
 import { getDefaultPythonPath, ensurePackagesInstalled } from './python-mcp-server.js';
 import { getProjectRoot, getTsxCommand, installPackages } from './typescript-mcp-server.js';
+import { killWithEscalation } from './process-utils.js';
 import type { ToolRuntime } from '../agents/tool-frontmatter.js';
 
 export interface ToolScriptSpec {
@@ -41,6 +42,8 @@ export interface ToolScriptSpec {
   timeout: number;
   /** pip packages (python) or npm packages (typescript) */
   requirements: string[];
+  /** Aborts the running script when the user cancels the agent turn */
+  signal?: AbortSignal;
 }
 
 export interface ToolScriptResult {
@@ -48,6 +51,7 @@ export interface ToolScriptResult {
   stderr: string;
   exitCode: number;
   timedOut: boolean;
+  cancelled: boolean;
 }
 
 export async function runToolScript(spec: ToolScriptSpec): Promise<ToolScriptResult> {
@@ -139,16 +143,24 @@ function spawnScript(
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let cancelled = false;
 
     const timeoutHandle = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
-      setTimeout(() => {
-        if (!child.killed) {
-          child.kill('SIGKILL');
-        }
-      }, 3000);
+      killWithEscalation(child);
     }, spec.timeout);
+
+    const onAbort = () => {
+      cancelled = true;
+      killWithEscalation(child);
+    };
+    if (spec.signal) {
+      if (spec.signal.aborted) {
+        onAbort();
+      } else {
+        spec.signal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
 
     child.stdout.on('data', (data: Buffer) => {
       stdout += data.toString('utf-8');
@@ -159,16 +171,19 @@ function spawnScript(
 
     child.on('error', (error) => {
       clearTimeout(timeoutHandle);
+      spec.signal?.removeEventListener('abort', onAbort);
       reject(new Error(`Failed to spawn tool script ${spec.scriptPath}: ${error.message}`));
     });
 
     child.on('close', (exitCode) => {
       clearTimeout(timeoutHandle);
+      spec.signal?.removeEventListener('abort', onAbort);
       resolve({
         stdout: stdout.trim(),
         stderr: stderr.trim(),
         exitCode: exitCode ?? -1,
         timedOut,
+        cancelled,
       });
     });
 

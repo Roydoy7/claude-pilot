@@ -71,15 +71,19 @@ const askClaude = tool(
       .describe('Model for this sub-task. Defaults to Haiku 4.5 (fast, cheap) - use Sonnet/Opus only for sub-tasks that need stronger reasoning.'),
     maxTokens: z.number().int().min(1).max(8192).default(1024).describe('Maximum output tokens.'),
   },
-  async (args) => {
+  async (args, extra) => {
     try {
       const client = createAnthropicClient();
-      const message = await client.messages.create({
-        model: args.model,
-        max_tokens: args.maxTokens,
-        system: args.system,
-        messages: [{ role: 'user', content: args.prompt }],
-      });
+      const signal = (extra as { signal?: AbortSignal })?.signal;
+      const message = await client.messages.create(
+        {
+          model: args.model,
+          max_tokens: args.maxTokens,
+          system: args.system,
+          messages: [{ role: 'user', content: args.prompt }],
+        },
+        { signal },
+      );
       const text = textOf(message.content);
       if (!text) {
         return fail('ask_claude', `Claude returned no text content (stop_reason: ${message.stop_reason ?? 'unknown'})`);

@@ -12,6 +12,13 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { randomUUID } from 'crypto';
+import { killWithEscalation } from './process-utils.js';
+
+/** The SDK types the tool handler's second argument as `unknown`, but it carries
+ * a per-request AbortSignal at runtime that fires when the user cancels. */
+interface ToolExtra {
+  signal?: AbortSignal;
+}
 
 /**
  * Progress entry for tracking execution history
@@ -51,6 +58,8 @@ interface PythonExecutorConfig {
   encoding?: BufferEncoding;
   requirements?: string[];
   onProgress?: ProgressCallback;
+  /** Aborts the running process when the user cancels the agent turn */
+  signal?: AbortSignal;
 }
 
 /**
@@ -266,6 +275,7 @@ async function executePythonCode(
     encoding = detectEncoding(code),
     requirements = [],
     onProgress,
+    signal,
   } = config;
 
   const progressHistory: ProgressEntry[] = [];
@@ -363,6 +373,7 @@ sys.exit(_exit_code)`;
       let stdout = '';
       let stderr = '';
       let isTimedOut = false;
+      let isCancelled = false;
       let timeoutHandle: NodeJS.Timeout | undefined;
 
       const pythonDir = path.dirname(pythonPath);
@@ -387,14 +398,21 @@ sys.exit(_exit_code)`;
       // Manual timeout handler
       timeoutHandle = setTimeout(() => {
         isTimedOut = true;
-        pythonProcess.kill('SIGTERM');
-        // Force kill after 3 seconds if SIGTERM didn't work
-        setTimeout(() => {
-          if (!pythonProcess.killed) {
-            pythonProcess.kill('SIGKILL');
-          }
-        }, 3000);
+        killWithEscalation(pythonProcess);
       }, timeout);
+
+      // User cancellation handler - stop the process as soon as the agent turn is cancelled
+      const onAbort = () => {
+        isCancelled = true;
+        killWithEscalation(pythonProcess);
+      };
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
 
       pythonProcess.stdout.on('data', (data) => {
         const message = data.toString(encoding);
@@ -420,11 +438,12 @@ sys.exit(_exit_code)`;
         });
       });
 
-      pythonProcess.on('close', (processExitCode, signal) => {
+      pythonProcess.on('close', (processExitCode, exitSignal) => {
         // Clear timeout
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
+        signal?.removeEventListener('abort', onAbort);
 
         const executionTime = Date.now() - startTime;
 
@@ -447,7 +466,7 @@ sys.exit(_exit_code)`;
           }
         }
 
-        const success = actualExitCode === 0 && !isTimedOut;
+        const success = actualExitCode === 0 && !isTimedOut && !isCancelled;
 
         if (success) {
           recordProgress({
@@ -468,11 +487,13 @@ sys.exit(_exit_code)`;
         } else {
           // Build error message based on failure type
           let errorMessage: string;
-          if (isTimedOut) {
+          if (isCancelled) {
+            errorMessage = 'Execution cancelled by user';
+          } else if (isTimedOut) {
             const timeoutSec = Math.round(timeout / 1000);
             errorMessage = `Execution timed out after ${timeoutSec}s`;
-          } else if (signal) {
-            errorMessage = `Process terminated by signal: ${signal}`;
+          } else if (exitSignal) {
+            errorMessage = `Process terminated by signal: ${exitSignal}`;
           } else if (actualExitCode === null && processExitCode === null) {
             errorMessage = 'Process terminated abnormally';
           } else {
@@ -503,6 +524,7 @@ sys.exit(_exit_code)`;
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
+        signal?.removeEventListener('abort', onAbort);
 
         const executionTime = Date.now() - startTime;
 
@@ -696,7 +718,7 @@ export function createPythonMcpServer() {
         'Use tempfile.gettempdir() or os.environ.get("TEMP") for temp files. ' +
         'Use os.path.join() for cross-platform path handling.',
         pythonToolSchema,
-        async (args) => {
+        async (args, extra) => {
           const { description, code, requirements, timeout } = args;
           // workingDirectory is auto-injected by PreToolUse hook from session cwd
           const workingDirectory = (args as Record<string, unknown>).workingDirectory as string | undefined;
@@ -710,6 +732,7 @@ export function createPythonMcpServer() {
             workingDir: workingDirectory || os.tmpdir(),
             requirements: requirements || [],
             timeout: timeout || 300000,
+            signal: (extra as ToolExtra)?.signal,
           });
 
           const resultText = formatResultForLLM(result);
