@@ -5,7 +5,6 @@
  * Provides streaming execution with tool support via MCP
  */
 
-import { promises as fs } from 'node:fs';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type {
   Query,
@@ -1182,36 +1181,11 @@ export class ClaudeAgent {
         settingSources: this.settingSources, // Use instance variable (may be updated via setSettingSources)
         canUseTool: canUseToolCallback,
         hooks: {
-          // PreToolUse: Auto-inject workingDirectory and check file size for Read tool
+          // PreToolUse: Auto-inject workingDirectory for all tools
           PreToolUse: [{
             hooks: [async (input) => {
               if (input.hook_event_name === 'PreToolUse') {
                 const toolInput = input.tool_input as Record<string, unknown> | undefined;
-                const toolName = input.tool_name;
-
-                // Check file size for Read tool to prevent large files from entering conversation history
-                if (toolName === 'Read' && toolInput?.file_path) {
-                  const filePath = toolInput.file_path as string;
-                  try {
-                    const stats = await fs.stat(filePath);
-                    const MAX_FILE_SIZE = 500 * 1024; // 500KB (~125000 tokens)
-                    if (stats.size > MAX_FILE_SIZE) {
-                      const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-                      return {
-                        hookSpecificOutput: {
-                          hookEventName: 'PreToolUse' as const,
-                          permissionDecision: 'deny' as const,
-                          permissionDecisionReason: `File too large (${sizeMB}MB). Maximum allowed size is 500KB. Use offset/limit parameters to read specific portions, or use Grep to search for specific content.`,
-                        },
-                      };
-                    }
-                  } catch (error) {
-                    // File doesn't exist or can't be accessed - let the Read tool
-                    // produce its own error, but surface the stat failure so it's
-                    // not silently invisible.
-                    console.warn(`[PreToolUse] fs.stat failed for ${filePath}:`, getErrorMessage(error));
-                  }
-                }
 
                 // Auto-inject workingDirectory for all tools if not specified
                 if (toolInput && !toolInput.workingDirectory) {
