@@ -8,6 +8,7 @@ export const sessionConfigJa = {
   title: '新しいセッションを開始',
   chooseRole: '役割を選択',
   chooseRoleDescription: 'この会話におけるアシスタントの役割を選択してください',
+  agentLoadErrorTitle: '以下の役割は読み込みに失敗したため利用できません：',
   selectProviderModel: 'プロバイダーとモデルを選択',
   selectProviderModelDescription: 'AIプロバイダーとモデルを選択してください',
   workspaceInstruction: 'AIにローカルファイルへのアクセスを許可するには、フォルダを追加してください',

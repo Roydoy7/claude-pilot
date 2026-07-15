@@ -16,10 +16,17 @@ function fetchAgentDefinitions(): Promise<AgentSummary[]> {
     return Promise.resolve(cachedAgents);
   }
   if (!cachedAgentsPromise) {
-    cachedAgentsPromise = window.electronAPI.agents.list().then((agents) => {
-      cachedAgents = agents;
-      return agents;
-    });
+    cachedAgentsPromise = window.electronAPI.agents.list().then(
+      (agents) => {
+        cachedAgents = agents;
+        return agents;
+      },
+      (err: unknown) => {
+        // Don't cache the rejection - a later mount can retry the IPC call
+        cachedAgentsPromise = null;
+        throw err;
+      },
+    );
   }
   return cachedAgentsPromise;
 }
@@ -35,7 +42,9 @@ export function useAgentDefinitions(): AgentSummary[] {
     if (cachedAgents) {
       return;
     }
-    fetchAgentDefinitions().then(setAgents);
+    fetchAgentDefinitions().then(setAgents).catch((err: unknown) => {
+      console.error('Failed to load agent definitions:', err);
+    });
   }, []);
 
   return agents;

@@ -8,6 +8,7 @@ export const sessionConfigZh = {
   title: '开始新会话',
   chooseRole: '选择角色',
   chooseRoleDescription: '选择本次对话的助手角色',
+  agentLoadErrorTitle: '以下角色加载失败，暂不可用：',
   selectProviderModel: '选择提供商和模型',
   selectProviderModelDescription: '选择您的 AI 提供商和模型',
   workspaceInstruction: '若要让 AI 访问本地文件，请添加文件夹到',

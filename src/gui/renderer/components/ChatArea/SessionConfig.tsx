@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAgentDefinitions } from '../../hooks/useAgentDefinitions.js';
 import { useLanguage } from '../../i18n/LanguageContext.js';
 import { RoleExampleRotator } from './RoleExampleRotator.js';
+import type { AgentLoadError } from '../../../preload/preload-types.js';
 
 interface SessionConfigProps {
   defaultAgentId?: string;
@@ -29,11 +30,20 @@ export function SessionConfig({
   const agentDefinitions = useAgentDefinitions();
   const [selectedAgentId, setSelectedAgentId] = useState<string>(defaultAgentId || '');
   const [selectedCwd, setSelectedCwd] = useState<string>(defaultCwd || '');
+  const [agentLoadErrors, setAgentLoadErrors] = useState<AgentLoadError[]>([]);
   const modelName = defaultModel || '';
 
   // Load settings on mount
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  // Surface agent definitions that failed to load (broken tool scripts,
+  // invalid tools.md, ...) instead of silently hiding them from the role list
+  useEffect(() => {
+    window.electronAPI.agents.loadErrors().then(setAgentLoadErrors).catch((error: unknown) => {
+      console.error('Failed to load agent load errors:', error);
+    });
   }, []);
 
   // Fall back to the first available agent definition once it loads, if
@@ -174,6 +184,27 @@ export function SessionConfig({
               );
             })}
           </div>
+          {agentLoadErrors.length > 0 && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.625rem 0.75rem',
+                border: '1px solid var(--error, #d64545)',
+                borderRadius: '6px',
+                fontSize: '0.8125rem',
+                color: 'var(--error, #d64545)',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                {t.sessionConfig.agentLoadErrorTitle}
+              </div>
+              {agentLoadErrors.map(({ id, error }) => (
+                <div key={id} style={{ fontFamily: 'monospace', overflowWrap: 'anywhere' }}>
+                  {id}: {error}
+                </div>
+              ))}
+            </div>
+          )}
           {selectedAgent && selectedAgent.prompts.length > 0 && (
             <RoleExampleRotator
               examples={selectedAgent.prompts}

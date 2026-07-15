@@ -8,6 +8,7 @@ export const sessionConfigEn = {
   title: 'Start New Session',
   chooseRole: 'Choose Role',
   chooseRoleDescription: "Select the assistant's role for this conversation",
+  agentLoadErrorTitle: 'Some roles failed to load and are unavailable:',
   selectProviderModel: 'Select Provider & Model',
   selectProviderModelDescription: 'Choose your AI provider and model',
   workspaceInstruction: 'To let AI access local files, add folders to',

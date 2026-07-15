@@ -74,6 +74,7 @@ export interface Translation {
     title: string;
     chooseRole: string;
     chooseRoleDescription: string;
+    agentLoadErrorTitle: string;
     selectProviderModel: string;
     selectProviderModelDescription: string;
     workspaceInstruction: string;
