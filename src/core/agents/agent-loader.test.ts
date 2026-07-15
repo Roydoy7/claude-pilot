@@ -5,8 +5,10 @@
  */
 
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { describe, it, expect } from 'vitest';
-import { getAgentDefinitions, getAgentDefinition } from './agent-loader.js';
+import { getAgentDefinitions, getAgentDefinition, loadAgentDefinitionsFrom } from './agent-loader.js';
 
 describe('getAgentDefinitions', () => {
   it('loads the office-assist agent definition', async () => {
@@ -81,6 +83,55 @@ describe('getAgentDefinitions', () => {
     const officeAssist = await getAgentDefinition('office-assist');
 
     expect(officeAssist.mcpServers['local']).toBeUndefined();
+  });
+});
+
+describe('loadAgentDefinitionsFrom', () => {
+  async function writeAgentFolder(agentDefsPath: string, id: string): Promise<string> {
+    const dir = path.join(agentDefsPath, id);
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(path.join(dir, 'description.md'), `${id} display name\nA test agent.\n`, 'utf-8');
+    await fs.promises.writeFile(path.join(dir, 'system-prompt.md'), 'You are a test agent.\n', 'utf-8');
+    await fs.promises.writeFile(path.join(dir, 'tools.md'), '#TOOLS\nRead\n#SAFE-TOOLS\nRead\n', 'utf-8');
+    await fs.promises.writeFile(path.join(dir, 'prompts.md'), 'Do something\n', 'utf-8');
+    return dir;
+  }
+
+  it('isolates a broken agent instead of failing the whole load', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      await writeAgentFolder(agentDefsPath, 'good-agent');
+      const brokenDir = await writeAgentFolder(agentDefsPath, 'broken-agent');
+      const toolsDir = path.join(brokenDir, 'tools');
+      await fs.promises.mkdir(toolsDir);
+      // Invalid frontmatter: missing the required safe declaration
+      await fs.promises.writeFile(path.join(toolsDir, 'bad_tool.ts'), '// ---\n// description: x\n// ---\n', 'utf-8');
+
+      const { definitions, loadErrors } = await loadAgentDefinitionsFrom(agentDefsPath);
+
+      expect(definitions.map((d) => d.id)).toEqual(['good-agent']);
+      expect(loadErrors).toHaveLength(1);
+      expect(loadErrors[0]?.id).toBe('broken-agent');
+      expect(loadErrors[0]?.error).toContain('Missing safe declaration');
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('isolates an agent with missing definition files', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      await writeAgentFolder(agentDefsPath, 'good-agent');
+      await fs.promises.mkdir(path.join(agentDefsPath, 'empty-agent'));
+
+      const { definitions, loadErrors } = await loadAgentDefinitionsFrom(agentDefsPath);
+
+      expect(definitions.map((d) => d.id)).toEqual(['good-agent']);
+      expect(loadErrors).toHaveLength(1);
+      expect(loadErrors[0]?.id).toBe('empty-agent');
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
   });
 });
 

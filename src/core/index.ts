@@ -47,8 +47,10 @@ export {
 // Agent definition exports
 export {
   type AgentDefinition,
+  type AgentLoadError,
   getAgentDefinitions,
   getAgentDefinition,
+  getAgentLoadErrors,
 } from './agents/agent-loader.js';
 
 // Model and Provider exports

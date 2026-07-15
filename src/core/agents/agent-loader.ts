@@ -22,6 +22,7 @@ import { existsSync } from 'fs';
 import { app } from 'electron';
 import { MCP_SERVER_REGISTRY, type McpServer } from './mcp-server-registry.js';
 import { loadLocalToolsServer } from './local-tools.js';
+import { getErrorMessage } from '../errors.js';
 
 export interface AgentDefinition {
   id: string;
@@ -238,7 +239,47 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
   };
 }
 
-let cachedDefinitions: AgentDefinition[] | null = null;
+/**
+ * A single agent definition that failed to load (bad tool frontmatter,
+ * missing files, invalid tools.md, ...). The agent is excluded from the
+ * usable definitions; the error is surfaced to the UI instead of crashing
+ * the whole agent list.
+ */
+export interface AgentLoadError {
+  id: string;
+  error: string;
+}
+
+interface AgentDefsLoadResult {
+  definitions: AgentDefinition[];
+  loadErrors: AgentLoadError[];
+}
+
+/**
+ * Load every agent folder under agentDefsPath. A failure in one agent is
+ * isolated: it becomes an AgentLoadError instead of rejecting the whole
+ * load, so one broken agent cannot take down the others.
+ */
+export async function loadAgentDefinitionsFrom(agentDefsPath: string): Promise<AgentDefsLoadResult> {
+  const dirents = await fs.readdir(agentDefsPath, { withFileTypes: true });
+  const agentIds = dirents.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+
+  const definitions: AgentDefinition[] = [];
+  const loadErrors: AgentLoadError[] = [];
+  for (const id of agentIds) {
+    try {
+      definitions.push(await loadAgentDefinition(agentDefsPath, id));
+    } catch (err) {
+      const error = getErrorMessage(err);
+      console.error(`[agent-loader] failed to load agent "${id}": ${error}`);
+      loadErrors.push({ id, error });
+    }
+  }
+
+  return { definitions, loadErrors };
+}
+
+let cachedLoad: AgentDefsLoadResult | null = null;
 let devWatcherStarted = false;
 
 /**
@@ -258,7 +299,7 @@ function startDevWatcher(agentDefsPath: string): void {
   import('chokidar')
     .then(({ watch }) => {
       watch(agentDefsPath, { ignoreInitial: true }).on('all', () => {
-        cachedDefinitions = null;
+        cachedLoad = null;
       });
     })
     .catch((err: unknown) => {
@@ -267,25 +308,30 @@ function startDevWatcher(agentDefsPath: string): void {
 }
 
 /**
- * Load all agent definitions from agent-defs (cached after first call)
+ * Load all agent definitions from agent-defs (cached after first call).
+ * Agents that fail to load are excluded; see getAgentLoadErrors().
  */
 export async function getAgentDefinitions(): Promise<AgentDefinition[]> {
-  if (cachedDefinitions) {
-    return cachedDefinitions;
+  if (cachedLoad) {
+    return cachedLoad.definitions;
   }
 
   const agentDefsPath = getAgentDefsPath();
   startDevWatcher(agentDefsPath);
-  const dirents = await fs.readdir(agentDefsPath, { withFileTypes: true });
-  const agentIds = dirents.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  cachedLoad = await loadAgentDefinitionsFrom(agentDefsPath);
+  return cachedLoad.definitions;
+}
 
-  const definitions: AgentDefinition[] = [];
-  for (const id of agentIds) {
-    definitions.push(await loadAgentDefinition(agentDefsPath, id));
+/**
+ * Errors from agent definitions that failed to load in the last
+ * getAgentDefinitions() run (triggers a load if none happened yet).
+ */
+export async function getAgentLoadErrors(): Promise<AgentLoadError[]> {
+  await getAgentDefinitions();
+  if (!cachedLoad) {
+    throw new Error('Agent definitions load did not populate the cache');
   }
-
-  cachedDefinitions = definitions;
-  return definitions;
+  return cachedLoad.loadErrors;
 }
 
 /**
