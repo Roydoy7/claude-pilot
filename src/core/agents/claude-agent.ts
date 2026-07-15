@@ -333,6 +333,16 @@ export class ClaudeAgent {
     if (this.currentQuery) {
       await this.currentQuery.setPermissionMode(mode);
     }
+
+    // bypassPermissions auto-approves everything, including an approval already
+    // waiting on the user - resolve it so the dialog doesn't hang forever
+    if (mode === 'bypassPermissions' && this.pendingToolApproval) {
+      this.pendingToolApproval.resolve({
+        approved: true,
+        updatedInput: this.pendingToolApproval.input,
+      });
+      this.pendingToolApproval = null;
+    }
   }
 
   /**
