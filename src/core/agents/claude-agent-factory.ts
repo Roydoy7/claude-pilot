@@ -166,7 +166,7 @@ export async function createAgentFromSessionData(
     mcpServers: agentDef.mcpServers, // Custom MCP servers for Python and other tools
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
-    permissionMode: 'default',
+    permissionMode: session.permissionMode ?? 'default',
     thinking: getThinkingConfig(session.modelName),
   };
 
