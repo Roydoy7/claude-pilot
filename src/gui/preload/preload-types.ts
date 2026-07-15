@@ -12,6 +12,12 @@ import type { AgentState, StreamEvent, PermissionMode, SettingSource, HistoryMes
 import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo, EffortLevel } from '../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
+import type { AgentLoadError } from '../../core/agents/agent-loader.js';
+
+/**
+ * Re-export AgentLoadError for frontend use
+ */
+export type { AgentLoadError };
 
 /**
  * Re-export PermissionMode and SettingSource for frontend use
@@ -404,6 +410,7 @@ export interface ElectronAPI {
   // Agent definitions
   agents: {
     list: () => Promise<AgentSummary[]>;
+    loadErrors: () => Promise<AgentLoadError[]>;
   };
 
   // Embedded browser pane

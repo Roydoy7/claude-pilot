@@ -25,6 +25,7 @@ import type { PromptTemplate } from '../../core/templates/template-manager.js';
 import type { ModelInfo, EffortLevel } from '../../core/providers/model-list-manager.js';
 import type { AuthStatus, OAuthLoginOptions, OAuthResult } from '../../core/types/auth-types.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
+import type { AgentLoadError } from '../../core/agents/agent-loader.js';
 import { IpcChannels, type ChannelMap } from '../../shared/ipc-channels.js';
 
 /**
@@ -245,6 +246,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agents: {
     list: (): Promise<AgentSummary[]> =>
       invokeChannel(IpcChannels.agents.list),
+    loadErrors: (): Promise<AgentLoadError[]> =>
+      invokeChannel(IpcChannels.agents.loadErrors),
   },
 
   // Browser

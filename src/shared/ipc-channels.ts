@@ -29,6 +29,7 @@ import type {
   SettingSource,
 } from '../gui/preload/preload-types.js';
 import type { HistoryMessage } from '../core/agents/claude-agent.js';
+import type { AgentLoadError } from '../core/agents/agent-loader.js';
 import type { Session } from '../core/sessions/session-manager.js';
 import type { PromptTemplate } from '../core/templates/template-manager.js';
 import type { ModelInfo, EffortLevel } from '../core/providers/model-list-manager.js';
@@ -142,6 +143,7 @@ export const IpcChannels = {
   },
   agents: {
     list: 'agents:list',
+    loadErrors: 'agents:loadErrors',
   },
   browser: {
     navigate: 'browser:navigate',
@@ -260,6 +262,7 @@ export interface ChannelMap {
 
   // Agents
   'agents:list': { args: []; result: AgentSummary[] };
+  'agents:loadErrors': { args: []; result: AgentLoadError[] };
 
   // Browser
   'browser:navigate': { args: [url: string]; result: { success: boolean; error?: string } };

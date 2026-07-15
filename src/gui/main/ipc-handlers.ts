@@ -9,7 +9,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { claudeAgentService } from '../../core/services/claude-agent-service.js';
 import type { ChatRequest, StreamEventCallback } from '../../core/services/claude-agent-service.js';
 import type { StreamEvent, ToolApprovalRequestHandler } from '../../core/agents/claude-agent.js';
-import { getAgentDefinitions } from '../../core/agents/agent-loader.js';
+import { getAgentDefinitions, getAgentLoadErrors } from '../../core/agents/agent-loader.js';
 import { SessionManager } from '../../core/sessions/session-manager.js';
 import { modelListManager, type EffortLevel } from '../../core/providers/model-list-manager.js';
 import { templateManager } from '../../core/templates/template-manager.js';
@@ -761,6 +761,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   handleIpc(IpcChannels.agents.list, async () => {
     const definitions = await getAgentDefinitions();
     return definitions.map(({ id, displayName, description, prompts }) => ({ id, displayName, description, prompts }));
+  });
+
+  /**
+   * List agent definitions that failed to load, so the UI can surface them
+   * instead of silently dropping broken agents from the list
+   */
+  handleIpc(IpcChannels.agents.loadErrors, async () => {
+    return getAgentLoadErrors();
   });
 
   /**
