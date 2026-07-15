@@ -181,8 +181,8 @@ export interface ChannelMap {
   'agent:toolApprovalRequest': { args: [data: ToolApprovalRequestEvent]; result: void };
   'agent:approveTool': { args: [toolUseId: string, updatedInput?: Record<string, unknown>]; result: { success: boolean; error?: string } };
   'agent:rejectTool': { args: [toolUseId: string, message?: string]; result: { success: boolean; error?: string } };
-  'agent:getPermissionMode': { args: []; result: { success: boolean; mode: PermissionMode } };
-  'agent:setPermissionMode': { args: [mode: PermissionMode]; result: { success: boolean; error?: string } };
+  'agent:getPermissionMode': { args: [sessionId?: string]; result: { success: boolean; mode: PermissionMode } };
+  'agent:setPermissionMode': { args: [mode: PermissionMode, sessionId?: string]; result: { success: boolean; error?: string } };
   'agent:getSettingSources': { args: []; result: { success: boolean; sources: SettingSource[] } };
   'agent:setSettingSources': { args: [sources: SettingSource[]]; result: { success: boolean; error?: string } };
   'agent:getModelName': { args: []; result: { success: boolean; modelName: string } };

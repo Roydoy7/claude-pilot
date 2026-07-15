@@ -191,17 +191,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current permission mode
    */
-  handleIpc(IpcChannels.agent.getPermissionMode, async () => {
-    const mode = claudeAgentService.getPermissionMode();
+  handleIpc(IpcChannels.agent.getPermissionMode, async (_event, sessionId?: string) => {
+    const mode = claudeAgentService.getPermissionMode(sessionId);
     return { success: true, mode };
   });
 
   /**
    * Set permission mode
    */
-  handleIpc(IpcChannels.agent.setPermissionMode, async (_event, mode: string) => {
+  handleIpc(IpcChannels.agent.setPermissionMode, async (_event, mode: string, sessionId?: string) => {
     try {
-      await claudeAgentService.setPermissionMode(mode as import('../../core/agents/claude-agent.js').PermissionMode);
+      await claudeAgentService.setPermissionMode(mode as import('../../core/agents/claude-agent.js').PermissionMode, sessionId);
       return { success: true };
     } catch (error) {
       console.error('[IPC] setPermissionMode error:', error);

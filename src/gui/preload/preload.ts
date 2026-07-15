@@ -87,11 +87,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     rejectTool: (toolUseId: string, message?: string): Promise<{ success: boolean; error?: string }> =>
       invokeChannel(IpcChannels.agent.rejectTool, toolUseId, message),
 
-    getPermissionMode: (): Promise<{ success: boolean; mode: PermissionMode }> =>
-      invokeChannel(IpcChannels.agent.getPermissionMode),
+    getPermissionMode: (sessionId?: string): Promise<{ success: boolean; mode: PermissionMode }> =>
+      invokeChannel(IpcChannels.agent.getPermissionMode, sessionId),
 
-    setPermissionMode: (mode: PermissionMode): Promise<{ success: boolean; error?: string }> =>
-      invokeChannel(IpcChannels.agent.setPermissionMode, mode),
+    setPermissionMode: (mode: PermissionMode, sessionId?: string): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.setPermissionMode, mode, sessionId),
 
     getSettingSources: (): Promise<{ success: boolean; sources: SettingSource[] }> =>
       invokeChannel(IpcChannels.agent.getSettingSources),

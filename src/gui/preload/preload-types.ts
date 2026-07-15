@@ -308,8 +308,8 @@ export interface ElectronAPI {
     onToolApprovalRequest: (callback: (data: ToolApprovalRequestEvent) => void) => void;
     approveTool: (toolUseId: string, updatedInput?: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
     rejectTool: (toolUseId: string, message?: string) => Promise<{ success: boolean; error?: string }>;
-    getPermissionMode: () => Promise<{ success: boolean; mode: PermissionMode }>;
-    setPermissionMode: (mode: PermissionMode) => Promise<{ success: boolean; error?: string }>;
+    getPermissionMode: (sessionId?: string) => Promise<{ success: boolean; mode: PermissionMode }>;
+    setPermissionMode: (mode: PermissionMode, sessionId?: string) => Promise<{ success: boolean; error?: string }>;
     getSettingSources: () => Promise<{ success: boolean; sources: SettingSource[] }>;
     setSettingSources: (sources: SettingSource[]) => Promise<{ success: boolean; error?: string }>;
     getModelName: () => Promise<{ success: boolean; modelName: string }>;

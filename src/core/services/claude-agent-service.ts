@@ -767,14 +767,39 @@ export class ClaudeAgentService {
    * Permission mode is now managed per-agent via ClaudeAgent.setPermissionMode()
    */
 
-  async setPermissionMode(mode: PermissionMode): Promise<void> {
-    if (this.currentAgent) {
-      await this.currentAgent.setPermissionMode(mode);
+  async setPermissionMode(mode: PermissionMode, sessionId?: string): Promise<void> {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    if (!targetSessionId) {
+      throw new AgentQueryError('No session to set permission mode on', 'NO_ACTIVE_SESSION');
+    }
+
+    // Persist first so any future agent recreation picks it up
+    this.sessionManager.updateSessionPermissionMode(targetSessionId, mode);
+
+    // Apply to the live agent if one exists for this session
+    const targetAgent =
+      this.currentAgent?.getSessionId() === targetSessionId
+        ? this.currentAgent
+        : getAgentBySessionId(targetSessionId);
+    if (targetAgent) {
+      await targetAgent.setPermissionMode(mode);
     }
   }
 
-  getPermissionMode(): PermissionMode {
-    return this.currentAgent?.getPermissionMode() || 'default';
+  getPermissionMode(sessionId?: string): PermissionMode {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    if (!targetSessionId) {
+      return 'default';
+    }
+    const targetAgent =
+      this.currentAgent?.getSessionId() === targetSessionId
+        ? this.currentAgent
+        : getAgentBySessionId(targetSessionId);
+    if (targetAgent) {
+      return targetAgent.getPermissionMode();
+    }
+    // No live agent - read from persisted session
+    return this.sessionManager.loadSession(targetSessionId)?.permissionMode ?? 'default';
   }
 
   /**

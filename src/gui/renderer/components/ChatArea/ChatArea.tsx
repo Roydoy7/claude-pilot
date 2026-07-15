@@ -186,6 +186,13 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
     setRejectedTools(agent.getRejectedTools());
     setCurrentSessionId(sessionId);
     setSessionStarted(true);
+
+    // Sync permission mode from backend for this session
+    window.electronAPI.agent.getPermissionMode(sessionId).then((result) => {
+      if (result.success) {
+        setPermissionMode(result.mode);
+      }
+    });
   }, [sessionId]);
 
   // Handle tool approval - delegate to SessionAgent
@@ -226,8 +233,14 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
   // Handle permission mode change
   const handlePermissionModeChange = async (mode: PermissionMode) => {
+    // If no session exists yet, buffer the selection locally; it will be
+    // applied to the backend when the session is created (see handleSendMessage).
+    if (!currentSessionId) {
+      setPermissionMode(mode);
+      return;
+    }
     try {
-      const result = await window.electronAPI.agent.setPermissionMode(mode);
+      const result = await window.electronAPI.agent.setPermissionMode(mode, currentSessionId);
       if (result.success) {
         setPermissionMode(mode);
       } else {
@@ -397,6 +410,13 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
         // This will trigger useEffect, but getOrCreate will return the same agent (from cache)
         setCurrentSessionId(result.session.id);
         setSessionStarted(true);
+
+        // If a non-default permission mode was selected before the session existed, apply it now
+        if (permissionMode !== 'default') {
+          window.electronAPI.agent.setPermissionMode(permissionMode, result.session.id).catch((error) => {
+            console.error('Failed to apply buffered permission mode:', error);
+          });
+        }
       } catch (error) {
         console.error('Failed to create session:', error);
         return;
