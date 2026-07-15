@@ -240,6 +240,7 @@ export class ClaudeAgent {
   private pendingToolApproval: PendingToolApproval | null = null; // Current pending tool approval
   private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null; // Handler for notifying UI
   private streamEndResolver: (() => void) | null = null; // Resolver to signal end of input stream
+  private turnFinishedResolvers: Array<() => void> = []; // Resolved when run()'s finally block runs (turn truly ended)
 
   constructor(
     config: ClaudeAgentConfig,
@@ -261,18 +262,51 @@ export class ClaudeAgent {
   }
 
   /**
-   * Cancel the ongoing request
+   * Cancel the ongoing request.
+   *
+   * Tries `query.interrupt()` first - the SDK's graceful stop (equivalent to
+   * pressing Esc in Claude Code), which lets in-flight tools/hooks clean up
+   * and keeps the CLI subprocess alive for the next turn. `interrupt()`
+   * resolving only means the request was accepted, not that the turn
+   * actually stopped (e.g. a tool ignoring the interrupt), so we wait for
+   * `run()`'s finally block to confirm the turn really ended. If that
+   * doesn't happen within ~2s, falls back to a hard `AbortController.abort()`.
    */
-  cancel(): void {
+  async cancel(): Promise<void> {
     this.turnCancelled = true;
     // Release the stream generator if it's waiting
     if (this.streamEndResolver) {
       this.streamEndResolver();
       this.streamEndResolver = null;
     }
-    if (this.abortController) {
+
+    const query = this.currentQuery;
+    let turnEnded = !query;
+    if (query) {
+      query.interrupt().catch(() => {});
+      turnEnded = await this.waitForTurnFinished(2000);
+    }
+
+    if (!turnEnded && this.abortController && !this.abortController.signal.aborted) {
       this.abortController.abort();
     }
+  }
+
+  /**
+   * Resolves true once `run()`'s finally block runs (the turn is fully over),
+   * or false if timeoutMs elapses first.
+   */
+  private waitForTurnFinished(timeoutMs: number): Promise<boolean> {
+    if (!this.currentQuery) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), timeoutMs);
+      this.turnFinishedResolvers.push(() => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+    });
   }
 
   /**
@@ -431,9 +465,15 @@ export class ClaudeAgent {
       const result = await Promise.race([
         approvalPromise,
         new Promise<ToolApprovalResult>((resolve) => {
+          // If the signal is already aborted, the 'abort' event will never fire -
+          // resolve immediately instead of hanging the approval forever.
+          if (options.signal.aborted) {
+            resolve({ approved: false, message: 'Request aborted' });
+            return;
+          }
           options.signal.addEventListener('abort', () => {
             resolve({ approved: false, message: 'Request aborted' });
-          });
+          }, { once: true });
         }),
       ]);
 
@@ -1225,6 +1265,10 @@ export class ClaudeAgent {
       this.abortController = null;
       this.turnCancelled = false;
       this.currentQuery = null;
+
+      const resolvers = this.turnFinishedResolvers;
+      this.turnFinishedResolvers = [];
+      resolvers.forEach((resolve) => resolve());
     }
   }
 
