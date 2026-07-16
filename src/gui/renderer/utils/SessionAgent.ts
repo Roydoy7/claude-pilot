@@ -23,6 +23,7 @@ import {
   applyToolEnd,
   applyToolProgress,
   applyMessageEvent,
+  applyTaskNotificationEvent,
   applyErrorEvent,
   applyCancelledEvent,
   clearPendingToolApprovals,
@@ -207,6 +208,11 @@ export class SessionAgent {
 
       case 'message':
         this.displayItems = applyMessageEvent(this.displayItems, event, this.sessionId);
+        this.notifyDisplayItemsChanged();
+        break;
+
+      case 'task_notification':
+        this.displayItems = applyTaskNotificationEvent(this.displayItems, event, this.sessionId);
         this.notifyDisplayItemsChanged();
         break;
 

@@ -61,6 +61,13 @@ export const jaTranslations: Translation = {
     collapse: '折りたたむ',
   },
 
+  taskNotification: {
+    outputFile: '出力ファイル',
+    tokens: 'トークン',
+    toolUses: 'ツール使用回数',
+    duration: '所要時間',
+  },
+
   // Tool Call
   toolCall: {
     showCode: 'コードを表示',

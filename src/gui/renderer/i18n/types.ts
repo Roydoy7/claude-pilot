@@ -234,6 +234,14 @@ export interface Translation {
     collapse: string;
   };
 
+  // Task Notification (background subagent finished)
+  taskNotification?: {
+    outputFile: string;
+    tokens: string;
+    toolUses: string;
+    duration: string;
+  };
+
   // Tool Call
   toolCall: {
     showCode: string;

@@ -61,6 +61,13 @@ export const zhTranslations: Translation = {
     collapse: '收起',
   },
 
+  taskNotification: {
+    outputFile: '输出文件',
+    tokens: 'tokens',
+    toolUses: '工具调用',
+    duration: '耗时',
+  },
+
   // Tool Call
   toolCall: {
     showCode: '显示代码',

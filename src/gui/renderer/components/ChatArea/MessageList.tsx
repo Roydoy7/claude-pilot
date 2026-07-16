@@ -20,6 +20,7 @@ import { ThinkingItem } from './ThinkingItem';
 import { CancelledItem } from './CancelledItem';
 import { UsageLimitItem } from './UsageLimitItem';
 import { CompactSummaryItem } from './CompactSummaryItem';
+import { TaskNotificationItem } from './TaskNotificationItem';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { MessageListItem } from '../../../preload/preload-types';
 
@@ -106,6 +107,8 @@ function renderItem(
     return <CancelledItem item={item} />;
   } else if (item.type === 'usage_limit') {
     return <UsageLimitItem item={item} />;
+  } else if (item.type === 'task_notification') {
+    return <TaskNotificationItem item={item} />;
   }
   return null;
 }

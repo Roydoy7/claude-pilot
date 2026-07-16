@@ -28,6 +28,7 @@ import { readTranscript } from '../sessions/transcript-manager.js';
 import { buildBaseQueryOptions } from './sdk-query.js';
 import type { ContentBlock, MessageContent } from '../types/message-types.js';
 import { getErrorMessage } from '../errors.js';
+import { parseTaskNotifications, type TaskNotification } from '../utils/task-notification.js';
 
 /**
  * Re-export message types for backward compatibility
@@ -144,6 +145,7 @@ export type StreamEvent =
   | { type: 'checkpoint' }
   | { type: 'slashCommands'; commands: string[] }
   | { type: 'message'; content: string; timestamp: number; isCompactSummary?: boolean }
+  | { type: 'task_notification'; notification: TaskNotification; timestamp: number }
   | { type: 'done'; usage?: UsageMetadata; terminalReason?: TerminalReason };
 
 /** Claude's rate-limit payload uses Unix seconds, while Date expects milliseconds. */
@@ -173,6 +175,7 @@ export interface HistoryMessage {
   tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
   isCompactSummary?: boolean; // Flag for compact summary messages (from /compact command)
   isUsageLimitError?: boolean; // Flag for usage limit error messages (rate_limit)
+  taskNotification?: TaskNotification; // Parsed <task-notification> from a background subagent
 }
 
 /**
@@ -757,6 +760,36 @@ export class ClaudeAgent {
                 });
               }
               break;
+            }
+
+            // Task-notification injections fire when a background subagent (Agent tool) stops.
+            // Parse and yield structured events instead of displaying the raw XML.
+            {
+              const notificationTexts: string[] = [];
+              if (typeof messageContent === 'string' && messageContent.includes('<task-notification>')) {
+                notificationTexts.push(messageContent);
+              } else if (Array.isArray(messageContent)) {
+                for (const block of messageContent) {
+                  if (block.type === 'text' && 'text' in block && typeof block.text === 'string' && block.text.includes('<task-notification>')) {
+                    notificationTexts.push(block.text);
+                  }
+                }
+              }
+
+              if (notificationTexts.length > 0) {
+                const notifications = notificationTexts.flatMap((text) => parseTaskNotifications(text));
+                for (const notification of notifications) {
+                  const timestamp = Date.now();
+                  yield { type: 'task_notification', notification, timestamp };
+                  this.conversationHistory.push({
+                    role: 'user',
+                    content: '',
+                    timestamp,
+                    taskNotification: notification,
+                  });
+                }
+                break;
+              }
             }
 
             // Process tool_result blocks from message content

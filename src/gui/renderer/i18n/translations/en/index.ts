@@ -61,6 +61,13 @@ export const enTranslations: Translation = {
     collapse: 'Show less',
   },
 
+  taskNotification: {
+    outputFile: 'Output file',
+    tokens: 'tokens',
+    toolUses: 'tool uses',
+    duration: 'duration',
+  },
+
   // Tool Call
   toolCall: {
     showCode: 'Show Code',

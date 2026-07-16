@@ -9,6 +9,7 @@
 
 import type { MessageListItem, MessageContent, UsageMetadata, ToolProgressEntry } from '../../../preload/preload-types';
 import type { AgentState } from '../../../../core/agents/claude-agent.js';
+import type { TaskNotification } from '../../../../core/utils/task-notification.js';
 
 /**
  * Update (or remove) the status indicator item. The status item is always
@@ -217,6 +218,23 @@ export function applyMessageEvent(
 }
 
 /**
+ * Handle a 'task_notification' event: a background subagent (Agent tool) finished.
+ */
+export function applyTaskNotificationEvent(
+  items: MessageListItem[],
+  event: { notification: TaskNotification; timestamp: number },
+  sessionId: string,
+): MessageListItem[] {
+  const notificationItem: MessageListItem = {
+    type: 'task_notification',
+    id: `${sessionId}-task-notification-${event.timestamp}-${event.notification.taskId}`,
+    timestamp: event.timestamp,
+    taskNotification: event.notification,
+  };
+  return addItemKeepingStatusAtEnd(items, notificationItem);
+}
+
+/**
  * Handle an 'error' event: append a visible error message.
  */
 export function applyErrorEvent(items: MessageListItem[], event: { error: string; details?: string }): MessageListItem[] {
@@ -392,6 +410,7 @@ export interface HistoryEntry {
   tool_responses?: Array<{ tool_call_id: string; output: string; error?: string }>;
   isCompactSummary?: boolean;
   isUsageLimitError?: boolean;
+  taskNotification?: TaskNotification;
 }
 
 /**
@@ -407,6 +426,16 @@ export function buildDisplayItemsFromHistory(
   const items: MessageListItem[] = [];
 
   history.forEach((msg, msgIndex) => {
+    if (msg.taskNotification) {
+      items.push({
+        type: 'task_notification',
+        id: `${sessionId}-task-notification-${msgIndex}`,
+        timestamp: msg.timestamp || Date.now(),
+        taskNotification: msg.taskNotification,
+      });
+      return;
+    }
+
     let displayContent: MessageContent = msg.content;
     let thinkingContent: string | undefined;
 

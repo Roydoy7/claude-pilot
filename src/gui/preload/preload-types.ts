@@ -13,6 +13,7 @@ import type { MessageContent } from '../../core/types/message-types.js';
 import type { ModelInfo, EffortLevel } from '../../core/providers/model-list-manager.js';
 import type { AppSettings } from '../../core/settings/settings-manager.js';
 import type { AgentLoadError } from '../../core/agents/agent-loader.js';
+import type { TaskNotification } from '../../core/utils/task-notification.js';
 
 /**
  * Re-export AgentLoadError for frontend use
@@ -154,7 +155,7 @@ export interface FileTreeNode {
  * Message list item - unified type for messages, tool calls, status indicators, thinking, cancelled, and usage_limit
  */
 export interface MessageListItem {
-  type: 'message' | 'tool_call' | 'status' | 'thinking' | 'cancelled' | 'usage_limit';
+  type: 'message' | 'tool_call' | 'status' | 'thinking' | 'cancelled' | 'usage_limit' | 'task_notification';
   id: string;
   timestamp: number;
 
@@ -182,6 +183,9 @@ export interface MessageListItem {
 
   // Usage limit type fields
   usageLimitMessage?: string;
+
+  // Task notification type fields (background subagent finished)
+  taskNotification?: TaskNotification;
 }
 
 /**

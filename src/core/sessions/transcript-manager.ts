@@ -10,6 +10,7 @@ import path from 'path';
 import os from 'os';
 import type { MessageContent, ContentBlock } from '../types/message-types.js';
 import type { UsageMetadata, HistoryMessage } from '../agents/claude-agent.js';
+import { parseTaskNotifications } from '../utils/task-notification.js';
 
 /**
  * SDK tool use result structure (from Bash, Read, etc.)
@@ -325,6 +326,21 @@ export function readTranscript(claudeSessionId: string, cwd: string): HistoryMes
 
         // Skip system/internal messages (meta messages, command messages, command output)
         if (isSystemMessage(content, entry.isMeta)) {
+          continue;
+        }
+
+        // <task-notification> injections (background subagent finished) - parse into
+        // structured HistoryMessages instead of showing raw XML as a user bubble.
+        if (role === 'user' && typeof content === 'string' && content.includes('<task-notification>')) {
+          const notifications = parseTaskNotifications(content);
+          for (const notification of notifications) {
+            history.push({
+              role: 'user',
+              content: '',
+              timestamp: entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now(),
+              taskNotification: notification,
+            });
+          }
           continue;
         }
 
