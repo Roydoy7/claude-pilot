@@ -25,6 +25,7 @@ import type {
   SDKModelRefusalFallbackMessage,
   SDKTaskStartedMessage,
   SDKTaskProgressMessage,
+  SDKTaskNotificationMessage,
   SDKRateLimitEvent,
 } from '@anthropic-ai/claude-agent-sdk';
 
@@ -186,15 +187,40 @@ function makeModelRefusalFallback(): SDKModelRefusalFallbackMessage {
   } as unknown as SDKModelRefusalFallbackMessage;
 }
 
-function makeTaskStarted(): SDKTaskStartedMessage {
+function makeTaskStarted(toolUseId?: string): SDKTaskStartedMessage {
   return {
     type: 'system',
     subtype: 'task_started',
     task_id: 'task_1',
     description: 'Run a subagent task',
+    tool_use_id: toolUseId,
     uuid: 'uuid-task-started-1',
     session_id: SESSION_ID,
   } as unknown as SDKTaskStartedMessage;
+}
+
+function makeTaskNotification(toolUseId?: string): SDKTaskNotificationMessage {
+  return {
+    type: 'system',
+    subtype: 'task_notification',
+    task_id: 'task_1',
+    tool_use_id: toolUseId,
+    status: 'completed',
+    output_file: '/tmp/task-output.txt',
+    summary: 'Review completed',
+    uuid: 'uuid-task-notification-1',
+    session_id: SESSION_ID,
+  } as unknown as SDKTaskNotificationMessage;
+}
+
+function makeSessionIdle(): SDKMessage {
+  return {
+    type: 'system',
+    subtype: 'session_state_changed',
+    state: 'idle',
+    uuid: 'uuid-session-idle-1',
+    session_id: SESSION_ID,
+  } as unknown as SDKMessage;
 }
 
 function makeTaskProgress(): SDKTaskProgressMessage {
@@ -395,6 +421,40 @@ describe('processQueryMessages - Task tool system messages', () => {
 
     const eventTypes = events.map((event) => event.type);
     expect(eventTypes).toEqual(['state', 'state', 'done']);
+  });
+
+  it('keeps streaming input open across an intermediate result while a background task is active', async () => {
+    const agent = makeAgent();
+    const processMessages = (agent as unknown as { processQueryMessages: ProcessQueryMessages }).processQueryMessages;
+
+    let releaseTask!: () => void;
+    const taskGate = new Promise<void>((resolve) => {
+      releaseTask = resolve;
+    });
+    let inputReleased = false;
+    (agent as unknown as { streamEndResolver: (() => void) | null }).streamEndResolver = () => {
+      inputReleased = true;
+    };
+
+    async function* messages(): AsyncGenerator<SDKMessage, void, unknown> {
+      yield makeTaskStarted('tool-agent-1');
+      yield makeResultSuccess();
+      await taskGate;
+      yield makeTaskNotification('tool-agent-1');
+      yield makeSessionIdle();
+    }
+
+    const events = processMessages.call(agent, messages() as unknown as Query);
+    await events.next(); // initial thinking state
+    const completion = events.next();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(inputReleased).toBe(false);
+
+    releaseTask();
+    await completion;
+    expect(inputReleased).toBe(true);
   });
 });
 

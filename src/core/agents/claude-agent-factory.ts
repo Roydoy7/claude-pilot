@@ -5,6 +5,7 @@
  * Uses Claude Agent SDK instead of LangChain/DeepAgents
  */
 
+import path from 'path';
 import { ClaudeAgent, type ClaudeAgentConfig } from './claude-agent.js';
 import { SessionManager, type Session } from '../sessions/session-manager.js';
 import { authManager } from '../auth/auth-manager.js';
@@ -196,6 +197,25 @@ async function installAgentResources(agentId: string, cwd: string): Promise<void
   await skillManager.initialize();
   await skillManager.installSkillsForAgent(agentId, cwd);
   await skillManager.installSubagentsForAgent(agentId, cwd);
+
+  // installSkillsForAgent deliberately continues after individual copy
+  // failures. Agent creation must not silently continue with a subagent whose
+  // declared skills are absent, because the SDK can only preload skills that
+  // exist under cwd/.claude/skills.
+  const agentDef = await getAgentDefinition(agentId);
+  const missingSkills: string[] = [];
+  for (const skillPath of agentDef.defaultSkills) {
+    const skillName = path.basename(skillPath);
+    if (!(await skillManager.isSkillInstalled(cwd, skillName))) {
+      missingSkills.push(skillName);
+    }
+  }
+  if (missingSkills.length > 0) {
+    throw new Error(
+      `Failed to install required skills for agent ${agentId}: ${missingSkills.join(', ')} ` +
+      `(expected under ${path.join(cwd, '.claude', 'skills')})`,
+    );
+  }
 }
 
 /**

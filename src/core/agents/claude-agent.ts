@@ -16,6 +16,10 @@ import type {
   SDKAuthStatusMessage,
   SDKCommandsChangedMessage,
   SDKFilesPersistedEvent,
+  SDKTaskNotificationMessage,
+  SDKTaskProgressMessage,
+  SDKTaskStartedMessage,
+  SDKTaskUpdatedMessage,
   Options,
   PermissionMode,
   CanUseTool,
@@ -589,6 +593,11 @@ export class ClaudeAgent {
     // messages (identified by parent_tool_use_id) can be attributed back to
     // the tool call that spawned them, for nested UI display.
     const subagentInfo = new Map<string, { name: string; lastToolName?: string; elapsedSeconds?: number }>();
+    // A result message marks a model turn boundary, not necessarily the end of
+    // the streaming-input session. Background agents keep using the same CLI
+    // control channel after that result, so stdin must remain open until every
+    // SDK task has settled and the session reports itself idle.
+    const activeTaskIds = new Set<string>();
 
     try {
       for await (const chunk of queryInstance) {
@@ -984,12 +993,11 @@ export class ClaudeAgent {
             const resultMessage = chunk as SDKResultMessage;
             terminalReason = resultMessage.terminal_reason;
 
-            // Signal the input stream generator to end
-            // This allows SDK to properly close stdin after conversation ends
-            if (this.streamEndResolver) {
-              this.streamEndResolver();
-              this.streamEndResolver = null;
-            }
+            // Do not close the streaming input here. Background Agent calls
+            // emit an intermediate result before their tools/hooks have
+            // finished. Closing stdin at this point breaks subsequent MCP and
+            // permission control requests with "Stream closed". The
+            // session_state_changed/idle event below is the authoritative end.
 
             // Update session checkpoint metadata on result
             if (resultMessage.session_id) {
@@ -1169,11 +1177,48 @@ export class ClaudeAgent {
                 break;
               }
 
-              case 'task_notification':
-              case 'task_started':
-              case 'task_updated':
+              case 'task_started': {
+                const task = chunk as SDKTaskStartedMessage;
+                activeTaskIds.add(task.task_id);
+                if (task.tool_use_id && !subagentInfo.has(task.tool_use_id)) {
+                  subagentInfo.set(task.tool_use_id, {
+                    name: task.subagent_type || task.description || 'agent',
+                  });
+                }
+                break;
+              }
+
               case 'task_progress': {
-                // Task tool UI rendering is handled separately (TodoWrite -> Task migration)
+                const task = chunk as SDKTaskProgressMessage;
+                activeTaskIds.add(task.task_id);
+                if (task.tool_use_id) {
+                  const info = subagentInfo.get(task.tool_use_id) ?? {
+                    name: task.subagent_type || task.description || 'agent',
+                  };
+                  info.lastToolName = task.last_tool_name;
+                  info.elapsedSeconds = Math.round(task.usage.duration_ms / 1000);
+                  subagentInfo.set(task.tool_use_id, info);
+                }
+                break;
+              }
+
+              case 'task_notification': {
+                const task = chunk as SDKTaskNotificationMessage;
+                activeTaskIds.delete(task.task_id);
+                if (task.tool_use_id) {
+                  subagentInfo.delete(task.tool_use_id);
+                }
+                // The injected user <task-notification> contains the richer
+                // display payload and is handled above; this system message is
+                // used only for lifecycle tracking.
+                break;
+              }
+
+              case 'task_updated': {
+                const task = chunk as SDKTaskUpdatedMessage;
+                if (task.patch.status && ['completed', 'failed', 'killed'].includes(task.patch.status)) {
+                  activeTaskIds.delete(task.task_id);
+                }
                 break;
               }
 
@@ -1184,7 +1229,13 @@ export class ClaudeAgent {
               }
 
               case 'session_state_changed': {
-                // Authoritative turn-over signal; thinking state is currently derived from the message stream
+                // A result can be intermediate while background tasks run.
+                // Idle with no live tasks is the safe point to close stdin and
+                // let the SDK subprocess finish normally.
+                if (chunk.state === 'idle' && activeTaskIds.size === 0 && this.streamEndResolver) {
+                  this.streamEndResolver();
+                  this.streamEndResolver = null;
+                }
                 break;
               }
 
@@ -1297,6 +1348,12 @@ export class ClaudeAgent {
         };
       }
     } finally {
+      // Also release on abnormal SDK termination so the input generator cannot
+      // retain an unresolved promise after its consumer has gone away.
+      if (this.streamEndResolver) {
+        this.streamEndResolver();
+        this.streamEndResolver = null;
+      }
       yield { type: 'state', state: { thinking: false } };
       yield { type: 'done', usage: finalUsage, terminalReason };
     }
