@@ -42,6 +42,7 @@ import {
   ApprovalWaitingIcon,
   AnimatedApprovalText,
   PythonCodeDisplay,
+  SubagentActivityLog,
 } from './tool-renderers';
 import type { ToolConfig } from './tool-renderers';
 
@@ -148,7 +149,7 @@ export function ToolCallItem({
     return null;
   }
 
-  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress } = item;
+  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress, subagentActivity } = item;
 
   // Get tool configuration first (needed for defaultExpanded)
   const toolConfig = getToolConfig(toolCall.name);
@@ -254,6 +255,11 @@ export function ToolCallItem({
       ) : (
         // Default rendering for other tools
         hasDetails && (showDetails || showResult) && toolConfig.renderContent(toolCall.args, showResult, response, showDetails)
+      )}
+
+      {/* Nested subagent activity timeline (Agent/Task tool calls) */}
+      {subagentActivity && subagentActivity.length > 0 && (
+        <SubagentActivityLog activity={subagentActivity} isRunning={!response} />
       )}
 
       {/* Approval buttons (if needed) - with animated text */}

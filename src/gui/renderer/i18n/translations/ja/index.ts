@@ -98,6 +98,8 @@ export const jaTranslations: Translation = {
     executingTool: (toolName: string) => `${toolName}を実行中...`,
     waitingForApproval: 'ツールの承認待ち',
     messageQueued: 'メッセージがキュー中...',
+    subagentRunning: (name: string, action?: string, elapsedSeconds?: number) =>
+      `サブエージェント ${name} 実行中${action ? ` · 最新の操作: ${action}` : ''}${elapsedSeconds ? ` (${elapsedSeconds}秒)` : ''}`,
     commands: {
       compact: '会話を圧縮中...',
       clear: '会話をクリア中...',

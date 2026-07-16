@@ -98,6 +98,8 @@ export const zhTranslations: Translation = {
     executingTool: (toolName: string) => `正在执行 ${toolName}...`,
     waitingForApproval: '等待工具审批',
     messageQueued: '消息已排队，请等待...',
+    subagentRunning: (name: string, action?: string, elapsedSeconds?: number) =>
+      `子代理 ${name} 运行中${action ? ` · 最近动作: ${action}` : ''}${elapsedSeconds ? ` · 已运行 ${elapsedSeconds}s` : ''}`,
     commands: {
       compact: '正在压缩对话...',
       clear: '正在清除对话...',

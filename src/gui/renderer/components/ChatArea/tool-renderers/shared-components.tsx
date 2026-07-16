@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { ToolProgressEntry } from '../../../../preload/preload-types';
+import type { ToolProgressEntry, SubagentActivityEntry } from '../../../../preload/preload-types';
 
 // ============================================
 // Approval Waiting Icon
@@ -133,6 +133,88 @@ export function CopyButton({ text }: { text: string }) {
     >
       {copied ? '✓ Copied' : '📋 Copy'}
     </button>
+  );
+}
+
+// ============================================
+// Subagent Activity Log Component
+// ============================================
+
+interface SubagentActivityLogProps {
+  activity: SubagentActivityEntry[];
+  isRunning: boolean;
+}
+
+/**
+ * Nested activity timeline for a running Agent/Task tool call - shows the
+ * subagent's recent tool calls / text / thinking without flattening them
+ * into the main message list. Auto-expanded while running (collapsed to a
+ * toggle once the subagent finishes).
+ */
+export function SubagentActivityLog({ activity, isRunning }: SubagentActivityLogProps) {
+  const [expanded, setExpanded] = useState(true);
+  if (!activity || activity.length === 0) return null;
+
+  const visibleEntries = isRunning ? activity.slice(-3) : activity;
+  const showEntries = isRunning || expanded;
+
+  return (
+    <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
+      {!isRunning && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '0.25rem 0',
+            cursor: 'pointer',
+            color: 'var(--text-secondary)',
+            fontSize: '0.7rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+          }}
+        >
+          <span style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▶</span>
+          <span>Subagent Activity ({activity.length} entries)</span>
+        </button>
+      )}
+      {showEntries && (
+        <div
+          style={{
+            padding: '0.5rem 0.75rem',
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: '4px',
+            border: '1px solid var(--border)',
+            fontSize: '0.7rem',
+            fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
+            maxHeight: '150px',
+            overflow: 'auto',
+            marginTop: isRunning ? 0 : '0.25rem',
+          }}
+        >
+          {visibleEntries.map((entry) => {
+            const icon = entry.kind === 'tool' ? '🔧' : entry.kind === 'thinking' ? '💭' : '💬';
+            const color = entry.isError ? 'var(--error)' : entry.kind === 'text' ? 'var(--text-primary)' : 'var(--text-secondary)';
+            const label = entry.kind === 'tool'
+              ? `${entry.toolName}${entry.toolArgsSummary ? `: ${entry.toolArgsSummary}` : ''}`
+              : (entry.text || '').slice(0, 200);
+
+            return (
+              <div key={entry.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.125rem', color }}>
+                <span>{icon}</span>
+                <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{label}</span>
+              </div>
+            );
+          })}
+          {isRunning && activity.length > visibleEntries.length && (
+            <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.25rem' }}>
+              ... {activity.length - visibleEntries.length} earlier entries
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

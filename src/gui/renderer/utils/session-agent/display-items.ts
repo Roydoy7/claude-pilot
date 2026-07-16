@@ -7,9 +7,35 @@
  * no mutation, no side effects.
  */
 
-import type { MessageListItem, MessageContent, UsageMetadata, ToolProgressEntry } from '../../../preload/preload-types';
+import type { MessageListItem, MessageContent, UsageMetadata, ToolProgressEntry, SubagentActivityEntry } from '../../../preload/preload-types';
 import type { AgentState } from '../../../../core/agents/claude-agent.js';
 import type { TaskNotification } from '../../../../core/utils/task-notification.js';
+
+/** Cap on how many nested activity entries a subagent card keeps, to avoid unbounded growth on long-running agents. */
+const MAX_SUBAGENT_ACTIVITY_ENTRIES = 30;
+
+/**
+ * Append a nested activity entry to the Agent/Task tool_call item identified
+ * by `parentToolCallId`. Returns the unchanged array if no such parent exists
+ * yet (defensive: caller should fall back to flat rendering in that case).
+ */
+function appendSubagentActivity(
+  items: MessageListItem[],
+  parentToolCallId: string,
+  entry: SubagentActivityEntry,
+): MessageListItem[] | null {
+  const parentIndex = items.findIndex((item) => item.type === 'tool_call' && item.toolCall?.id === parentToolCallId);
+  if (parentIndex === -1) {
+    return null;
+  }
+
+  const parent = items[parentIndex];
+  const nextActivity = [...(parent.subagentActivity ?? []), entry].slice(-MAX_SUBAGENT_ACTIVITY_ENTRIES);
+
+  const next = [...items];
+  next[parentIndex] = { ...parent, subagentActivity: nextActivity };
+  return next;
+}
 
 /**
  * Update (or remove) the status indicator item. The status item is always
@@ -93,9 +119,18 @@ export function upsertStreamingMessage(items: MessageListItem[], message: Messag
 /**
  * Handle a tool_start event: parse args and add a new tool_call item.
  */
+/** Short one-line summary of a nested tool call's args, for the subagent activity timeline. */
+function summarizeToolArgs(args: Record<string, unknown>): string | undefined {
+  const candidate = args.file_path ?? args.path ?? args.command ?? args.pattern ?? args.url ?? args.description;
+  if (typeof candidate === 'string') {
+    return candidate.length > 80 ? `${candidate.slice(0, 80)}...` : candidate;
+  }
+  return undefined;
+}
+
 export function applyToolStart(
   items: MessageListItem[],
-  event: { toolCallId: string; toolName: string; args: Record<string, unknown> },
+  event: { toolCallId: string; toolName: string; args: Record<string, unknown>; parentToolCallId?: string },
   pendingApprovals: Map<string, string>,
 ): MessageListItem[] {
   const argsValue: unknown = event.args;
@@ -113,6 +148,21 @@ export function applyToolStart(
     parsedArgs = { _error: 'Invalid argument type' };
   }
 
+  if (event.parentToolCallId) {
+    const nested = appendSubagentActivity(items, event.parentToolCallId, {
+      id: `subagent-activity-${event.toolCallId}`,
+      kind: 'tool',
+      timestamp: Date.now(),
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      toolArgsSummary: summarizeToolArgs(parsedArgs),
+    });
+    if (nested) {
+      return nested;
+    }
+    // Parent card not found (e.g. arrived out of order) - fall back to flat rendering below.
+  }
+
   const toolStartItem: MessageListItem = {
     type: 'tool_call',
     id: `tool-${event.toolCallId}`,
@@ -123,6 +173,7 @@ export function applyToolStart(
       args: parsedArgs,
     },
     needsApproval: pendingApprovals.has(event.toolCallId),
+    parentToolCallId: event.parentToolCallId,
   };
 
   return addItemKeepingStatusAtEnd(items, toolStartItem);
@@ -134,8 +185,25 @@ export function applyToolStart(
  */
 export function applyToolEnd(
   items: MessageListItem[],
-  event: { toolCallId: string; output: string; error?: string },
+  event: { toolCallId: string; output: string; error?: string; parentToolCallId?: string },
 ): MessageListItem[] {
+  if (event.parentToolCallId) {
+    const parentIndex = items.findIndex((item) => item.type === 'tool_call' && item.toolCall?.id === event.parentToolCallId);
+    if (parentIndex !== -1) {
+      const parent = items[parentIndex];
+      const activityIndex = (parent.subagentActivity ?? []).findIndex((entry) => entry.toolCallId === event.toolCallId);
+      if (activityIndex === -1) {
+        return items;
+      }
+      const nextActivity = [...parent.subagentActivity!];
+      nextActivity[activityIndex] = { ...nextActivity[activityIndex], isError: !!event.error };
+      const next = [...items];
+      next[parentIndex] = { ...parent, subagentActivity: nextActivity };
+      return next;
+    }
+    // Parent card not found - fall through to flat lookup as a defensive fallback.
+  }
+
   const index = items.findIndex((item) => item.type === 'tool_call' && item.toolCall?.id === event.toolCallId);
   if (index === -1) {
     return items;
@@ -196,6 +264,42 @@ export function applyToolProgress(
     progress: [...(existingItem.progress ?? []), progressEntry],
   };
   return next;
+}
+
+/**
+ * Handle a 'subagent_text' event: a running subagent produced a text block.
+ * Nests it into the parent Agent/Task card's activity timeline; dropped
+ * entirely if the parent card can't be found (no flat fallback - subagent
+ * text was never meant to appear in the main message stream).
+ */
+export function applySubagentText(
+  items: MessageListItem[],
+  event: { parentToolCallId: string; text: string },
+): MessageListItem[] {
+  const nested = appendSubagentActivity(items, event.parentToolCallId, {
+    id: `subagent-activity-text-${event.parentToolCallId}-${Date.now()}`,
+    kind: 'text',
+    timestamp: Date.now(),
+    text: event.text,
+  });
+  return nested ?? items;
+}
+
+/**
+ * Handle a nested 'thinking' event (parentToolCallId set): a running subagent's
+ * extended thinking block. Nests into the parent card like applySubagentText.
+ */
+export function applySubagentThinking(
+  items: MessageListItem[],
+  event: { parentToolCallId: string; thinking: string },
+): MessageListItem[] {
+  const nested = appendSubagentActivity(items, event.parentToolCallId, {
+    id: `subagent-activity-thinking-${event.parentToolCallId}-${Date.now()}`,
+    kind: 'thinking',
+    timestamp: Date.now(),
+    text: event.thinking,
+  });
+  return nested ?? items;
 }
 
 /**

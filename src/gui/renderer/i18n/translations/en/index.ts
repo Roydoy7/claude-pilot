@@ -98,6 +98,8 @@ export const enTranslations: Translation = {
     executingTool: (toolName: string) => `Executing ${toolName}...`,
     waitingForApproval: 'Waiting for tool approval',
     messageQueued: 'Message queued, waiting...',
+    subagentRunning: (name: string, action?: string, elapsedSeconds?: number) =>
+      `Subagent ${name} running${action ? ` — ${action}` : ''}${elapsedSeconds ? ` (${elapsedSeconds}s)` : ''}`,
     commands: {
       compact: 'Compacting conversation...',
       clear: 'Clearing conversation...',

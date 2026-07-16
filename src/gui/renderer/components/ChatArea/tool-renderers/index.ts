@@ -91,6 +91,7 @@ export {
   ApprovalWaitingIcon,
   AnimatedApprovalText,
   ProgressLog,
+  SubagentActivityLog,
   CopyButton,
 } from './shared-components';
 

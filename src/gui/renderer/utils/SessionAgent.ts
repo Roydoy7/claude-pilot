@@ -22,6 +22,8 @@ import {
   applyToolStart,
   applyToolEnd,
   applyToolProgress,
+  applySubagentText,
+  applySubagentThinking,
   applyMessageEvent,
   applyTaskNotificationEvent,
   applyErrorEvent,
@@ -154,11 +156,20 @@ export class SessionAgent {
       }
 
       case 'thinking': {
-        const thinkingItem = createThinkingItem(this.sessionId, event.thinking);
-        this.displayItems = addItemKeepingStatusAtEnd(this.displayItems, thinkingItem);
+        if (event.parentToolCallId) {
+          this.displayItems = applySubagentThinking(this.displayItems, { parentToolCallId: event.parentToolCallId, thinking: event.thinking });
+        } else {
+          const thinkingItem = createThinkingItem(this.sessionId, event.thinking);
+          this.displayItems = addItemKeepingStatusAtEnd(this.displayItems, thinkingItem);
+        }
         this.notifyDisplayItemsChanged();
         break;
       }
+
+      case 'subagent_text':
+        this.displayItems = applySubagentText(this.displayItems, event);
+        this.notifyDisplayItemsChanged();
+        break;
 
       case 'thinking_tokens': {
         const next = updateThinkingTokens(this.displayItems, event.estimatedTokens);

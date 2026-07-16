@@ -262,12 +262,13 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
   const state = item.agentState;
 
   // Check if there's anything to display
-  const hasThinking = state.thinking;
+  const hasSubagent = state.subagent !== undefined;
+  const hasThinking = state.thinking && !hasSubagent;
   const hasTool = state.tool !== undefined;
   const hasCommand = state.command !== undefined && state.command.status === 'running';
   const hasQueued = state.queued === true;
 
-  if (!hasThinking && !hasTool && !hasCommand && !hasQueued) {
+  if (!hasThinking && !hasTool && !hasCommand && !hasQueued && !hasSubagent) {
     return null; // Idle state - nothing to display
   }
 
@@ -347,6 +348,28 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
               <AnimatedText text={t.status.waitingForApproval} />
             </>
           )}
+        </div>
+      )}
+
+      {/* Subagent state indicator - takes over from the generic thinking line while a subagent runs */}
+      {hasSubagent && state.subagent && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span className="status-icon-gear">
+            <GearIcon />
+          </span>
+          <AnimatedText
+            text={t.status.subagentRunning(
+              state.subagent.name,
+              state.subagent.lastToolName,
+              state.subagent.elapsedSeconds
+            )}
+          />
         </div>
       )}
 

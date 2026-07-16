@@ -142,6 +142,22 @@ export interface ToolProgressEntry {
 }
 
 /**
+ * A single activity entry inside a running subagent (Agent/Task tool call),
+ * displayed as a nested timeline within the parent tool_call card instead of
+ * flattened into the main message list.
+ */
+export interface SubagentActivityEntry {
+  id: string;
+  kind: 'tool' | 'text' | 'thinking';
+  timestamp: number;
+  toolCallId?: string;
+  toolName?: string;
+  toolArgsSummary?: string;
+  isError?: boolean;
+  text?: string;
+}
+
+/**
  * File tree node for workspace browser
  */
 export interface FileTreeNode {
@@ -171,6 +187,12 @@ export interface MessageListItem {
   wasRejected?: boolean;
   wasCancelled?: boolean;
   progress?: ToolProgressEntry[];
+  // Set on nested tool calls made by a subagent (Agent/Task tool) - points at
+  // the parent tool_call item's id so the reducer can fold this activity into it
+  // instead of rendering it as a top-level item.
+  parentToolCallId?: string;
+  // Set on the parent Agent/Task tool_call item: live nested activity timeline.
+  subagentActivity?: SubagentActivityEntry[];
 
   // Status type fields
   agentState?: AgentState;

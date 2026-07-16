@@ -116,6 +116,14 @@ export interface AgentState {
   };
   // Message is queued (another request is being processed)
   queued?: boolean;
+  // A subagent (Agent/Task tool) is currently running - lets the UI show
+  // what it's doing instead of a generic "AI is thinking"
+  subagent?: {
+    toolCallId: string;
+    name: string;
+    lastToolName?: string;
+    elapsedSeconds?: number;
+  };
 }
 
 /**
@@ -133,11 +141,12 @@ export interface TodoItem {
 export type StreamEvent =
   | { type: 'state'; state: AgentState }
   | { type: 'text_delta'; text: string; usage?: UsageMetadata }
-  | { type: 'thinking'; thinking: string }
+  | { type: 'thinking'; thinking: string; parentToolCallId?: string }
   | { type: 'thinking_tokens'; estimatedTokens: number }
-  | { type: 'tool_start'; toolCallId: string; toolName: string; args: Record<string, unknown> }
-  | { type: 'tool_end'; toolName: string; toolCallId: string; output: string; error?: string }
-  | { type: 'tool_progress'; toolName: string; toolCallId?: string; progressType: string; message: string; timestamp: number }
+  | { type: 'tool_start'; toolCallId: string; toolName: string; args: Record<string, unknown>; parentToolCallId?: string }
+  | { type: 'tool_end'; toolName: string; toolCallId: string; output: string; error?: string; parentToolCallId?: string }
+  | { type: 'tool_progress'; toolName: string; toolCallId?: string; progressType: string; message: string; timestamp: number; parentToolCallId?: string }
+  | { type: 'subagent_text'; parentToolCallId: string; text: string }
   | { type: 'interrupt'; interruptId: string; toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> }
   | { type: 'error'; error: string; details?: string }
   | { type: 'usage_limit'; message: string }
@@ -576,6 +585,11 @@ export class ClaudeAgent {
     let isCompacting = false;
     let usageLimitReported = false;
 
+    // Tracks in-flight subagents (Agent/Task tool calls) so nested SDK
+    // messages (identified by parent_tool_use_id) can be attributed back to
+    // the tool call that spawned them, for nested UI display.
+    const subagentInfo = new Map<string, { name: string; lastToolName?: string; elapsedSeconds?: number }>();
+
     try {
       for await (const chunk of queryInstance) {
         if (this.isCancelled()) {
@@ -607,6 +621,84 @@ export class ClaudeAgent {
 
           case 'assistant': {
             const assistantMessage = chunk as SDKAssistantMessage;
+            const subagentParentId = assistantMessage.parent_tool_use_id ?? undefined;
+
+            if (subagentParentId) {
+              // Nested message from a running subagent (Agent/Task tool call).
+              // Attribute its activity back to the parent tool call instead of
+              // mixing it into the main thread's text/usage/checkpoint state.
+              if (!subagentInfo.has(subagentParentId)) {
+                subagentInfo.set(subagentParentId, { name: assistantMessage.subagent_type || 'agent' });
+              }
+              const info = subagentInfo.get(subagentParentId)!;
+
+              const content = assistantMessage.message?.content;
+              if (Array.isArray(content)) {
+                for (const block of content) {
+                  switch (block.type) {
+                    case 'thinking': {
+                      if ('thinking' in block) {
+                        const thinkingBlock = block as { type: 'thinking'; thinking: string };
+                        yield { type: 'thinking', thinking: thinkingBlock.thinking, parentToolCallId: subagentParentId };
+                      }
+                      break;
+                    }
+                    case 'text': {
+                      if (block.text) {
+                        yield { type: 'subagent_text', parentToolCallId: subagentParentId, text: block.text };
+                      }
+                      break;
+                    }
+                    case 'tool_use': {
+                      const toolUseBlock = block as { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+                      info.lastToolName = toolUseBlock.name;
+                      yield {
+                        type: 'tool_start',
+                        toolCallId: toolUseBlock.id,
+                        toolName: toolUseBlock.name,
+                        args: toolUseBlock.input,
+                        parentToolCallId: subagentParentId,
+                      };
+                      break;
+                    }
+                    case 'server_tool_use': {
+                      const serverToolBlock = block as { type: 'server_tool_use'; id: string; name: string; input: Record<string, unknown> };
+                      info.lastToolName = serverToolBlock.name;
+                      yield {
+                        type: 'tool_start',
+                        toolCallId: serverToolBlock.id,
+                        toolName: `server:${serverToolBlock.name}`,
+                        args: serverToolBlock.input,
+                        parentToolCallId: subagentParentId,
+                      };
+                      break;
+                    }
+                    case 'web_search_tool_result': {
+                      const webSearchBlock = block as { type: 'web_search_tool_result'; tool_use_id: string; content: unknown };
+                      yield {
+                        type: 'tool_end',
+                        toolName: 'server:web_search',
+                        toolCallId: webSearchBlock.tool_use_id,
+                        output: JSON.stringify(webSearchBlock.content),
+                        parentToolCallId: subagentParentId,
+                      };
+                      break;
+                    }
+                    // Unknown block types are silently ignored
+                  }
+                }
+              }
+
+              yield {
+                type: 'state',
+                state: {
+                  thinking: true,
+                  subagent: { toolCallId: subagentParentId, name: info.name, lastToolName: info.lastToolName, elapsedSeconds: info.elapsedSeconds },
+                },
+              };
+              break;
+            }
+
             yield { type: 'checkpoint' };
 
             // Update session checkpoint metadata
@@ -676,6 +768,13 @@ export class ClaudeAgent {
                       // Note: tool_start was already sent from stream_event with empty args
                       // Here we have the complete args, so update the tool call
                       const toolUseBlock = block as { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+                      // Track Agent/Task tool calls so nested subagent messages (identified
+                      // by parent_tool_use_id) and progress heartbeats can be attributed back.
+                      if (toolUseBlock.name === 'Agent' || toolUseBlock.name === 'Task') {
+                        subagentInfo.set(toolUseBlock.id, {
+                          name: String(toolUseBlock.input?.subagent_type || toolUseBlock.name),
+                        });
+                      }
                       // Yield tool_start with complete args (overwrites the earlier empty-args version)
                       yield {
                         type: 'tool_start',
@@ -732,6 +831,7 @@ export class ClaudeAgent {
 
           case 'user': {
             const userMessage = chunk as SDKUserMessage;
+            const subagentParentId = userMessage.parent_tool_use_id ?? undefined;
 
             // Check if this is a compact summary message
             // SDK may include isCompactSummary flag, or the content may start with the compact summary prefix
@@ -830,16 +930,30 @@ export class ClaudeAgent {
                     toolCallId: toolUseId,
                     output: isError ? '' : output,
                     error: errorContent,
+                    parentToolCallId: subagentParentId,
                   };
+
+                  // A top-level Agent/Task tool call just finished - stop tracking it.
+                  if (!subagentParentId && subagentInfo.has(toolUseId)) {
+                    subagentInfo.delete(toolUseId);
+                  }
                 }
               }
-              yield { type: 'state', state: { thinking: true } };
+
+              const activeSubagent = subagentParentId ? subagentInfo.get(subagentParentId) : undefined;
+              yield {
+                type: 'state',
+                state: activeSubagent
+                  ? { thinking: true, subagent: { toolCallId: subagentParentId!, name: activeSubagent.name, lastToolName: activeSubagent.lastToolName, elapsedSeconds: activeSubagent.elapsedSeconds } }
+                  : { thinking: true },
+              };
             }
             break;
           }
 
           case 'tool_progress': {
             const progressMessage = chunk as SDKToolProgressMessage;
+            const parentToolCallId = progressMessage.parent_tool_use_id ?? undefined;
             yield {
               type: 'tool_progress',
               toolName: progressMessage.tool_name,
@@ -847,7 +961,22 @@ export class ClaudeAgent {
               progressType: 'progress',
               message: `Elapsed: ${progressMessage.elapsed_time_seconds}s`,
               timestamp: Date.now(),
+              parentToolCallId,
             };
+
+            // Heartbeat for a running Agent/Task tool call itself - refresh its
+            // elapsed time so the status line can show "running for Xs".
+            if (!parentToolCallId && subagentInfo.has(progressMessage.tool_use_id)) {
+              const info = subagentInfo.get(progressMessage.tool_use_id)!;
+              info.elapsedSeconds = progressMessage.elapsed_time_seconds;
+              yield {
+                type: 'state',
+                state: {
+                  thinking: true,
+                  subagent: { toolCallId: progressMessage.tool_use_id, name: info.name, lastToolName: info.lastToolName, elapsedSeconds: info.elapsedSeconds },
+                },
+              };
+            }
             break;
           }
 
@@ -1262,6 +1391,9 @@ export class ClaudeAgent {
         // decisions are still gated by our own canUseTool callback based on the active permissionMode
         allowDangerouslySkipPermissions: true,
         settingSources: this.settingSources, // Use instance variable (may be updated via setSettingSources)
+        // Forward subagent (Agent/Task tool) text/thinking blocks with parent_tool_use_id set,
+        // so the UI can render a nested activity timeline instead of a generic "AI is thinking".
+        forwardSubagentText: true,
         canUseTool: canUseToolCallback,
         hooks: {
           // PreToolUse: Auto-inject workingDirectory for all tools
