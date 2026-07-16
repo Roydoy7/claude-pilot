@@ -20,6 +20,8 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { app } from 'electron';
+import * as yaml from 'js-yaml';
+import type { AgentDefinition as SdkAgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { MCP_SERVER_REGISTRY, type McpServer } from './mcp-server-registry.js';
 import { loadLocalToolsServer } from './local-tools.js';
 import { getErrorMessage } from '../errors.js';
@@ -38,6 +40,8 @@ export interface AgentDefinition {
   defaultSkills: string[];
   /** Absolute paths to this agent's default Claude subagent definitions */
   defaultSubagents: string[];
+  /** Parsed subagent definitions keyed by name, passed to SDK `agents` option */
+  subagentDefs: Record<string, SdkAgentDefinition>;
 }
 
 /**
@@ -190,6 +194,83 @@ function resolveMcpServers(mcpTools: string[]): Record<string, McpServer> {
 }
 
 /**
+ * Parse a Claude subagent .md file (`agents/<name>.md`) into an SDK
+ * AgentDefinition. Bad frontmatter (missing `name:`/`description:`, invalid
+ * YAML, or a `name:` that doesn't match the file name) throws so the caller
+ * surfaces it as a load error instead of the SDK silently ignoring the file.
+ */
+function parseSubagentDefinition(content: string, filePath: string): { name: string; definition: SdkAgentDefinition } {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) {
+    throw new Error(`Missing frontmatter block in subagent file ${filePath}`);
+  }
+
+  const [, frontmatterText, body] = match;
+  let frontmatter: unknown;
+  try {
+    frontmatter = yaml.load(frontmatterText);
+  } catch (err) {
+    throw new Error(`Invalid YAML frontmatter in subagent file ${filePath}: ${getErrorMessage(err)}`);
+  }
+
+  if (typeof frontmatter !== 'object' || frontmatter === null) {
+    throw new Error(`Frontmatter in subagent file ${filePath} must be a YAML mapping`);
+  }
+
+  const fm = frontmatter as Record<string, unknown>;
+  const name = fm.name;
+  const description = fm.description;
+
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error(`Subagent file ${filePath} is missing required frontmatter field "name"`);
+  }
+  if (typeof description !== 'string' || !description.trim()) {
+    throw new Error(`Subagent file ${filePath} is missing required frontmatter field "description"`);
+  }
+
+  const expectedName = path.basename(filePath, '.md');
+  if (name !== expectedName) {
+    throw new Error(
+      `Subagent file ${filePath} has name "${name}" which does not match its file name "${expectedName}.md"`,
+    );
+  }
+
+  const prompt = body.trim();
+  if (!prompt) {
+    throw new Error(`Subagent file ${filePath} has an empty prompt body`);
+  }
+
+  const definition: SdkAgentDefinition = { description, prompt };
+
+  if (typeof fm.tools === 'string') {
+    definition.tools = fm.tools.split(',').map((t) => t.trim()).filter(Boolean);
+  }
+  if (typeof fm.model === 'string' && fm.model !== 'inherit') {
+    definition.model = fm.model;
+  }
+  if (typeof fm.maxTurns === 'number') {
+    definition.maxTurns = fm.maxTurns;
+  }
+  if (Array.isArray(fm.skills)) {
+    definition.skills = fm.skills.filter((s): s is string => typeof s === 'string');
+  }
+  if (Array.isArray(fm.disallowedTools)) {
+    definition.disallowedTools = fm.disallowedTools.filter((s): s is string => typeof s === 'string');
+  }
+  if (typeof fm.permissionMode === 'string') {
+    definition.permissionMode = fm.permissionMode as SdkAgentDefinition['permissionMode'];
+  }
+  if (typeof fm.effort === 'string') {
+    definition.effort = fm.effort as SdkAgentDefinition['effort'];
+  }
+  if (typeof fm.background === 'boolean') {
+    definition.background = fm.background;
+  }
+
+  return { name, definition };
+}
+
+/**
  * Load a single agent definition from its folder
  */
 async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<AgentDefinition> {
@@ -218,6 +299,13 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
     .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
     .map((entry) => path.join(subagentsDir, entry.name));
 
+  const subagentDefs: Record<string, SdkAgentDefinition> = {};
+  for (const subagentPath of defaultSubagents) {
+    const subagentContent = await fs.readFile(subagentPath, 'utf-8');
+    const { name, definition } = parseSubagentDefinition(subagentContent, subagentPath);
+    subagentDefs[name] = definition;
+  }
+
   const mcpServers = resolveMcpServers(mcpTools);
   const localTools = await loadLocalToolsServer(dir, id);
   if (localTools.server) {
@@ -236,6 +324,7 @@ async function loadAgentDefinition(agentDefsPath: string, id: string): Promise<A
     autoApprovedMcpTools: [...safeMcpTools, ...localTools.safeToolNames],
     defaultSkills,
     defaultSubagents,
+    subagentDefs,
   };
 }
 

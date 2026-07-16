@@ -116,6 +116,10 @@ export async function createAgentFromSession(
     throw new Error(`Session ${sessionId} not found`);
   }
 
+  // Install even on a cache hit, so agent-defs changes (new/edited subagents)
+  // stay synced to {cwd}/.claude/agents without needing forceRecreate.
+  await installAgentResources(session.agentId, session.cwd);
+
   if (!forceRecreate) {
     const cachedAgent = getCachedAgent(sessionId);
     if (cachedAgent) {
@@ -164,6 +168,7 @@ export async function createAgentFromSessionData(
     allowedTools: [...agentDef.safeTools], // Safe tools auto-approved (bypass canUseTool)
     autoApprovedMcpTools: [...agentDef.autoApprovedMcpTools], // MCP tools auto-approved
     mcpServers: agentDef.mcpServers, // Custom MCP servers for Python and other tools
+    agents: agentDef.subagentDefs, // Programmatically registered subagents (reliable, order-independent)
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
     permissionMode: session.permissionMode ?? 'default',
@@ -176,14 +181,21 @@ export async function createAgentFromSessionData(
     agentConfig.effort = session.effortLevel;
   }
 
-  // Install skills and project-scoped Claude subagents for this host agent.
-  const skillManager = SkillManager.getInstance();
-  await skillManager.initialize();
-  await skillManager.installSkillsForAgent(session.agentId, session.cwd);
-  await skillManager.installSubagentsForAgent(session.agentId, session.cwd);
-
   // Create and return agent
   return new ClaudeAgent(agentConfig, session.id, session.cwd, session.claudeSessionId);
+}
+
+/**
+ * Install skills and project-scoped Claude subagents for a host agent into
+ * {cwd}/.claude/. Copies are idempotent, so this is cheap to call on every
+ * agent creation path (including cache hits) to keep them in sync with
+ * agent-defs changes.
+ */
+async function installAgentResources(agentId: string, cwd: string): Promise<void> {
+  const skillManager = SkillManager.getInstance();
+  await skillManager.initialize();
+  await skillManager.installSkillsForAgent(agentId, cwd);
+  await skillManager.installSubagentsForAgent(agentId, cwd);
 }
 
 /**
@@ -200,6 +212,8 @@ export async function createNewAgent(
 
   // Create new session (provider is always Claude now)
   const session = sessionManager.createSession(title, agentId, modelName, cwd, effortLevel);
+
+  await installAgentResources(agentId, cwd);
 
   // Create agent from session
   const agent = await createAgentFromSessionData(session);
