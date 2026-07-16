@@ -149,7 +149,7 @@ export function ToolCallItem({
     return null;
   }
 
-  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress, subagentActivity } = item;
+  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress, subagentActivity, subagentCompletedAt } = item;
 
   // Get tool configuration first (needed for defaultExpanded)
   const toolConfig = getToolConfig(toolCall.name);
@@ -259,7 +259,12 @@ export function ToolCallItem({
 
       {/* Nested subagent activity timeline (Agent/Task tool calls) */}
       {subagentActivity && subagentActivity.length > 0 && (
-        <SubagentActivityLog activity={subagentActivity} isRunning={!response} />
+        <SubagentActivityLog
+          activity={subagentActivity}
+          isRunning={!response}
+          startedAt={item.timestamp}
+          completedAt={subagentCompletedAt}
+        />
       )}
 
       {/* Approval buttons (if needed) - with animated text */}

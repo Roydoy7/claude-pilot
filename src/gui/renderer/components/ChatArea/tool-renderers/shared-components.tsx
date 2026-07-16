@@ -101,10 +101,20 @@ export function AnimatedApprovalText({ text }: { text: string }) {
 // Copy Button
 // ============================================
 
-/**
- * Small button that copies the given text to the clipboard
- */
-export function CopyButton({ text }: { text: string }) {
+interface CopyButtonProps {
+  text: string;
+  variant?: 'default' | 'message-action';
+  copyLabel?: string;
+  copiedLabel?: string;
+}
+
+/** Small button that copies the given text to the clipboard. */
+export function CopyButton({
+  text,
+  variant = 'default',
+  copyLabel = 'Copy',
+  copiedLabel = 'Copied',
+}: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -120,18 +130,23 @@ export function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      style={{
-        padding: '0.125rem 0.375rem',
-        fontSize: '0.65rem',
-        backgroundColor: copied ? 'var(--success)' : 'var(--bg-secondary)',
-        color: copied ? 'var(--on-accent)' : 'var(--text-secondary)',
-        border: '0px solid var(--border)',
-        borderRadius: '3px',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s',
-      }}
+      className={variant === 'message-action' ? 'message-copy' : 'copy-button'}
+      data-copied={copied}
+      title={copied ? copiedLabel : copyLabel}
+      aria-label={copied ? copiedLabel : copyLabel}
+      type="button"
     >
-      {copied ? '✓ Copied' : '📋 Copy'}
+      {copied ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+      {variant === 'default' && <span>{copied ? copiedLabel : copyLabel}</span>}
     </button>
   );
 }
@@ -143,6 +158,8 @@ export function CopyButton({ text }: { text: string }) {
 interface SubagentActivityLogProps {
   activity: SubagentActivityEntry[];
   isRunning: boolean;
+  startedAt: number;
+  completedAt?: number;
 }
 
 /**
@@ -153,9 +170,16 @@ interface SubagentActivityLogProps {
  * the newest entry while the subagent is running; the user can still
  * collapse it manually and scroll back through history at any time.
  */
-export function SubagentActivityLog({ activity, isRunning }: SubagentActivityLogProps) {
+export function SubagentActivityLog({ activity, isRunning, startedAt, completedAt }: SubagentActivityLogProps) {
   const [expanded, setExpanded] = useState(true);
+  const [now, setNow] = useState(Date.now());
   const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
 
   useEffect(() => {
     if (isRunning && expanded && logRef.current) {
@@ -165,51 +189,61 @@ export function SubagentActivityLog({ activity, isRunning }: SubagentActivityLog
 
   if (!activity || activity.length === 0) return null;
 
+  const lastEntry = activity[activity.length - 1];
+  const endedAt = completedAt ?? lastEntry.completedAt ?? lastEntry.timestamp;
+  const elapsedSeconds = Math.max(0, Math.floor(((isRunning ? now : endedAt) - startedAt) / 1000));
+  const elapsed = elapsedSeconds >= 60
+    ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
+    : `${elapsedSeconds}s`;
+
   return (
-    <div style={{ marginLeft: '1.5rem', marginBottom: '0.5rem', marginTop: '0.5rem' }}>
+    <div className="subagent-activity">
       <button
         onClick={() => setExpanded(!expanded)}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: '0.25rem 0',
-          cursor: 'pointer',
-          color: 'var(--text-secondary)',
-          fontSize: '0.7rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.25rem',
-        }}
+        className="subagent-activity-header"
       >
-        <span style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▶</span>
-        <span>Subagent Activity ({activity.length} entries{isRunning ? ', running...' : ''})</span>
+        <span className={`subagent-activity-chevron${expanded ? ' expanded' : ''}`}>›</span>
+        <span className={`subagent-live-dot${isRunning ? ' running' : ''}`} />
+        <span className="subagent-activity-title">Subagent Activity</span>
+        <span className={`subagent-activity-state${isRunning ? ' running' : ' completed'}`}>
+          {isRunning ? 'LIVE' : 'DONE'}
+        </span>
+        <span className="subagent-activity-meta">{activity.length} events · {elapsed}</span>
       </button>
       {expanded && (
         <div
           ref={logRef}
-          style={{
-            padding: '0.5rem 0.75rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: '4px',
-            border: '1px solid var(--border)',
-            fontSize: '0.7rem',
-            fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
-            maxHeight: '320px',
-            overflow: 'auto',
-            marginTop: '0.25rem',
-          }}
+          className="subagent-activity-log"
         >
           {activity.map((entry) => {
-            const icon = entry.kind === 'tool' ? '🔧' : entry.kind === 'thinking' ? '💭' : '💬';
-            const color = entry.isError ? 'var(--error)' : entry.kind === 'text' ? 'var(--text-primary)' : 'var(--text-secondary)';
+            const icon = entry.kind === 'tool' ? '⚙' : entry.kind === 'thinking' ? '◆' : '›';
+            const kindLabel = entry.kind === 'tool' ? 'TOOL' : entry.kind === 'thinking' ? 'THOUGHT' : 'MESSAGE';
             const label = entry.kind === 'tool'
               ? `${entry.toolName}${entry.toolArgsSummary ? `: ${entry.toolArgsSummary}` : ''}`
-              : (entry.text || '').slice(0, 200);
+              : (entry.text || '');
+            const time = new Date(entry.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
 
             return (
-              <div key={entry.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.125rem', color }}>
-                <span>{icon}</span>
-                <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{label}</span>
+              <div key={entry.id} className={`subagent-activity-entry ${entry.kind}${entry.isError ? ' error' : ''}`}>
+                <div className="subagent-activity-rail">
+                  <span className="subagent-activity-icon">{icon}</span>
+                </div>
+                <div className="subagent-activity-body">
+                  <div className="subagent-activity-entry-meta">
+                    <span>{kindLabel}</span>
+                    <span>{time}</span>
+                    {entry.kind === 'tool' && (
+                      <span className={`subagent-tool-state${entry.isError ? ' error' : entry.completedAt ? ' completed' : ' running'}`}>
+                        {entry.isError ? 'FAILED' : entry.completedAt ? 'DONE' : 'RUNNING'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="subagent-activity-content">{label}</div>
+                </div>
               </div>
             );
           })}

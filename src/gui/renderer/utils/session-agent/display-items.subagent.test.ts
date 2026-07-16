@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { applyToolStart, applyToolEnd, applySubagentText } from './display-items';
+import { applyToolStart, applyToolEnd, applySubagentText, applyTaskNotificationEvent } from './display-items';
 import type { MessageListItem } from '../../../preload/preload-types';
 
 function agentCard(id: string): MessageListItem {
@@ -40,6 +40,7 @@ describe('subagent activity nesting', () => {
     const next = applyToolEnd(withStart, { toolCallId: 'read-1', output: '', error: 'boom', parentToolCallId: 'agent-1' });
 
     expect(next[0].subagentActivity?.[0].isError).toBe(true);
+    expect(next[0].subagentActivity?.[0].completedAt).toEqual(expect.any(Number));
   });
 
   it('falls back to flat rendering when the parent card is not found', () => {
@@ -60,5 +61,36 @@ describe('subagent activity nesting', () => {
 
     const withoutParent = applySubagentText([], { parentToolCallId: 'missing', text: 'hello' });
     expect(withoutParent).toEqual([]);
+  });
+
+  it('marks the parent Agent card complete and clears its live status on task notification', () => {
+    const items: MessageListItem[] = [
+      agentCard('agent-1'),
+      {
+        type: 'status',
+        id: 'status-1',
+        timestamp: 1,
+        agentState: {
+          thinking: true,
+          subagent: { toolCallId: 'agent-1', name: 'office-quality-reviewer', lastToolName: 'Read' },
+        },
+      },
+    ];
+
+    const next = applyTaskNotificationEvent(items, {
+      timestamp: 2,
+      notification: {
+        taskId: 'task-1',
+        toolUseId: 'agent-1',
+        status: 'completed',
+        summary: 'Review completed',
+      },
+    }, 'session-1');
+
+    const card = next.find((item) => item.toolCall?.id === 'agent-1');
+    const status = next.find((item) => item.type === 'status');
+    expect(card?.toolResponse).toMatchObject({ tool_call_id: 'agent-1', output: 'Review completed' });
+    expect(status?.agentState?.subagent).toBeUndefined();
+    expect(next.some((item) => item.type === 'task_notification')).toBe(true);
   });
 });

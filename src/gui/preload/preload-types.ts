@@ -154,6 +154,7 @@ export interface SubagentActivityEntry {
   toolName?: string;
   toolArgsSummary?: string;
   isError?: boolean;
+  completedAt?: number;
   text?: string;
 }
 
@@ -193,6 +194,7 @@ export interface MessageListItem {
   parentToolCallId?: string;
   // Set on the parent Agent/Task tool_call item: live nested activity timeline.
   subagentActivity?: SubagentActivityEntry[];
+  subagentCompletedAt?: number;
 
   // Status type fields
   agentState?: AgentState;

@@ -235,7 +235,12 @@ export const Message = memo(function Message({ message }: MessageProps) {
             )}
           </div>
           {contentString && contentString.trim() !== '' && (
-            <CopyButton text={textContent} />
+            <CopyButton
+              text={textContent}
+              variant="message-action"
+              copyLabel={t.common.buttons.copyCode}
+              copiedLabel={t.common.buttons.copied}
+            />
           )}
           {showUsage && message.usage && !isUser && (
             <div className="message-usage">

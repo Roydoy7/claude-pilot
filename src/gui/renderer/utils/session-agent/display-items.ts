@@ -12,7 +12,7 @@ import type { AgentState } from '../../../../core/agents/claude-agent.js';
 import type { TaskNotification } from '../../../../core/utils/task-notification.js';
 
 /** Cap on how many nested activity entries a subagent card keeps, to avoid unbounded growth on long-running agents. */
-const MAX_SUBAGENT_ACTIVITY_ENTRIES = 30;
+const MAX_SUBAGENT_ACTIVITY_ENTRIES = 200;
 
 /**
  * Append a nested activity entry to the Agent/Task tool_call item identified
@@ -196,7 +196,11 @@ export function applyToolEnd(
         return items;
       }
       const nextActivity = [...parent.subagentActivity!];
-      nextActivity[activityIndex] = { ...nextActivity[activityIndex], isError: !!event.error };
+      nextActivity[activityIndex] = {
+        ...nextActivity[activityIndex],
+        isError: !!event.error,
+        completedAt: Date.now(),
+      };
       const next = [...items];
       next[parentIndex] = { ...parent, subagentActivity: nextActivity };
       return next;
@@ -329,13 +333,42 @@ export function applyTaskNotificationEvent(
   event: { notification: TaskNotification; timestamp: number },
   sessionId: string,
 ): MessageListItem[] {
+  // A background Agent/Task call does not always emit the ordinary tool_end
+  // event when it settles. Correlate the notification back to its originating
+  // tool card so the activity timeline and global subagent status stop showing
+  // "running" immediately.
+  const toolUseId = event.notification.toolUseId;
+  const completedItems = toolUseId
+    ? items.map((item) => {
+        if (item.type === 'tool_call' && item.toolCall?.id === toolUseId && !item.toolResponse) {
+          const succeeded = event.notification.status === 'completed';
+          return {
+            ...item,
+            subagentCompletedAt: event.timestamp,
+            toolResponse: {
+              tool_call_id: toolUseId,
+              output: event.notification.result || event.notification.summary,
+              error: succeeded ? undefined : event.notification.summary,
+            },
+          };
+        }
+        if (item.type === 'status' && item.agentState?.subagent?.toolCallId === toolUseId) {
+          return {
+            ...item,
+            agentState: { ...item.agentState, subagent: undefined },
+          };
+        }
+        return item;
+      })
+    : items;
+
   const notificationItem: MessageListItem = {
     type: 'task_notification',
     id: `${sessionId}-task-notification-${event.timestamp}-${event.notification.taskId}`,
     timestamp: event.timestamp,
     taskNotification: event.notification,
   };
-  return addItemKeepingStatusAtEnd(items, notificationItem);
+  return addItemKeepingStatusAtEnd(completedItems, notificationItem);
 }
 
 /**
