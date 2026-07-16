@@ -27,6 +27,11 @@
   --radius-lg: 10px; /* cards, bubbles, popovers */
   --radius-full: 9999px;
 
+  /* Interactive control heights */
+  --control-height-sm: 28px;
+  --control-height-md: 32px;
+  --control-height-lg: 36px;
+
   /* Motion */
   --duration-fast: 120ms;
   --duration-normal: 160ms;

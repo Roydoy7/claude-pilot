@@ -37,8 +37,8 @@ export const sessionConfigZh = {
   noModelsAvailable: '无可用模型',
   logout: '登出',
   selectWorkingDirectory: '选择工作目录',
-  selectWorkingDirectoryDescription: 'AI 将被允许访问工作目录的文件，您可以稍后在',
-  selectWorkingDirectoryDescriptionSuffix: '增加额外的目录',
+  selectWorkingDirectoryDescription: '这是当前会话的项目根目录。Agent 会在这里读取和创建文件，并加载项目级配置与技能。',
+  selectWorkingDirectoryDescriptionSuffix: '',
   noDirectorySelected: '未选择目录',
   browseDirectory: '浏览...',
 };

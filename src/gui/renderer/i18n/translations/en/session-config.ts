@@ -37,7 +37,7 @@ export const sessionConfigEn = {
   noModelsAvailable: 'No models available',
   logout: 'Logout',
   selectWorkingDirectory: 'Select Working Directory',
-  selectWorkingDirectoryDescription: 'AI will be allowed to access files in the working directory. You can add more directories later in',
+  selectWorkingDirectoryDescription: 'This is the project root for the session. The agent reads and creates files here and loads project-level configuration and skills.',
   selectWorkingDirectoryDescriptionSuffix: '',
   noDirectorySelected: 'No directory selected',
   browseDirectory: 'Browse...',

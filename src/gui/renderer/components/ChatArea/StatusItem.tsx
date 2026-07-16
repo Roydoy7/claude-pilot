@@ -263,9 +263,11 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
 
   // Check if there's anything to display
   const hasSubagent = state.subagent !== undefined;
-  const hasThinking = state.thinking && !hasSubagent;
   const hasTool = state.tool !== undefined;
   const hasCommand = state.command !== undefined && state.command.status === 'running';
+  // A running slash command already explains what the agent is doing. Avoid
+  // rendering the generic thinking line alongside it (notably for /compact).
+  const hasThinking = state.thinking && !hasSubagent && !hasCommand;
   const hasQueued = state.queued === true;
 
   if (!hasThinking && !hasTool && !hasCommand && !hasQueued && !hasSubagent) {

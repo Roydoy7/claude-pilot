@@ -124,7 +124,7 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
       {/* Action Buttons */}
       <div className="prompts-actions">
         <button
-          className="new-template-button"
+          className="btn btn-outline btn-lg prompts-new-button"
           onClick={handleNew}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -136,7 +136,7 @@ export function PromptsTab({ onApplyTemplate }: PromptsTabProps) {
           {t.rightPanel.promptsTab.newTemplate}
         </button>
         <button
-          className="btn btn-danger-ghost prompts-clear-button"
+          className="btn btn-danger-ghost btn-lg prompts-clear-button"
           onClick={handleDeleteAll}
           disabled={templates.length === 0}
         >

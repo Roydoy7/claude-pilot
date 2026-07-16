@@ -118,7 +118,7 @@ export function WorkspaceTab({ sessionId }: WorkspaceTabProps) {
 
             {/* Add Directory Button */}
             <button
-              className="add-workspace-button"
+              className="btn btn-outline"
               onClick={handleAddDirectory}
               disabled={loading}
             >

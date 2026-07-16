@@ -83,6 +83,13 @@ export function SessionConfig({
       const directory = await window.electronAPI.workspace.selectDirectory();
       if (directory) {
         setSelectedCwd(directory);
+        // Keep the new-session working directory in sync with the user's
+        // latest selection. Otherwise the next SessionConfig mount reloads
+        // SettingsManager's initial home-directory default.
+        const result = await window.electronAPI.settings.update({ defaultCwd: directory });
+        if (!result.success) {
+          console.error('Failed to remember selected directory');
+        }
       }
     } catch (error) {
       console.error('Failed to select directory:', error);
@@ -124,11 +131,22 @@ export function SessionConfig({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.5rem',
             margin: '0 auto 0.75rem',
           }}
         >
-          💬
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--on-accent)"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6.5 5.5h11a3 3 0 0 1 3 3v5.5a3 3 0 0 1-3 3H11l-4.5 3v-3.25A3 3 0 0 1 3.5 14V8.5a3 3 0 0 1 3-3Z" />
+          </svg>
         </div>
         <h2
           style={{
@@ -222,11 +240,24 @@ export function SessionConfig({
               fontSize: '0.875rem',
               fontWeight: 500,
               color: 'var(--text-primary)',
-              marginBottom: '0.5rem',
+              marginBottom: '0.25rem',
             }}
           >
             {t.sessionConfig.selectWorkingDirectory}
           </label>
+          <p
+            style={{
+              margin: '0 0 0.5rem',
+              fontSize: '0.8125rem',
+              lineHeight: 1.5,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            {t.sessionConfig.selectWorkingDirectoryDescription}
+            {t.sessionConfig.selectWorkingDirectoryDescriptionSuffix && (
+              <> {t.sessionConfig.selectWorkingDirectoryDescriptionSuffix}</>
+            )}
+          </p>
           <div
             style={{
               display: 'flex',

@@ -167,7 +167,7 @@ export function LeftSidebar({ currentSessionId, onSessionSelect }: LeftSidebarPr
   return (
     <div className="left-sidebar">
       <div className="left-sidebar-header">
-        <button className="left-sidebar-new-button" onClick={handleNewSession}>
+        <button className="btn btn-outline btn-lg left-sidebar-new-button" onClick={handleNewSession}>
           {t.leftSidebar.newSession}
         </button>
         <button className="icon-button" onClick={toggleCollapsed} title={t.leftSidebar.collapse}>
