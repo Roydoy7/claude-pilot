@@ -5,7 +5,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { applyToolStart, applyToolEnd, applySubagentText, applyTaskNotificationEvent } from './display-items';
+import {
+  applyToolStart,
+  applyToolEnd,
+  applySubagentText,
+  applySubagentActivityDelta,
+  applySubagentSkills,
+  applyTaskNotificationEvent,
+} from './display-items';
 import type { MessageListItem } from '../../../preload/preload-types';
 
 function agentCard(id: string): MessageListItem {
@@ -61,6 +68,40 @@ describe('subagent activity nesting', () => {
 
     const withoutParent = applySubagentText([], { parentToolCallId: 'missing', text: 'hello' });
     expect(withoutParent).toEqual([]);
+  });
+
+  it('merges streaming deltas into one stable activity entry', () => {
+    const first = applySubagentActivityDelta([agentCard('agent-1')], {
+      parentToolCallId: 'agent-1',
+      activityId: 'stream-1',
+      kind: 'thinking',
+      delta: 'trace ',
+    });
+    const second = applySubagentActivityDelta(first, {
+      parentToolCallId: 'agent-1',
+      activityId: 'stream-1',
+      kind: 'thinking',
+      delta: 'the pipe',
+    });
+
+    expect(second[0].subagentActivity).toHaveLength(1);
+    expect(second[0].subagentActivity?.[0]).toMatchObject({
+      id: 'stream-1',
+      kind: 'thinking',
+      text: 'trace the pipe',
+    });
+  });
+
+  it('shows skills as preloaded subagent metadata', () => {
+    const next = applySubagentSkills([agentCard('agent-1')], {
+      parentToolCallId: 'agent-1',
+      skills: ['how-to-see-flowsheet', 'instrument-types'],
+    });
+
+    expect(next[0].subagentActivity?.[0]).toMatchObject({
+      kind: 'skill',
+      text: 'Preloaded: how-to-see-flowsheet, instrument-types',
+    });
   });
 
   it('marks the parent Agent card complete and clears its live status on task notification', () => {

@@ -178,6 +178,71 @@ describe('processQueryMessages - assistant messages', () => {
     });
   });
 
+  it('streams subagent thinking deltas and does not duplicate the complete block', async () => {
+    const events = await run(createAgent(), [
+      {
+        type: 'stream_event',
+        parent_tool_use_id: 'agent-1',
+        event: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } },
+      },
+      {
+        type: 'stream_event',
+        parent_tool_use_id: 'agent-1',
+        event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'tracing...' } },
+      },
+      {
+        type: 'stream_event',
+        parent_tool_use_id: 'agent-1',
+        event: { type: 'content_block_stop', index: 0 },
+      },
+      {
+        type: 'assistant',
+        parent_tool_use_id: 'agent-1',
+        subagent_type: 'instrument-naming-agent',
+        message: { content: [{ type: 'thinking', thinking: 'tracing...' }] },
+      },
+    ]);
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'subagent_activity_delta',
+      parentToolCallId: 'agent-1',
+      kind: 'thinking',
+      delta: 'tracing...',
+    }));
+    expect(events.filter((event) => event.type === 'thinking')).toHaveLength(0);
+  });
+
+  it('announces skills preloaded for a started subagent', async () => {
+    const config: ClaudeAgentConfig = {
+      agentId: 'test-agent',
+      agentDisplayName: 'Test Agent',
+      modelName: 'claude-sonnet-4-6',
+      agents: {
+        'instrument-naming-agent': {
+          description: 'Inspect a sheet',
+          prompt: 'Inspect the images',
+          skills: ['how-to-see-flowsheet', 'instrument-types'],
+        },
+      },
+    };
+    const events = await run(new ClaudeAgent(config, 'stream-test-session', 'C:\\temp'), [
+      {
+        type: 'system',
+        subtype: 'task_started',
+        task_id: 'task-1',
+        tool_use_id: 'agent-1',
+        description: 'Inspect a sheet',
+        subagent_type: 'instrument-naming-agent',
+      },
+    ]);
+
+    expect(events).toContainEqual({
+      type: 'subagent_skills',
+      parentToolCallId: 'agent-1',
+      skills: ['how-to-see-flowsheet', 'instrument-types'],
+    });
+  });
+
   it('terminates with an error when a text block carries an API error', async () => {
     const events = await run(createAgent(), [
       {

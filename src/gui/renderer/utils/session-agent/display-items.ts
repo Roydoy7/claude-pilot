@@ -306,6 +306,52 @@ export function applySubagentThinking(
   return nested ?? items;
 }
 
+/** Append a streaming delta to a stable subagent activity entry. */
+export function applySubagentActivityDelta(
+  items: MessageListItem[],
+  event: { parentToolCallId: string; activityId: string; kind: 'thinking' | 'text'; delta: string },
+): MessageListItem[] {
+  const parentIndex = items.findIndex((item) => item.type === 'tool_call' && item.toolCall?.id === event.parentToolCallId);
+  if (parentIndex === -1) return items;
+
+  const parent = items[parentIndex];
+  const activity = parent.subagentActivity ?? [];
+  const entryIndex = activity.findIndex((entry) => entry.id === event.activityId);
+  let nextActivity: SubagentActivityEntry[];
+  if (entryIndex === -1) {
+    nextActivity = [...activity, {
+      id: event.activityId,
+      kind: event.kind,
+      timestamp: Date.now(),
+      text: event.delta,
+    }].slice(-MAX_SUBAGENT_ACTIVITY_ENTRIES);
+  } else {
+    nextActivity = [...activity];
+    nextActivity[entryIndex] = {
+      ...nextActivity[entryIndex],
+      text: `${nextActivity[entryIndex].text ?? ''}${event.delta}`,
+    };
+  }
+
+  const next = [...items];
+  next[parentIndex] = { ...parent, subagentActivity: nextActivity };
+  return next;
+}
+
+/** Show skills injected into a subagent's context as preload metadata. */
+export function applySubagentSkills(
+  items: MessageListItem[],
+  event: { parentToolCallId: string; skills: string[] },
+): MessageListItem[] {
+  const nested = appendSubagentActivity(items, event.parentToolCallId, {
+    id: `subagent-skills-${event.parentToolCallId}`,
+    kind: 'skill',
+    timestamp: Date.now(),
+    text: `Preloaded: ${event.skills.join(', ')}`,
+  });
+  return nested ?? items;
+}
+
 /**
  * Handle a 'message' event (e.g. a compact summary).
  */

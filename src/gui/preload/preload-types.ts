@@ -148,7 +148,7 @@ export interface ToolProgressEntry {
  */
 export interface SubagentActivityEntry {
   id: string;
-  kind: 'tool' | 'text' | 'thinking';
+  kind: 'tool' | 'text' | 'thinking' | 'skill';
   timestamp: number;
   toolCallId?: string;
   toolName?: string;

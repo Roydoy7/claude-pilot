@@ -24,6 +24,8 @@ import {
   applyToolProgress,
   applySubagentText,
   applySubagentThinking,
+  applySubagentActivityDelta,
+  applySubagentSkills,
   applyMessageEvent,
   applyTaskNotificationEvent,
   applyErrorEvent,
@@ -168,6 +170,16 @@ export class SessionAgent {
 
       case 'subagent_text':
         this.displayItems = applySubagentText(this.displayItems, event);
+        this.notifyDisplayItemsChanged();
+        break;
+
+      case 'subagent_activity_delta':
+        this.displayItems = applySubagentActivityDelta(this.displayItems, event);
+        this.notifyDisplayItemsChanged();
+        break;
+
+      case 'subagent_skills':
+        this.displayItems = applySubagentSkills(this.displayItems, event);
         this.notifyDisplayItemsChanged();
         break;
 

@@ -151,6 +151,8 @@ export type StreamEvent =
   | { type: 'tool_end'; toolName: string; toolCallId: string; output: string; error?: string; parentToolCallId?: string }
   | { type: 'tool_progress'; toolName: string; toolCallId?: string; progressType: string; message: string; timestamp: number; parentToolCallId?: string }
   | { type: 'subagent_text'; parentToolCallId: string; text: string }
+  | { type: 'subagent_activity_delta'; parentToolCallId: string; activityId: string; kind: 'thinking' | 'text'; delta: string }
+  | { type: 'subagent_skills'; parentToolCallId: string; skills: string[] }
   | { type: 'interrupt'; interruptId: string; toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> }
   | { type: 'error'; error: string; details?: string }
   | { type: 'usage_limit'; message: string }
@@ -598,6 +600,12 @@ export class ClaudeAgent {
     // control channel after that result, so stdin must remain open until every
     // SDK task has settled and the session reports itself idle.
     const activeTaskIds = new Set<string>();
+    // Partial subagent blocks are streamed before their complete assistant
+    // message. Keep stable IDs so the renderer can append deltas to one
+    // timeline entry instead of creating an entry for every token.
+    const partialSubagentBlocks = new Map<string, { activityId: string; kind: 'thinking' | 'text' }>();
+    const subagentParentsWithPartialContent = new Set<string>();
+    let partialSubagentActivitySequence = 0;
 
     try {
       for await (const chunk of queryInstance) {
@@ -610,19 +618,56 @@ export class ClaudeAgent {
           case 'stream_event': {
             const partialMessage = chunk as SDKPartialAssistantMessage;
             const event = partialMessage.event;
-
-            // Note: Don't yield text_delta or tool_start here - wait for complete assistant message
-            // stream_event is for partial updates, assistant message has the complete content
-            // Only update state here to show tool is being used
+            const parentToolCallId = partialMessage.parent_tool_use_id ?? undefined;
 
             if (event.type === 'content_block_start') {
               const contentBlock = (event as { content_block?: { type?: string; id?: string; name?: string } }).content_block;
+              const blockIndex = (event as { index?: number }).index;
+              if (
+                parentToolCallId &&
+                typeof blockIndex === 'number' &&
+                (contentBlock?.type === 'thinking' || contentBlock?.type === 'text')
+              ) {
+                const activityId = `subagent-stream-${parentToolCallId}-${++partialSubagentActivitySequence}`;
+                partialSubagentBlocks.set(`${parentToolCallId}:${blockIndex}`, {
+                  activityId,
+                  kind: contentBlock.type,
+                });
+                subagentParentsWithPartialContent.add(parentToolCallId);
+              }
               if (contentBlock?.type === 'tool_use' && contentBlock.name) {
                 // Only update state - tool_start will be sent from assistant message with complete args
                 yield {
                   type: 'state',
                   state: { thinking: true, tool: { type: 'executing', toolName: contentBlock.name } },
                 };
+              }
+            } else if (event.type === 'content_block_delta' && parentToolCallId) {
+              const deltaEvent = event as {
+                index?: number;
+                delta?: { type?: string; thinking?: string; text?: string };
+              };
+              const block = typeof deltaEvent.index === 'number'
+                ? partialSubagentBlocks.get(`${parentToolCallId}:${deltaEvent.index}`)
+                : undefined;
+              const delta = deltaEvent.delta?.type === 'thinking_delta'
+                ? deltaEvent.delta.thinking
+                : deltaEvent.delta?.type === 'text_delta'
+                  ? deltaEvent.delta.text
+                  : undefined;
+              if (block && delta) {
+                yield {
+                  type: 'subagent_activity_delta',
+                  parentToolCallId,
+                  activityId: block.activityId,
+                  kind: block.kind,
+                  delta,
+                };
+              }
+            } else if (event.type === 'content_block_stop' && parentToolCallId) {
+              const blockIndex = (event as { index?: number }).index;
+              if (typeof blockIndex === 'number') {
+                partialSubagentBlocks.delete(`${parentToolCallId}:${blockIndex}`);
               }
             }
             break;
@@ -640,20 +685,25 @@ export class ClaudeAgent {
                 subagentInfo.set(subagentParentId, { name: assistantMessage.subagent_type || 'agent' });
               }
               const info = subagentInfo.get(subagentParentId)!;
+              // When partial messages were available, the corresponding
+              // thinking/text has already reached the UI. The complete
+              // assistant message is still used for tool calls, but must not
+              // duplicate those activity blocks.
+              const contentWasStreamed = subagentParentsWithPartialContent.delete(subagentParentId);
 
               const content = assistantMessage.message?.content;
               if (Array.isArray(content)) {
                 for (const block of content) {
                   switch (block.type) {
                     case 'thinking': {
-                      if ('thinking' in block) {
+                      if (!contentWasStreamed && 'thinking' in block) {
                         const thinkingBlock = block as { type: 'thinking'; thinking: string };
                         yield { type: 'thinking', thinking: thinkingBlock.thinking, parentToolCallId: subagentParentId };
                       }
                       break;
                     }
                     case 'text': {
-                      if (block.text) {
+                      if (!contentWasStreamed && block.text) {
                         yield { type: 'subagent_text', parentToolCallId: subagentParentId, text: block.text };
                       }
                       break;
@@ -1185,6 +1235,16 @@ export class ClaudeAgent {
                     name: task.subagent_type || task.description || 'agent',
                   });
                 }
+                if (task.tool_use_id && task.subagent_type) {
+                  const skills = this.config.agents?.[task.subagent_type]?.skills;
+                  if (skills?.length) {
+                    yield {
+                      type: 'subagent_skills',
+                      parentToolCallId: task.tool_use_id,
+                      skills: [...skills],
+                    };
+                  }
+                }
                 break;
               }
 
@@ -1451,6 +1511,10 @@ export class ClaudeAgent {
         // Forward subagent (Agent/Task tool) text/thinking blocks with parent_tool_use_id set,
         // so the UI can render a nested activity timeline instead of a generic "AI is thinking".
         forwardSubagentText: true,
+        // Required for token-level thinking/text updates. Without this the
+        // SDK only forwards the complete assistant block after a subagent
+        // turn, producing long silent gaps in the activity timeline.
+        includePartialMessages: true,
         canUseTool: canUseToolCallback,
         hooks: {
           // PreToolUse: Auto-inject workingDirectory for all tools

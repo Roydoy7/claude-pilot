@@ -216,8 +216,8 @@ export function SubagentActivityLog({ activity, isRunning, startedAt, completedA
           className="subagent-activity-log"
         >
           {activity.map((entry) => {
-            const icon = entry.kind === 'tool' ? '⚙' : entry.kind === 'thinking' ? '◆' : '›';
-            const kindLabel = entry.kind === 'tool' ? 'TOOL' : entry.kind === 'thinking' ? 'THOUGHT' : 'MESSAGE';
+            const icon = entry.kind === 'tool' ? '⚙' : entry.kind === 'thinking' ? '◆' : entry.kind === 'skill' ? '◈' : '›';
+            const kindLabel = entry.kind === 'tool' ? 'TOOL' : entry.kind === 'thinking' ? 'THOUGHT' : entry.kind === 'skill' ? 'SKILLS' : 'MESSAGE';
             const label = entry.kind === 'tool'
               ? `${entry.toolName}${entry.toolArgsSummary ? `: ${entry.toolArgsSummary}` : ''}`
               : (entry.text || '');
