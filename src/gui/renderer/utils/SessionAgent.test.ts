@@ -105,6 +105,21 @@ describe('SessionAgent - state events', () => {
     expect(items[0].type).toBe('thinking');
     expect(items[1].type).toBe('status');
   });
+
+  it('clears a stale thinking status when done arrives without an idle state', () => {
+    const { emit, displayItemsHistory } = createHarness(nextSessionId());
+
+    emit({ type: 'state', state: { thinking: true } });
+    emit({ type: 'text_delta', text: 'Finished response' });
+    emit({ type: 'done' });
+
+    const items = displayItemsHistory[displayItemsHistory.length - 1];
+    expect(items.some((item) => item.type === 'status')).toBe(false);
+    expect(items).toContainEqual(expect.objectContaining({
+      type: 'message',
+      content: 'Finished response',
+    }));
+  });
 });
 
 describe('SessionAgent - text streaming', () => {

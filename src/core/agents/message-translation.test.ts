@@ -459,6 +459,18 @@ describe('processQueryMessages - Task tool system messages', () => {
 });
 
 describe('processQueryMessages - result', () => {
+  it('releases streaming input on result when no background task is active', async () => {
+    const agent = makeAgent();
+    let inputReleased = false;
+    (agent as unknown as { streamEndResolver: (() => void) | null }).streamEndResolver = () => {
+      inputReleased = true;
+    };
+
+    await collectEvents(agent, [makeResultSuccess()]);
+
+    expect(inputReleased).toBe(true);
+  });
+
   it('propagates terminal_reason from a success result', async () => {
     const agent = makeAgent();
     const events = await collectEvents(agent, [

@@ -264,13 +264,14 @@ export class SessionAgent {
 
       case 'done':
         this.displayItems = applyDone(this.displayItems, event.usage);
+        // `done` is itself authoritative. Clear any stale status even if an
+        // earlier idle state event was delayed or omitted by the backend.
+        this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
         this.streamingState = createStreamingTextState();
 
         // Notify UI of the filtered items
         this.notifyDisplayItemsChanged();
 
-        // Don't manually set idle here - backend already sends idle state event before done
-        // Status will be cleared by the idle state event from backend
         break;
     }
   }

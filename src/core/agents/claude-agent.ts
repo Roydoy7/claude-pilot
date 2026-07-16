@@ -14,7 +14,6 @@ import type {
   SDKPartialAssistantMessage,
   SDKToolProgressMessage,
   SDKAuthStatusMessage,
-  SDKCommandsChangedMessage,
   SDKFilesPersistedEvent,
   SDKTaskNotificationMessage,
   SDKTaskProgressMessage,
@@ -1043,11 +1042,15 @@ export class ClaudeAgent {
             const resultMessage = chunk as SDKResultMessage;
             terminalReason = resultMessage.terminal_reason;
 
-            // Do not close the streaming input here. Background Agent calls
-            // emit an intermediate result before their tools/hooks have
-            // finished. Closing stdin at this point breaks subsequent MCP and
-            // permission control requests with "Stream closed". The
-            // session_state_changed/idle event below is the authoritative end.
+            // A result is terminal when no background task is still alive.
+            // Background Agent calls can emit an intermediate result, so keep
+            // stdin open for those; ordinary turns should close immediately
+            // instead of depending on a later session_state_changed/idle event
+            // that the SDK does not always emit.
+            if (activeTaskIds.size === 0 && this.streamEndResolver) {
+              this.streamEndResolver();
+              this.streamEndResolver = null;
+            }
 
             // Update session checkpoint metadata on result
             if (resultMessage.session_id) {
@@ -1154,10 +1157,7 @@ export class ClaudeAgent {
 
               case 'commands_changed': {
                 // Mid-session slash command list change - replace cached list (per SDK docs)
-                // Explicit type: sdk.d.ts ships with unresolved names in the
-                // SDKMessage union (upstream packaging bug), collapsing it to
-                // `any`, so chunk carries no inferred type here.
-                this.slashCommands = (chunk as SDKCommandsChangedMessage).commands.map((command) => command.name);
+                this.slashCommands = chunk.commands.map((command) => command.name);
                 yield { type: 'slashCommands', commands: this.slashCommands };
                 break;
               }
@@ -1325,10 +1325,6 @@ export class ClaudeAgent {
               }
 
               default: {
-                // Exhaustiveness check disabled: SDKMessage collapses to `any`
-                // due to unresolved names in the shipped sdk.d.ts (upstream
-                // packaging bug). Restore `= chunk` once fixed upstream.
-                const _exhaustive: never = chunk as never;
                 break;
               }
             }
@@ -1375,10 +1371,6 @@ export class ClaudeAgent {
           // The SDK sends it with type: 'user' and isReplay: true flag
 
           default: {
-            // Exhaustiveness check disabled: SDKMessage collapses to `any`
-            // due to unresolved names in the shipped sdk.d.ts (upstream
-            // packaging bug). Restore `= chunk` once fixed upstream.
-            const _exhaustive: never = chunk as never;
             break;
           }
         }
