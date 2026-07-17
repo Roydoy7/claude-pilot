@@ -55,6 +55,14 @@ export const ALL_SETTING_SOURCES: SettingSource[] = ['user', 'project', 'local']
 const FILE_EDIT_TOOLS = ['Write', 'Edit'];
 
 /**
+ * How long to wait after a `result` with no live tasks before closing the
+ * streaming input. Long enough to absorb a task_started or injected
+ * task-notification that trails the model-turn boundary, short enough that
+ * the turn still ends promptly when nothing follows.
+ */
+const STREAM_CLOSE_GRACE_MS = 1500;
+
+/**
  * Cache creation breakdown by TTL
  */
 export interface CacheCreationBreakdown {
@@ -168,6 +176,11 @@ export type StreamEvent =
   | { type: 'subagent_text'; parentToolCallId: string; text: string }
   | { type: 'subagent_activity_delta'; parentToolCallId: string; activityId: string; kind: 'thinking' | 'text'; delta: string }
   | { type: 'subagent_skills'; parentToolCallId: string; skills: string[] }
+  // Liveness signal for a running subagent whose content the CLI does not
+  // stream (subagent partials are never emitted; complete blocks can be
+  // minutes apart during long generations). Lets the UI show "still working"
+  // instead of appearing frozen between blocks.
+  | { type: 'subagent_heartbeat'; parentToolCallId: string; lastToolName?: string; totalTokens?: number; elapsedSeconds?: number; timestamp: number }
   | { type: 'interrupt'; interruptId: string; toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> }
   | { type: 'error'; error: string; details?: string }
   | { type: 'usage_limit'; message: string }
@@ -630,6 +643,38 @@ export class ClaudeAgent {
       console.log('[claude-agent] task lifecycle', entry);
       writeAgentLifecycleLog(entry);
     };
+    // `result` only marks a model-turn boundary: the CLI may follow it with a
+    // trailing task_started or an injected task-notification that begins a new
+    // model turn. Closing stdin right at the boundary races those and kills
+    // live subagents - but waiting only for session_state_changed:idle
+    // deadlocks on SDK builds that never emit it (turn never ends, UI stuck on
+    // "thinking"). So a result with no live tasks arms a short grace timer;
+    // any sign of continued activity cancels it, and the timer re-checks task
+    // liveness when it fires.
+    let streamCloseTimer: ReturnType<typeof setTimeout> | null = null;
+    const cancelScheduledStreamClose = (reason: string): void => {
+      if (streamCloseTimer) {
+        clearTimeout(streamCloseTimer);
+        streamCloseTimer = null;
+        logTaskLifecycle('stream_close_cancelled', { reason });
+      }
+    };
+    const scheduleStreamClose = (): void => {
+      if (!this.streamEndResolver) {
+        return;
+      }
+      if (streamCloseTimer) {
+        clearTimeout(streamCloseTimer);
+      }
+      streamCloseTimer = setTimeout(() => {
+        streamCloseTimer = null;
+        if (activeTasks.size === 0 && this.streamEndResolver) {
+          logTaskLifecycle('stream_close', { trigger: 'result_grace_elapsed' });
+          this.streamEndResolver();
+          this.streamEndResolver = null;
+        }
+      }, STREAM_CLOSE_GRACE_MS);
+    };
     // Partial subagent blocks are streamed before their complete assistant
     // message. Keep stable IDs so the renderer can append deltas to one
     // timeline entry instead of creating an entry for every token.
@@ -646,6 +691,7 @@ export class ClaudeAgent {
 
         switch (chunk.type) {
           case 'stream_event': {
+            cancelScheduledStreamClose('stream_event');
             const partialMessage = chunk as SDKPartialAssistantMessage;
             const event = partialMessage.event;
             const parentToolCallId = partialMessage.parent_tool_use_id ?? undefined;
@@ -704,6 +750,7 @@ export class ClaudeAgent {
           }
 
           case 'assistant': {
+            cancelScheduledStreamClose('assistant_message');
             const assistantMessage = chunk as SDKAssistantMessage;
             const subagentParentId = assistantMessage.parent_tool_use_id ?? undefined;
 
@@ -919,6 +966,7 @@ export class ClaudeAgent {
           }
 
           case 'user': {
+            cancelScheduledStreamClose('user_message');
             const userMessage = chunk as SDKUserMessage;
             const subagentParentId = userMessage.parent_tool_use_id ?? undefined;
 
@@ -1059,6 +1107,13 @@ export class ClaudeAgent {
               const info = subagentInfo.get(progressMessage.tool_use_id)!;
               info.elapsedSeconds = progressMessage.elapsed_time_seconds;
               yield {
+                type: 'subagent_heartbeat',
+                parentToolCallId: progressMessage.tool_use_id,
+                lastToolName: info.lastToolName,
+                elapsedSeconds: progressMessage.elapsed_time_seconds,
+                timestamp: Date.now(),
+              };
+              yield {
                 type: 'state',
                 state: {
                   thinking: true,
@@ -1072,15 +1127,21 @@ export class ClaudeAgent {
           case 'result': {
             const resultMessage = chunk as SDKResultMessage;
             terminalReason = resultMessage.terminal_reason;
-            // `result` is only a model-turn boundary. In background mode it may
-            // arrive before task_started, so closing stdin here races the SDK
-            // lifecycle stream and kills newly launched subagents. The SDK's
-            // session_state_changed:idle event is the authoritative turn-over
-            // signal and is the only normal path that releases streaming input.
+            // `result` is only a model-turn boundary. With live background
+            // tasks stdin must stay open (closing would kill them); without
+            // any, arm the grace-close timer rather than depending on a
+            // session_state_changed:idle event the SDK does not always emit.
             logTaskLifecycle('result', {
               resultSubtype: resultMessage.subtype,
               terminalReason: resultMessage.terminal_reason,
             });
+            if (activeTasks.size === 0) {
+              scheduleStreamClose();
+            } else {
+              logTaskLifecycle('stream_close_deferred', {
+                activeTaskIds: Array.from(activeTasks.keys()),
+              });
+            }
 
             // Update session checkpoint metadata on result
             if (resultMessage.session_id) {
@@ -1272,6 +1333,7 @@ export class ClaudeAgent {
                   toolUseId: task.tool_use_id,
                   subagentType: task.subagent_type,
                 });
+                cancelScheduledStreamClose('task_started');
                 if (task.tool_use_id && !subagentInfo.has(task.tool_use_id)) {
                   subagentInfo.set(task.tool_use_id, {
                     name: task.subagent_type || task.description || 'agent',
@@ -1319,6 +1381,14 @@ export class ClaudeAgent {
                   info.lastToolName = task.last_tool_name;
                   info.elapsedSeconds = Math.round(task.usage.duration_ms / 1000);
                   subagentInfo.set(task.tool_use_id, info);
+                  yield {
+                    type: 'subagent_heartbeat',
+                    parentToolCallId: task.tool_use_id,
+                    lastToolName: task.last_tool_name,
+                    totalTokens: task.usage.total_tokens,
+                    elapsedSeconds: info.elapsedSeconds,
+                    timestamp: Date.now(),
+                  };
                 }
                 yield { type: 'state', state: taskState() };
                 break;
@@ -1387,6 +1457,8 @@ export class ClaudeAgent {
                 // let the SDK subprocess finish normally.
                 logTaskLifecycle('session_state_changed', { state: chunk.state });
                 if (chunk.state === 'idle' && activeTasks.size === 0 && this.streamEndResolver) {
+                  cancelScheduledStreamClose('idle_close');
+                  logTaskLifecycle('stream_close', { trigger: 'session_idle' });
                   this.streamEndResolver();
                   this.streamEndResolver = null;
                 }
@@ -1499,6 +1571,10 @@ export class ClaudeAgent {
         };
       }
     } finally {
+      if (streamCloseTimer) {
+        clearTimeout(streamCloseTimer);
+        streamCloseTimer = null;
+      }
       // Also release on abnormal SDK termination so the input generator cannot
       // retain an unresolved promise after its consumer has gone away.
       if (this.streamEndResolver) {
@@ -1555,9 +1631,9 @@ export class ClaudeAgent {
 
     // Keep the generator alive until the conversation ends
     // This prevents SDK from closing stdin prematurely (which breaks tool approval requests)
-    // Normal completion is signalled by session_state_changed:idle. A result
-    // message is not sufficient because background tasks can start around the
-    // same model-turn boundary.
+    // Normal completion is signalled by session_state_changed:idle or, on SDK
+    // builds that don't emit it, by the grace timer armed when a result
+    // arrives with no live background tasks (see scheduleStreamClose).
     await new Promise<void>((resolve) => {
       this.streamEndResolver = resolve;
     });

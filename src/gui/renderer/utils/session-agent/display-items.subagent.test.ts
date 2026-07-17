@@ -10,6 +10,7 @@ import {
   applyToolEnd,
   applySubagentText,
   applySubagentActivityDelta,
+  applySubagentHeartbeat,
   applySubagentSkills,
   applyTaskNotificationEvent,
 } from './display-items';
@@ -133,5 +134,39 @@ describe('subagent activity nesting', () => {
     expect(card?.toolResponse).toMatchObject({ tool_call_id: 'agent-1', output: 'Review completed' });
     expect(status?.agentState?.subagent).toBeUndefined();
     expect(next.some((item) => item.type === 'task_notification')).toBe(true);
+  });
+});
+
+describe('subagent heartbeat', () => {
+  it('sets and refreshes the heartbeat on a running parent card', () => {
+    const first = applySubagentHeartbeat([agentCard('agent-1')], {
+      parentToolCallId: 'agent-1',
+      lastToolName: 'Read',
+      totalTokens: 7000,
+      elapsedSeconds: 7,
+      timestamp: 1,
+    });
+    expect(first[0].subagentHeartbeat).toMatchObject({ lastToolName: 'Read', totalTokens: 7000, elapsedSeconds: 7 });
+
+    // A later heartbeat without lastToolName keeps the previous value.
+    const second = applySubagentHeartbeat(first, {
+      parentToolCallId: 'agent-1',
+      totalTokens: 12000,
+      elapsedSeconds: 16,
+      timestamp: 2,
+    });
+    expect(second[0].subagentHeartbeat).toMatchObject({ lastToolName: 'Read', totalTokens: 12000, elapsedSeconds: 16 });
+  });
+
+  it('ignores heartbeats for settled or unknown parent cards', () => {
+    const settled: MessageListItem = {
+      ...agentCard('agent-1'),
+      toolResponse: { tool_call_id: 'agent-1', output: 'done' },
+    };
+    const items = [settled];
+    expect(applySubagentHeartbeat(items, { parentToolCallId: 'agent-1', timestamp: 1 })).toBe(items);
+
+    const empty: MessageListItem[] = [];
+    expect(applySubagentHeartbeat(empty, { parentToolCallId: 'missing', timestamp: 1 })).toBe(empty);
   });
 });

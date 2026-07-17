@@ -160,6 +160,16 @@ interface SubagentActivityLogProps {
   isRunning: boolean;
   startedAt: number;
   completedAt?: number;
+  heartbeat?: {
+    lastToolName?: string;
+    totalTokens?: number;
+    elapsedSeconds?: number;
+    timestamp: number;
+  };
+}
+
+function formatTokenCount(tokens: number): string {
+  return tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : `${tokens}`;
 }
 
 /**
@@ -170,7 +180,7 @@ interface SubagentActivityLogProps {
  * the newest entry while the subagent is running; the user can still
  * collapse it manually and scroll back through history at any time.
  */
-export function SubagentActivityLog({ activity, isRunning, startedAt, completedAt }: SubagentActivityLogProps) {
+export function SubagentActivityLog({ activity, isRunning, startedAt, completedAt, heartbeat }: SubagentActivityLogProps) {
   const [expanded, setExpanded] = useState(true);
   const [now, setNow] = useState(Date.now());
   const logRef = useRef<HTMLDivElement>(null);
@@ -247,6 +257,30 @@ export function SubagentActivityLog({ activity, isRunning, startedAt, completedA
               </div>
             );
           })}
+          {isRunning && (
+            // The CLI does not stream subagent content - complete blocks can be
+            // minutes apart during long generations. This trailing row (fed by
+            // task_progress/tool_progress heartbeats plus a local clock) keeps
+            // the log visibly alive between blocks.
+            <div className="subagent-activity-entry working">
+              <div className="subagent-activity-rail">
+                <span className="subagent-activity-icon working">⚙</span>
+              </div>
+              <div className="subagent-activity-body">
+                <div className="subagent-activity-entry-meta">
+                  <span>WORKING</span>
+                  <span>{elapsed}</span>
+                </div>
+                <div className="subagent-activity-content subagent-working-content">
+                  {[
+                    'Generating…',
+                    heartbeat?.lastToolName ? `last tool: ${heartbeat.lastToolName}` : undefined,
+                    heartbeat?.totalTokens !== undefined ? `${formatTokenCount(heartbeat.totalTokens)} tokens` : undefined,
+                  ].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

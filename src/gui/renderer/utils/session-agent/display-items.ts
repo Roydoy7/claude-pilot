@@ -338,6 +338,36 @@ export function applySubagentActivityDelta(
   return next;
 }
 
+/**
+ * Refresh the liveness heartbeat on a running Agent/Task tool_call item.
+ * The CLI does not stream subagent content, so between complete blocks this
+ * heartbeat is the only signal that the subagent is still working.
+ */
+export function applySubagentHeartbeat(
+  items: MessageListItem[],
+  event: { parentToolCallId: string; lastToolName?: string; totalTokens?: number; elapsedSeconds?: number; timestamp: number },
+): MessageListItem[] {
+  const parentIndex = items.findIndex((item) => item.type === 'tool_call' && item.toolCall?.id === event.parentToolCallId);
+  if (parentIndex === -1) return items;
+
+  const parent = items[parentIndex];
+  if (parent.toolResponse || parent.subagentCompletedAt) {
+    return items; // already settled - a late heartbeat must not revive the card
+  }
+
+  const next = [...items];
+  next[parentIndex] = {
+    ...parent,
+    subagentHeartbeat: {
+      lastToolName: event.lastToolName ?? parent.subagentHeartbeat?.lastToolName,
+      totalTokens: event.totalTokens ?? parent.subagentHeartbeat?.totalTokens,
+      elapsedSeconds: event.elapsedSeconds ?? parent.subagentHeartbeat?.elapsedSeconds,
+      timestamp: event.timestamp,
+    },
+  };
+  return next;
+}
+
 /** Show skills injected into a subagent's context as preload metadata. */
 export function applySubagentSkills(
   items: MessageListItem[],

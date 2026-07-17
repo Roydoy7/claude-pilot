@@ -1199,6 +1199,21 @@
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
+.subagent-activity-icon.working {
+  color: var(--accent-primary);
+  animation: subagent-working-spin 3s linear infinite;
+}
+
+.subagent-working-content {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+@keyframes subagent-working-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @container chat (max-width: 719px) {
   .tool-row {
     padding-right: 0;

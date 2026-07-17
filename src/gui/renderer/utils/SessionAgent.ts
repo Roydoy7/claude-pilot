@@ -25,6 +25,7 @@ import {
   applySubagentText,
   applySubagentThinking,
   applySubagentActivityDelta,
+  applySubagentHeartbeat,
   applySubagentSkills,
   applyMessageEvent,
   applyTaskNotificationEvent,
@@ -182,6 +183,15 @@ export class SessionAgent {
         this.displayItems = applySubagentSkills(this.displayItems, event);
         this.notifyDisplayItemsChanged();
         break;
+
+      case 'subagent_heartbeat': {
+        const next = applySubagentHeartbeat(this.displayItems, event);
+        if (next !== this.displayItems) {
+          this.displayItems = next;
+          this.notifyDisplayItemsChanged();
+        }
+        break;
+      }
 
       case 'thinking_tokens': {
         const next = updateThinkingTokens(this.displayItems, event.estimatedTokens);

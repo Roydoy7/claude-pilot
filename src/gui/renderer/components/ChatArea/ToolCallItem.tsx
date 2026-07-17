@@ -149,7 +149,7 @@ export function ToolCallItem({
     return null;
   }
 
-  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress, subagentActivity, subagentCompletedAt } = item;
+  const { toolCall, toolResponse: response, needsApproval, wasRejected, wasCancelled, progress, subagentActivity, subagentCompletedAt, subagentHeartbeat } = item;
 
   // Get tool configuration first (needed for defaultExpanded)
   const toolConfig = getToolConfig(toolCall.name);
@@ -264,6 +264,7 @@ export function ToolCallItem({
           isRunning={!response}
           startedAt={item.timestamp}
           completedAt={subagentCompletedAt}
+          heartbeat={subagentHeartbeat}
         />
       )}
 

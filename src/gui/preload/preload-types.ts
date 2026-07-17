@@ -195,6 +195,14 @@ export interface MessageListItem {
   // Set on the parent Agent/Task tool_call item: live nested activity timeline.
   subagentActivity?: SubagentActivityEntry[];
   subagentCompletedAt?: number;
+  // Latest liveness signal for a running subagent (the CLI does not stream
+  // subagent content, so between complete blocks this is the only progress).
+  subagentHeartbeat?: {
+    lastToolName?: string;
+    totalTokens?: number;
+    elapsedSeconds?: number;
+    timestamp: number;
+  };
 
   // Status type fields
   agentState?: AgentState;
