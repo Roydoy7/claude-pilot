@@ -262,15 +262,16 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
   const state = item.agentState;
 
   // Check if there's anything to display
-  const hasSubagent = state.subagent !== undefined;
+  const hasActiveTasks = Boolean(state.activeTasks?.length);
+  const hasSubagent = state.subagent !== undefined && !hasActiveTasks;
   const hasTool = state.tool !== undefined;
   const hasCommand = state.command !== undefined && state.command.status === 'running';
   // A running slash command already explains what the agent is doing. Avoid
   // rendering the generic thinking line alongside it (notably for /compact).
-  const hasThinking = state.thinking && !hasSubagent && !hasCommand;
+  const hasThinking = state.thinking && !hasSubagent && !hasActiveTasks && !hasCommand;
   const hasQueued = state.queued === true;
 
-  if (!hasThinking && !hasTool && !hasCommand && !hasQueued && !hasSubagent) {
+  if (!hasThinking && !hasTool && !hasCommand && !hasQueued && !hasSubagent && !hasActiveTasks) {
     return null; // Idle state - nothing to display
   }
 
@@ -374,6 +375,34 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
           />
         </div>
       )}
+
+      {/* SDK task lifecycle supports several concurrent background agents. */}
+      {state.activeTasks?.map((task) => (
+        <div
+          key={task.taskId}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span className="status-icon-gear">
+            <GearIcon />
+          </span>
+          <AnimatedText
+            text={t.status.subagentRunning(
+              task.subagentType || task.description || 'agent',
+              task.status === 'paused' ? 'paused' : task.lastToolName,
+              task.durationMs === undefined ? undefined : Math.round(task.durationMs / 1000)
+            )}
+          />
+          {task.totalTokens !== undefined && (
+            <span style={{ color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+              {task.totalTokens.toLocaleString()} tokens
+            </span>
+          )}
+        </div>
+      ))}
 
       {/* Thinking state indicator - shown last (at bottom) */}
       {hasThinking && (

@@ -32,6 +32,7 @@ import { buildBaseQueryOptions } from './sdk-query.js';
 import type { ContentBlock, MessageContent } from '../types/message-types.js';
 import { getErrorMessage } from '../errors.js';
 import { parseTaskNotifications, type TaskNotification } from '../utils/task-notification.js';
+import { writeAgentLifecycleLog } from '../utils/agent-lifecycle-log.js';
 
 /**
  * Re-export message types for backward compatibility
@@ -127,6 +128,21 @@ export interface AgentState {
     lastToolName?: string;
     elapsedSeconds?: number;
   };
+  // All SDK-managed background tasks that are still alive. Unlike `subagent`,
+  // this is keyed by task_id and therefore remains accurate when several
+  // Agent calls run concurrently or before their nested assistant output starts.
+  activeTasks?: Array<{
+    taskId: string;
+    toolUseId?: string;
+    subagentType?: string;
+    description: string;
+    status: 'pending' | 'running' | 'paused';
+    isBackgrounded: boolean;
+    lastToolName?: string;
+    totalTokens?: number;
+    toolUses?: number;
+    durationMs?: number;
+  }>;
 }
 
 /**
@@ -598,7 +614,22 @@ export class ClaudeAgent {
     // the streaming-input session. Background agents keep using the same CLI
     // control channel after that result, so stdin must remain open until every
     // SDK task has settled and the session reports itself idle.
-    const activeTaskIds = new Set<string>();
+    type ActiveTask = NonNullable<AgentState['activeTasks']>[number];
+    const activeTasks = new Map<string, ActiveTask>();
+    const taskState = (): AgentState => ({
+      thinking: true,
+      activeTasks: Array.from(activeTasks.values()),
+    });
+    const logTaskLifecycle = (event: string, details: Record<string, unknown> = {}): void => {
+      const entry = {
+        event,
+        sessionId: this.sessionId,
+        activeTaskCount: activeTasks.size,
+        ...details,
+      };
+      console.log('[claude-agent] task lifecycle', entry);
+      writeAgentLifecycleLog(entry);
+    };
     // Partial subagent blocks are streamed before their complete assistant
     // message. Keep stable IDs so the renderer can append deltas to one
     // timeline entry instead of creating an entry for every token.
@@ -1041,16 +1072,15 @@ export class ClaudeAgent {
           case 'result': {
             const resultMessage = chunk as SDKResultMessage;
             terminalReason = resultMessage.terminal_reason;
-
-            // A result is terminal when no background task is still alive.
-            // Background Agent calls can emit an intermediate result, so keep
-            // stdin open for those; ordinary turns should close immediately
-            // instead of depending on a later session_state_changed/idle event
-            // that the SDK does not always emit.
-            if (activeTaskIds.size === 0 && this.streamEndResolver) {
-              this.streamEndResolver();
-              this.streamEndResolver = null;
-            }
+            // `result` is only a model-turn boundary. In background mode it may
+            // arrive before task_started, so closing stdin here races the SDK
+            // lifecycle stream and kills newly launched subagents. The SDK's
+            // session_state_changed:idle event is the authoritative turn-over
+            // signal and is the only normal path that releases streaming input.
+            logTaskLifecycle('result', {
+              resultSubtype: resultMessage.subtype,
+              terminalReason: resultMessage.terminal_reason,
+            });
 
             // Update session checkpoint metadata on result
             if (resultMessage.session_id) {
@@ -1229,7 +1259,19 @@ export class ClaudeAgent {
 
               case 'task_started': {
                 const task = chunk as SDKTaskStartedMessage;
-                activeTaskIds.add(task.task_id);
+                activeTasks.set(task.task_id, {
+                  taskId: task.task_id,
+                  toolUseId: task.tool_use_id,
+                  subagentType: task.subagent_type,
+                  description: task.description,
+                  status: 'running',
+                  isBackgrounded: false,
+                });
+                logTaskLifecycle('task_started', {
+                  taskId: task.task_id,
+                  toolUseId: task.tool_use_id,
+                  subagentType: task.subagent_type,
+                });
                 if (task.tool_use_id && !subagentInfo.has(task.tool_use_id)) {
                   subagentInfo.set(task.tool_use_id, {
                     name: task.subagent_type || task.description || 'agent',
@@ -1245,12 +1287,31 @@ export class ClaudeAgent {
                     };
                   }
                 }
+                yield { type: 'state', state: taskState() };
                 break;
               }
 
               case 'task_progress': {
                 const task = chunk as SDKTaskProgressMessage;
-                activeTaskIds.add(task.task_id);
+                const current = activeTasks.get(task.task_id);
+                activeTasks.set(task.task_id, {
+                  taskId: task.task_id,
+                  toolUseId: task.tool_use_id ?? current?.toolUseId,
+                  subagentType: task.subagent_type ?? current?.subagentType,
+                  description: task.description || current?.description || 'Background task',
+                  status: current?.status ?? 'running',
+                  isBackgrounded: current?.isBackgrounded ?? true,
+                  lastToolName: task.last_tool_name,
+                  totalTokens: task.usage.total_tokens,
+                  toolUses: task.usage.tool_uses,
+                  durationMs: task.usage.duration_ms,
+                });
+                logTaskLifecycle('task_progress', {
+                  taskId: task.task_id,
+                  lastToolName: task.last_tool_name,
+                  totalTokens: task.usage.total_tokens,
+                  durationMs: task.usage.duration_ms,
+                });
                 if (task.tool_use_id) {
                   const info = subagentInfo.get(task.tool_use_id) ?? {
                     name: task.subagent_type || task.description || 'agent',
@@ -1259,26 +1320,58 @@ export class ClaudeAgent {
                   info.elapsedSeconds = Math.round(task.usage.duration_ms / 1000);
                   subagentInfo.set(task.tool_use_id, info);
                 }
+                yield { type: 'state', state: taskState() };
                 break;
               }
 
               case 'task_notification': {
                 const task = chunk as SDKTaskNotificationMessage;
-                activeTaskIds.delete(task.task_id);
+                activeTasks.delete(task.task_id);
+                logTaskLifecycle('task_notification', {
+                  taskId: task.task_id,
+                  toolUseId: task.tool_use_id,
+                  status: task.status,
+                  totalTokens: task.usage?.total_tokens,
+                  durationMs: task.usage?.duration_ms,
+                });
                 if (task.tool_use_id) {
                   subagentInfo.delete(task.tool_use_id);
                 }
                 // The injected user <task-notification> contains the richer
                 // display payload and is handled above; this system message is
                 // used only for lifecycle tracking.
+                // Do not close stdin here: Claude Code still has to inject the
+                // task result and let the parent agent consume/summarize it.
+                yield { type: 'state', state: taskState() };
                 break;
               }
 
               case 'task_updated': {
                 const task = chunk as SDKTaskUpdatedMessage;
                 if (task.patch.status && ['completed', 'failed', 'killed'].includes(task.patch.status)) {
-                  activeTaskIds.delete(task.task_id);
+                  activeTasks.delete(task.task_id);
+                } else {
+                  const current = activeTasks.get(task.task_id);
+                  if (current) {
+                    activeTasks.set(task.task_id, {
+                      ...current,
+                      description: task.patch.description ?? current.description,
+                      status: task.patch.status === 'paused'
+                        ? 'paused'
+                        : task.patch.status === 'pending'
+                          ? 'pending'
+                          : 'running',
+                      isBackgrounded: task.patch.is_backgrounded ?? current.isBackgrounded,
+                    });
+                  }
                 }
+                logTaskLifecycle('task_updated', {
+                  taskId: task.task_id,
+                  status: task.patch.status,
+                  isBackgrounded: task.patch.is_backgrounded,
+                  error: task.patch.error,
+                });
+                yield { type: 'state', state: taskState() };
                 break;
               }
 
@@ -1292,7 +1385,8 @@ export class ClaudeAgent {
                 // A result can be intermediate while background tasks run.
                 // Idle with no live tasks is the safe point to close stdin and
                 // let the SDK subprocess finish normally.
-                if (chunk.state === 'idle' && activeTaskIds.size === 0 && this.streamEndResolver) {
+                logTaskLifecycle('session_state_changed', { state: chunk.state });
+                if (chunk.state === 'idle' && activeTasks.size === 0 && this.streamEndResolver) {
                   this.streamEndResolver();
                   this.streamEndResolver = null;
                 }
@@ -1315,7 +1409,12 @@ export class ClaudeAgent {
               }
 
               case 'worker_shutting_down': {
-                // Opt-in graceful worker teardown notice (e.g. host_exit, remote_control_disabled) - no UI surface yet
+                // Keep this visible in packaged-process logs. This is the key
+                // diagnostic when a Claude Code host exits with live tasks.
+                logTaskLifecycle('worker_shutting_down', {
+                  reason: chunk.reason,
+                  activeTaskIds: Array.from(activeTasks.keys()),
+                });
                 break;
               }
 
@@ -1456,7 +1555,9 @@ export class ClaudeAgent {
 
     // Keep the generator alive until the conversation ends
     // This prevents SDK from closing stdin prematurely (which breaks tool approval requests)
-    // The streamEndResolver is called when we receive a 'result' message
+    // Normal completion is signalled by session_state_changed:idle. A result
+    // message is not sufficient because background tasks can start around the
+    // same model-turn boundary.
     await new Promise<void>((resolve) => {
       this.streamEndResolver = resolve;
     });

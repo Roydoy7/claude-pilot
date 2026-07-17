@@ -43,7 +43,7 @@ function appendSubagentActivity(
  */
 export function updateStatusItem(items: MessageListItem[], state: AgentState): MessageListItem[] {
   const itemsWithoutStatus = items.filter((item) => item.type !== 'status');
-  const isIdle = !state.thinking && !state.tool && !state.command && !state.queued;
+  const isIdle = !state.thinking && !state.tool && !state.command && !state.queued && !state.activeTasks?.length;
 
   if (isIdle) {
     return itemsWithoutStatus;

@@ -411,7 +411,7 @@ describe('processQueryMessages - tool_progress', () => {
 });
 
 describe('processQueryMessages - Task tool system messages', () => {
-  it('does not emit visible events for task_started/task_progress (handled by Task UI renderers)', async () => {
+  it('emits live state for task_started/task_progress', async () => {
     const agent = makeAgent();
     const events = await collectEvents(agent, [
       makeTaskStarted(),
@@ -419,8 +419,14 @@ describe('processQueryMessages - Task tool system messages', () => {
       makeResultSuccess(),
     ]);
 
-    const eventTypes = events.map((event) => event.type);
-    expect(eventTypes).toEqual(['state', 'state', 'done']);
+    const taskStates = events.filter((event) => event.type === 'state' && event.state.activeTasks?.length);
+    expect(taskStates).toHaveLength(2);
+    expect(taskStates[1]).toEqual(expect.objectContaining({
+      type: 'state',
+      state: expect.objectContaining({
+        activeTasks: [expect.objectContaining({ taskId: 'task_1', totalTokens: 100 })],
+      }),
+    }));
   });
 
   it('keeps streaming input open across an intermediate result while a background task is active', async () => {
@@ -454,20 +460,48 @@ describe('processQueryMessages - Task tool system messages', () => {
 
     releaseTask();
     await completion;
+    for await (const _event of events) {
+      // Drain through task_notification and authoritative session idle.
+    }
     expect(inputReleased).toBe(true);
   });
 });
 
 describe('processQueryMessages - result', () => {
-  it('releases streaming input on result when no background task is active', async () => {
+  it('waits for authoritative idle instead of releasing streaming input on result', async () => {
     const agent = makeAgent();
     let inputReleased = false;
     (agent as unknown as { streamEndResolver: (() => void) | null }).streamEndResolver = () => {
       inputReleased = true;
     };
 
-    await collectEvents(agent, [makeResultSuccess()]);
+    await collectEvents(agent, [makeResultSuccess(), makeSessionIdle()]);
 
+    expect(inputReleased).toBe(true);
+  });
+
+  it('does not release when result races ahead of task_started or when the task notification arrives', async () => {
+    const agent = makeAgent();
+    const processMessages = (agent as unknown as { processQueryMessages: ProcessQueryMessages }).processQueryMessages;
+    let inputReleased = false;
+    (agent as unknown as { streamEndResolver: (() => void) | null }).streamEndResolver = () => {
+      inputReleased = true;
+    };
+
+    async function* messages(): AsyncGenerator<SDKMessage, void, unknown> {
+      yield makeResultSuccess();
+      expect(inputReleased).toBe(false);
+      yield makeTaskStarted('tool-agent-race');
+      yield makeTaskNotification('tool-agent-race');
+      expect(inputReleased).toBe(false);
+      yield makeResultSuccess();
+      expect(inputReleased).toBe(false);
+      yield makeSessionIdle();
+    }
+
+    for await (const _event of processMessages.call(agent, messages() as unknown as Query)) {
+      // Drain the synthetic SDK stream so each inline lifecycle assertion runs.
+    }
     expect(inputReleased).toBe(true);
   });
 
