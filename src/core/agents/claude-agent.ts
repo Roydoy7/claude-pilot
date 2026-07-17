@@ -63,6 +63,15 @@ const FILE_EDIT_TOOLS = ['Write', 'Edit'];
 const STREAM_CLOSE_GRACE_MS = 1500;
 
 /**
+ * Last-resort fallback while stdin is held open for live background tasks
+ * (see `scheduleStreamClose`/`activeTasks`). If no task message (started/
+ * progress/notification/updated) arrives for this long, something is stuck
+ * with no visible cause (API retry storm, deadlocked approval, etc.) - force
+ * the stream closed rather than hang forever.
+ */
+const TASK_STALL_TIMEOUT_MS = 15 * 60 * 1000;
+
+/**
  * Cache creation breakdown by TTL
  */
 export interface CacheCreationBreakdown {
@@ -300,7 +309,11 @@ export class ClaudeAgent {
   private permissionMode: PermissionMode; // Current permission mode, persists across turns
   private settingSources: SettingSource[]; // Current setting sources, persists across turns
   private slashCommands: string[] = []; // Available slash commands from SDK
-  private pendingToolApproval: PendingToolApproval | null = null; // Current pending tool approval
+  // Pending tool approvals, keyed by toolUseId. Concurrent subagents can each
+  // have their own tool awaiting approval at the same time - a single slot
+  // would let a second request silently overwrite the first, permanently
+  // losing its resolve() and deadlocking that subagent's canUseTool promise.
+  private pendingToolApprovals = new Map<string, PendingToolApproval>();
   private toolApprovalRequestHandler: ToolApprovalRequestHandler | null = null; // Handler for notifying UI
   private streamEndResolver: (() => void) | null = null; // Resolver to signal end of input stream
   private turnFinishedResolvers: Array<() => void> = []; // Resolved when run()'s finally block runs (turn truly ended)
@@ -397,14 +410,13 @@ export class ClaudeAgent {
       await this.currentQuery.setPermissionMode(mode);
     }
 
-    // bypassPermissions auto-approves everything, including an approval already
-    // waiting on the user - resolve it so the dialog doesn't hang forever
-    if (mode === 'bypassPermissions' && this.pendingToolApproval) {
-      this.pendingToolApproval.resolve({
-        approved: true,
-        updatedInput: this.pendingToolApproval.input,
-      });
-      this.pendingToolApproval = null;
+    // bypassPermissions auto-approves everything, including any approvals already
+    // waiting on the user - resolve them so their dialogs don't hang forever
+    if (mode === 'bypassPermissions' && this.pendingToolApprovals.size > 0) {
+      for (const pending of this.pendingToolApprovals.values()) {
+        pending.resolve({ approved: true, updatedInput: pending.input });
+      }
+      this.pendingToolApprovals.clear();
     }
   }
 
@@ -472,14 +484,31 @@ export class ClaudeAgent {
    * Returns a Promise that resolves when user approves/rejects via UI
    */
   private createCanUseToolCallback(): CanUseTool {
+    const logDecision = (decision: string, toolUseId: string, toolName: string, extra: Record<string, unknown> = {}): void => {
+      const entry = {
+        event: 'can_use_tool',
+        sessionId: this.sessionId,
+        toolUseId,
+        toolName,
+        decision,
+        pendingApprovalCount: this.pendingToolApprovals.size,
+        ...extra,
+      };
+      console.log('[claude-agent] task lifecycle', entry);
+      writeAgentLifecycleLog(entry);
+    };
+
     return async (
       toolName: string,
       toolInput: Record<string, unknown>,
       options: { signal: AbortSignal; toolUseID: string }
     ): Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }> => {
+      logDecision('entry', options.toolUseID, toolName);
+
       // Check if this MCP tool is auto-approved
       const autoApprovedMcpTools = this.config.autoApprovedMcpTools || [];
       if (autoApprovedMcpTools.includes(toolName)) {
+        logDecision('auto-approved-mcp', options.toolUseID, toolName);
         return {
           behavior: 'allow',
           updatedInput: toolInput,
@@ -488,6 +517,7 @@ export class ClaudeAgent {
 
       // bypassPermissions: auto-allow every tool call
       if (this.permissionMode === 'bypassPermissions') {
+        logDecision('auto-approved-bypass', options.toolUseID, toolName);
         return {
           behavior: 'allow',
           updatedInput: toolInput,
@@ -496,6 +526,7 @@ export class ClaudeAgent {
 
       // acceptEdits: auto-allow built-in file edit tools (Write/Edit)
       if (this.permissionMode === 'acceptEdits' && FILE_EDIT_TOOLS.includes(toolName)) {
+        logDecision('auto-approved-accept-edits', options.toolUseID, toolName);
         return {
           behavior: 'allow',
           updatedInput: toolInput,
@@ -505,6 +536,7 @@ export class ClaudeAgent {
       // plan: no tool execution allowed - deny everything except ExitPlanMode,
       // which is the user's actual decision point and falls through to the UI prompt below
       if (this.permissionMode === 'plan' && toolName !== 'ExitPlanMode') {
+        logDecision('denied-plan-mode', options.toolUseID, toolName);
         return {
           behavior: 'deny',
           message: 'Currently in plan mode: no tool execution is allowed. Call ExitPlanMode to present your plan.',
@@ -513,26 +545,30 @@ export class ClaudeAgent {
 
       // dontAsk: deny tools that aren't pre-approved, never prompt the user
       if (this.permissionMode === 'dontAsk') {
+        logDecision('denied-dont-ask', options.toolUseID, toolName);
         return {
           behavior: 'deny',
           message: 'Tool not pre-approved under dontAsk permission mode',
         };
       }
 
-      // Create a Promise that will be resolved when user approves/rejects
+      // Create a Promise that will be resolved when user approves/rejects.
+      // Keyed by toolUseId so concurrent subagents each get their own slot -
+      // see pendingToolApprovals field comment.
       const approvalPromise = new Promise<ToolApprovalResult>((resolve) => {
-        this.pendingToolApproval = {
+        this.pendingToolApprovals.set(options.toolUseID, {
           toolUseId: options.toolUseID,
           toolName,
           input: toolInput,
           resolve,
-        };
+        });
       });
 
       // Notify UI about the pending approval via handler
       if (this.toolApprovalRequestHandler) {
         this.toolApprovalRequestHandler(options.toolUseID, toolName, toolInput);
       }
+      logDecision('awaiting-ui', options.toolUseID, toolName);
 
       // Wait for user decision or abort signal
       const result = await Promise.race([
@@ -551,7 +587,10 @@ export class ClaudeAgent {
       ]);
 
       // Clear pending approval
-      this.pendingToolApproval = null;
+      this.pendingToolApprovals.delete(options.toolUseID);
+      logDecision(result.approved ? 'resolved-approved' : 'resolved-denied', options.toolUseID, toolName, {
+        message: result.message,
+      });
 
       if (result.approved) {
         return {
@@ -572,14 +611,15 @@ export class ClaudeAgent {
    * Called by IPC handler when user clicks approve in UI
    */
   approveToolCall(toolUseId: string, updatedInput?: Record<string, unknown>): boolean {
-    if (!this.pendingToolApproval || this.pendingToolApproval.toolUseId !== toolUseId) {
+    const pending = this.pendingToolApprovals.get(toolUseId);
+    if (!pending) {
       console.warn(`No pending approval for tool ${toolUseId}`);
       return false;
     }
 
-    this.pendingToolApproval.resolve({
+    pending.resolve({
       approved: true,
-      updatedInput: updatedInput || this.pendingToolApproval.input,
+      updatedInput: updatedInput || pending.input,
     });
     return true;
   }
@@ -589,12 +629,13 @@ export class ClaudeAgent {
    * Called by IPC handler when user clicks reject in UI
    */
   rejectToolCall(toolUseId: string, message?: string): boolean {
-    if (!this.pendingToolApproval || this.pendingToolApproval.toolUseId !== toolUseId) {
+    const pending = this.pendingToolApprovals.get(toolUseId);
+    if (!pending) {
       console.warn(`No pending approval for tool ${toolUseId}`);
       return false;
     }
 
-    this.pendingToolApproval.resolve({
+    pending.resolve({
       approved: false,
       message: message || 'Tool execution rejected by user, stop and waiting for next instruction.',
     });
@@ -602,24 +643,21 @@ export class ClaudeAgent {
   }
 
   /**
-   * Check if there's a pending tool approval
+   * Check if there's at least one pending tool approval
    */
   hasPendingToolApproval(): boolean {
-    return this.pendingToolApproval !== null;
+    return this.pendingToolApprovals.size > 0;
   }
 
   /**
-   * Get pending tool approval info
+   * Get all pending tool approvals (concurrent subagents can each have one)
    */
-  getPendingToolApproval(): { toolUseId: string; toolName: string; input: Record<string, unknown> } | null {
-    if (!this.pendingToolApproval) {
-      return null;
-    }
-    return {
-      toolUseId: this.pendingToolApproval.toolUseId,
-      toolName: this.pendingToolApproval.toolName,
-      input: this.pendingToolApproval.input,
-    };
+  getPendingToolApprovals(): Array<{ toolUseId: string; toolName: string; input: Record<string, unknown> }> {
+    return Array.from(this.pendingToolApprovals.values(), (pending) => ({
+      toolUseId: pending.toolUseId,
+      toolName: pending.toolName,
+      input: pending.input,
+    }));
   }
 
   /**
@@ -691,6 +729,36 @@ export class ClaudeAgent {
           this.streamEndResolver = null;
         }
       }, STREAM_CLOSE_GRACE_MS);
+    };
+    // Deferring stream close for live background tasks can hang forever if
+    // the SDK goes silent (429 retry storm, deadlocked tool approval, etc.)
+    // with no task_* message to react to. Reset on every task message; if it
+    // ever fires, force the stream closed and warn with the stuck task ids
+    // rather than leave the UI spinning indefinitely.
+    let taskStallTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearTaskStallTimer = (): void => {
+      if (taskStallTimer) {
+        clearTimeout(taskStallTimer);
+        taskStallTimer = null;
+      }
+    };
+    const resetTaskStallTimer = (): void => {
+      clearTaskStallTimer();
+      taskStallTimer = setTimeout(() => {
+        taskStallTimer = null;
+        const staleTaskIds = Array.from(activeTasks.keys());
+        console.warn(
+          `[claude-agent] no task activity for ${TASK_STALL_TIMEOUT_MS / 60000}min, forcing stream close`,
+          staleTaskIds
+        );
+        logTaskLifecycle('task_stall_timeout', { staleTaskIds, timeoutMs: TASK_STALL_TIMEOUT_MS });
+        activeTasks.clear();
+        cancelScheduledStreamClose('task_stall_timeout');
+        if (this.streamEndResolver) {
+          this.streamEndResolver();
+          this.streamEndResolver = null;
+        }
+      }, TASK_STALL_TIMEOUT_MS);
     };
     // Partial subagent blocks are streamed before their complete assistant
     // message. Keep stable IDs so the renderer can append deltas to one
@@ -1153,11 +1221,13 @@ export class ClaudeAgent {
               terminalReason: resultMessage.terminal_reason,
             });
             if (activeTasks.size === 0) {
+              clearTaskStallTimer();
               scheduleStreamClose();
             } else {
               logTaskLifecycle('stream_close_deferred', {
                 activeTaskIds: Array.from(activeTasks.keys()),
               });
+              resetTaskStallTimer();
             }
 
             // Update session checkpoint metadata on result
@@ -1372,6 +1442,7 @@ export class ClaudeAgent {
                   subagentType: task.subagent_type,
                 });
                 cancelScheduledStreamClose('task_started');
+                resetTaskStallTimer();
                 if (task.tool_use_id && !subagentInfo.has(task.tool_use_id)) {
                   subagentInfo.set(task.tool_use_id, {
                     name: task.subagent_type || task.description || 'agent',
@@ -1412,6 +1483,7 @@ export class ClaudeAgent {
                   totalTokens: task.usage.total_tokens,
                   durationMs: task.usage.duration_ms,
                 });
+                resetTaskStallTimer();
                 if (task.tool_use_id) {
                   const info = subagentInfo.get(task.tool_use_id) ?? {
                     name: task.subagent_type || task.description || 'agent',
@@ -1444,6 +1516,11 @@ export class ClaudeAgent {
                 });
                 if (task.tool_use_id) {
                   subagentInfo.delete(task.tool_use_id);
+                }
+                if (activeTasks.size === 0) {
+                  clearTaskStallTimer();
+                } else {
+                  resetTaskStallTimer();
                 }
                 // The injected user <task-notification> contains the richer
                 // display payload and is handled above; this system message is
@@ -1479,6 +1556,11 @@ export class ClaudeAgent {
                   isBackgrounded: task.patch.is_backgrounded,
                   error: task.patch.error,
                 });
+                if (activeTasks.size === 0) {
+                  clearTaskStallTimer();
+                } else {
+                  resetTaskStallTimer();
+                }
                 yield { type: 'state', state: taskState() };
                 break;
               }
@@ -1613,6 +1695,7 @@ export class ClaudeAgent {
         clearTimeout(streamCloseTimer);
         streamCloseTimer = null;
       }
+      clearTaskStallTimer();
       // Also release on abnormal SDK termination so the input generator cannot
       // retain an unresolved promise after its consumer has gone away.
       if (this.streamEndResolver) {
