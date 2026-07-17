@@ -13,6 +13,9 @@ import {
   applySubagentHeartbeat,
   applySubagentSkills,
   applyTaskNotificationEvent,
+  applyApiRetry,
+  clearApiRetry,
+  updateStatusItem,
 } from './display-items';
 import type { MessageListItem } from '../../../preload/preload-types';
 
@@ -168,5 +171,41 @@ describe('subagent heartbeat', () => {
 
     const empty: MessageListItem[] = [];
     expect(applySubagentHeartbeat(empty, { parentToolCallId: 'missing', timestamp: 1 })).toBe(empty);
+  });
+});
+
+describe('api retry banner', () => {
+  const statusItem: MessageListItem = {
+    type: 'status',
+    id: 'status-1',
+    timestamp: 1,
+    agentState: { thinking: true },
+  };
+  const retry = { attempt: 3, maxRetries: 10, retryDelayMs: 8000, errorStatus: 429, timestamp: 2 };
+
+  it('sets the retry on the status item and clears it on resumed activity', () => {
+    const withRetry = applyApiRetry([statusItem], retry);
+    expect(withRetry[0].agentState?.apiRetry).toMatchObject({ attempt: 3, errorStatus: 429 });
+
+    const cleared = clearApiRetry(withRetry);
+    expect(cleared[0].agentState?.apiRetry).toBeUndefined();
+    // Clearing again is a no-op returning the same reference.
+    expect(clearApiRetry(cleared)).toBe(cleared);
+  });
+
+  it('is a no-op without a status item', () => {
+    const items: MessageListItem[] = [];
+    expect(applyApiRetry(items, retry)).toBe(items);
+    expect(clearApiRetry(items)).toBe(items);
+  });
+
+  it('survives a status refresh from an interleaved state event', () => {
+    const withRetry = applyApiRetry([statusItem], retry);
+    const refreshed = updateStatusItem(withRetry, {
+      thinking: true,
+      activeTasks: [{ taskId: 't1', description: 'work', status: 'running', isBackgrounded: false }],
+    });
+    const status = refreshed.find((item) => item.type === 'status');
+    expect(status?.agentState?.apiRetry).toMatchObject({ attempt: 3, errorStatus: 429 });
   });
 });

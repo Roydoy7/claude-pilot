@@ -42,6 +42,7 @@ function appendSubagentActivity(
  * kept at the end of the list; an idle state removes it entirely.
  */
 export function updateStatusItem(items: MessageListItem[], state: AgentState): MessageListItem[] {
+  const previousStatus = items.find((item) => item.type === 'status');
   const itemsWithoutStatus = items.filter((item) => item.type !== 'status');
   const isIdle = !state.thinking && !state.tool && !state.command && !state.queued && !state.activeTasks?.length;
 
@@ -49,11 +50,16 @@ export function updateStatusItem(items: MessageListItem[], state: AgentState): M
     return itemsWithoutStatus;
   }
 
+  // Carry an in-progress API retry across state refreshes: retry attempts can
+  // be tens of seconds apart, and an interleaved state event must not hide
+  // the only explanation for the stall. clearApiRetry removes it when normal
+  // stream activity resumes.
+  const apiRetry = state.apiRetry ?? previousStatus?.agentState?.apiRetry;
   const statusItem: MessageListItem = {
     type: 'status',
     id: `status-${Date.now()}`,
     timestamp: Date.now(),
-    agentState: state,
+    agentState: apiRetry ? { ...state, apiRetry } : state,
   };
   return [...itemsWithoutStatus, statusItem];
 }
@@ -78,6 +84,54 @@ export function updateThinkingTokens(items: MessageListItem[], estimatedTokens: 
     ...statusItem,
     agentState: { ...statusItem.agentState, thinkingTokens: estimatedTokens },
   };
+  return next;
+}
+
+/**
+ * Show an in-progress API retry (429/5xx backoff) on the current status item.
+ * This is the only live signal during a rate-limit retry storm - without it
+ * the session looks frozen. No-op if there is no status item.
+ */
+export function applyApiRetry(
+  items: MessageListItem[],
+  retry: NonNullable<NonNullable<MessageListItem['agentState']>['apiRetry']>,
+): MessageListItem[] {
+  const statusIndex = items.findIndex((item) => item.type === 'status');
+  if (statusIndex === -1) {
+    return items;
+  }
+
+  const statusItem = items[statusIndex];
+  if (statusItem.type !== 'status' || !statusItem.agentState) {
+    return items;
+  }
+
+  const next = [...items];
+  next[statusIndex] = {
+    ...statusItem,
+    agentState: { ...statusItem.agentState, apiRetry: retry },
+  };
+  return next;
+}
+
+/**
+ * Clear a previously shown API retry once normal stream activity resumes.
+ * Returns the same array reference when there is nothing to clear.
+ */
+export function clearApiRetry(items: MessageListItem[]): MessageListItem[] {
+  const statusIndex = items.findIndex((item) => item.type === 'status');
+  if (statusIndex === -1) {
+    return items;
+  }
+
+  const statusItem = items[statusIndex];
+  if (statusItem.type !== 'status' || !statusItem.agentState?.apiRetry) {
+    return items;
+  }
+
+  const { apiRetry: _cleared, ...rest } = statusItem.agentState;
+  const next = [...items];
+  next[statusIndex] = { ...statusItem, agentState: rest };
   return next;
 }
 

@@ -100,6 +100,8 @@ export const jaTranslations: Translation = {
     messageQueued: 'メッセージがキュー中...',
     subagentRunning: (name: string, action?: string, elapsedSeconds?: number) =>
       `サブエージェント ${name} 実行中${action ? ` · 最新の操作: ${action}` : ''}${elapsedSeconds ? ` (${elapsedSeconds}秒)` : ''}`,
+    apiRetrying: (attempt: number, maxRetries: number, delaySeconds: number, errorStatus?: number | null) =>
+      `APIリクエスト失敗${errorStatus ? `（HTTP ${errorStatus}）` : ''} — ${delaySeconds}秒後に再試行（${attempt}/${maxRetries}回目）`,
     commands: {
       compact: '会話を圧縮中...',
       clear: '会話をクリア中...',

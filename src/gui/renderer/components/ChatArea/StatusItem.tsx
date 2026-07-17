@@ -404,6 +404,30 @@ export const StatusItem = memo(function StatusItem({ item }: StatusItemProps) {
         </div>
       ))}
 
+      {/* API retry banner - the only live signal during a rate-limit retry
+          storm; shown whenever the SDK reports a retry, regardless of which
+          activity row is visible (it cannot be attributed to one subagent) */}
+      {state.apiRetry && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            color: 'var(--warning, #d97706)',
+          }}
+        >
+          <span aria-hidden="true">⚠</span>
+          <span>
+            {t.status.apiRetrying(
+              state.apiRetry.attempt,
+              state.apiRetry.maxRetries,
+              Math.round(state.apiRetry.retryDelayMs / 1000),
+              state.apiRetry.errorStatus,
+            )}
+          </span>
+        </div>
+      )}
+
       {/* Thinking state indicator - shown last (at bottom) */}
       {hasThinking && (
         <div

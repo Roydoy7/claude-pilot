@@ -100,6 +100,8 @@ export const enTranslations: Translation = {
     messageQueued: 'Message queued, waiting...',
     subagentRunning: (name: string, action?: string, elapsedSeconds?: number) =>
       `Subagent ${name} running${action ? ` — ${action}` : ''}${elapsedSeconds ? ` (${elapsedSeconds}s)` : ''}`,
+    apiRetrying: (attempt: number, maxRetries: number, delaySeconds: number, errorStatus?: number | null) =>
+      `API request failed${errorStatus ? ` (HTTP ${errorStatus})` : ''} — retrying in ${delaySeconds}s (attempt ${attempt}/${maxRetries})`,
     commands: {
       compact: 'Compacting conversation...',
       clear: 'Clearing conversation...',

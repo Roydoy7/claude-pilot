@@ -36,6 +36,8 @@ import {
   applyDone,
   buildDisplayItemsFromHistory,
   updateThinkingTokens,
+  applyApiRetry,
+  clearApiRetry,
 } from './session-agent/display-items.js';
 
 interface SessionAgentCallbacks {
@@ -136,6 +138,25 @@ export class SessionAgent {
    * Called sequentially from event queue to guarantee order
    */
   private processStreamEvent(event: StreamEvent) {
+    // Any content arriving means the API request that was being retried has
+    // succeeded - drop the retry banner before applying the event.
+    switch (event.type) {
+      case 'text_delta':
+      case 'thinking':
+      case 'thinking_tokens':
+      case 'tool_start':
+      case 'subagent_text':
+      case 'subagent_activity_delta': {
+        const cleared = clearApiRetry(this.displayItems);
+        if (cleared !== this.displayItems) {
+          this.displayItems = cleared;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
     switch (event.type) {
       case 'state':
         this.displayItems = updateStatusItem(this.displayItems, event.state);
@@ -186,6 +207,22 @@ export class SessionAgent {
 
       case 'subagent_heartbeat': {
         const next = applySubagentHeartbeat(this.displayItems, event);
+        if (next !== this.displayItems) {
+          this.displayItems = next;
+          this.notifyDisplayItemsChanged();
+        }
+        break;
+      }
+
+      case 'api_retry': {
+        const next = applyApiRetry(this.displayItems, {
+          attempt: event.attempt,
+          maxRetries: event.maxRetries,
+          retryDelayMs: event.retryDelayMs,
+          errorStatus: event.errorStatus,
+          errorType: event.errorType,
+          timestamp: event.timestamp,
+        });
         if (next !== this.displayItems) {
           this.displayItems = next;
           this.notifyDisplayItemsChanged();

@@ -128,6 +128,19 @@ export interface AgentState {
   };
   // Message is queued (another request is being processed)
   queued?: boolean;
+  // The SDK is retrying a failed API request (e.g. 429 rate limit). Without
+  // this the UI shows a silent stall while the retry backoff runs - which can
+  // last minutes when quota is exhausted. Not attributable to a specific
+  // subagent (the SDK message carries no parent_tool_use_id), so it is
+  // surfaced globally. Cleared when normal stream activity resumes.
+  apiRetry?: {
+    attempt: number;
+    maxRetries: number;
+    retryDelayMs: number;
+    errorStatus: number | null;
+    errorType?: string;
+    timestamp: number;
+  };
   // A subagent (Agent/Task tool) is currently running - lets the UI show
   // what it's doing instead of a generic "AI is thinking"
   subagent?: {
@@ -181,6 +194,10 @@ export type StreamEvent =
   // minutes apart during long generations). Lets the UI show "still working"
   // instead of appearing frozen between blocks.
   | { type: 'subagent_heartbeat'; parentToolCallId: string; lastToolName?: string; totalTokens?: number; elapsedSeconds?: number; timestamp: number }
+  // A failed API request is being retried after a backoff delay. This is the
+  // only signal the SDK emits during a rate-limit (429) retry storm - without
+  // it the whole session looks frozen with no console errors.
+  | { type: 'api_retry'; attempt: number; maxRetries: number; retryDelayMs: number; errorStatus: number | null; errorType?: string; timestamp: number }
   | { type: 'interrupt'; interruptId: string; toolCalls: Array<{ name: string; args: Record<string, unknown>; id?: string }> }
   | { type: 'error'; error: string; details?: string }
   | { type: 'usage_limit'; message: string }
@@ -1307,7 +1324,28 @@ export class ClaudeAgent {
               }
 
               case 'api_retry': {
-                // Automatic retry of a failed API request - 'thinking' state already covers this
+                // A retryable API failure (429/5xx/timeout). During a quota
+                // exhaustion storm this is the ONLY message emitted for
+                // minutes - log it and surface it to the UI so the stall has
+                // a visible cause.
+                logTaskLifecycle('api_retry', {
+                  attempt: chunk.attempt,
+                  maxRetries: chunk.max_retries,
+                  retryDelayMs: chunk.retry_delay_ms,
+                  errorStatus: chunk.error_status,
+                  errorType: chunk.error,
+                  activeTaskIds: Array.from(activeTasks.keys()),
+                });
+                cancelScheduledStreamClose('api_retry');
+                yield {
+                  type: 'api_retry',
+                  attempt: chunk.attempt,
+                  maxRetries: chunk.max_retries,
+                  retryDelayMs: chunk.retry_delay_ms,
+                  errorStatus: chunk.error_status,
+                  errorType: chunk.error,
+                  timestamp: Date.now(),
+                };
                 break;
               }
 

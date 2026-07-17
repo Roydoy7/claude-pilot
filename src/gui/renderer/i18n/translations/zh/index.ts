@@ -100,6 +100,8 @@ export const zhTranslations: Translation = {
     messageQueued: '消息已排队，请等待...',
     subagentRunning: (name: string, action?: string, elapsedSeconds?: number) =>
       `子代理 ${name} 运行中${action ? ` · 最近动作: ${action}` : ''}${elapsedSeconds ? ` · 已运行 ${elapsedSeconds}s` : ''}`,
+    apiRetrying: (attempt: number, maxRetries: number, delaySeconds: number, errorStatus?: number | null) =>
+      `API 请求失败${errorStatus ? `（HTTP ${errorStatus}）` : ''} — ${delaySeconds}s 后重试（第 ${attempt}/${maxRetries} 次）`,
     commands: {
       compact: '正在压缩对话...',
       clear: '正在清除对话...',

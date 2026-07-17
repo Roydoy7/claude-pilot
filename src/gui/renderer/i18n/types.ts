@@ -273,6 +273,7 @@ export interface Translation {
     waitingForApproval: string;
     messageQueued: string;
     subagentRunning: (name: string, action?: string, elapsedSeconds?: number) => string;
+    apiRetrying: (attempt: number, maxRetries: number, delaySeconds: number, errorStatus?: number | null) => string;
     // Slash command execution states
     commands?: {
       compact: string;
