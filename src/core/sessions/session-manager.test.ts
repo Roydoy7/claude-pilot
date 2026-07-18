@@ -62,6 +62,18 @@ describe('updateClaudeSessionId', () => {
   });
 });
 
+describe('updateSessionSettingSources', () => {
+  it('persists setting sources independently for each session', () => {
+    const first = createTestSession('Setting sources A');
+    const second = createTestSession('Setting sources B');
+
+    sessionManager.updateSessionSettingSources(first.id, ['project']);
+
+    expect(sessionManager.loadSession(first.id)?.settingSources).toEqual(['project']);
+    expect(sessionManager.loadSession(second.id)?.settingSources).toBeUndefined();
+  });
+});
+
 describe('updateSessionCheckpoint', () => {
   it('persists the checkpoint ID and increments totalTurns', () => {
     const session = createTestSession('Checkpoint test');

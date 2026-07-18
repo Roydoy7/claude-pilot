@@ -126,7 +126,8 @@ export class ClaudeAgentService {
 
   // Request queue for sequential message processing
   private requestQueue: Map<string, PendingChatRequest[]> = new Map(); // sessionId -> queue
-  private processingSession: string | null = null; // Currently processing session
+  private processingSessions = new Set<string>();
+  private runningAgents = new Map<string, ClaudeAgent>();
 
   private constructor() {
     this.sessionManager = SessionManager.getInstance();
@@ -154,6 +155,29 @@ export class ClaudeAgentService {
       console.log('[ClaudeAgentService] Applying handler to current agent');
       this.currentAgent.setToolApprovalRequestHandler(handler);
     }
+  }
+
+  private getLiveAgent(sessionId: string): ClaudeAgent | undefined {
+    if (this.currentAgent?.getSessionId() === sessionId) {
+      return this.currentAgent;
+    }
+    return this.runningAgents.get(sessionId) ?? getAgentBySessionId(sessionId);
+  }
+
+  private async getAgentForSession(sessionId: string): Promise<ClaudeAgent> {
+    const liveAgent = this.getLiveAgent(sessionId);
+    if (liveAgent) {
+      if (this.toolApprovalRequestHandler) {
+        liveAgent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
+      }
+      return liveAgent;
+    }
+
+    const agent = await createAgentFromSession(sessionId);
+    if (this.toolApprovalRequestHandler) {
+      agent.setToolApprovalRequestHandler(this.toolApprovalRequestHandler);
+    }
+    return agent;
   }
 
   /**
@@ -274,12 +298,17 @@ export class ClaudeAgentService {
     }
 
     // If this session is currently being processed, queue the request
-    if (effectiveSessionId && this.processingSession === effectiveSessionId) {
+    if (effectiveSessionId && this.processingSessions.has(effectiveSessionId)) {
       return this.enqueueRequest(effectiveSessionId, request);
     }
 
-    // Execute immediately
-    return this.executeChat(request);
+    if (effectiveSessionId) {
+      this.processingSessions.add(effectiveSessionId);
+    }
+
+    // Execute immediately. The session is reserved synchronously above so a
+    // second renderer request cannot race past the per-session queue.
+    return this.executeChat(request, effectiveSessionId);
   }
 
   /**
@@ -323,7 +352,8 @@ export class ClaudeAgentService {
     console.log(`[ClaudeAgentService] Processing queued request for session ${sessionId}, remaining: ${queue.length}`);
 
     try {
-      const response = await this.executeChat(pending.request);
+      this.processingSessions.add(sessionId);
+      const response = await this.executeChat(pending.request, sessionId);
       pending.resolve(response);
     } catch (error) {
       pending.reject(error instanceof Error ? error : new Error(String(error)));
@@ -333,35 +363,29 @@ export class ClaudeAgentService {
   /**
    * Execute a chat request (internal implementation)
    */
-  private async executeChat(request: ChatRequest): Promise<ChatResponse> {
+  private async executeChat(request: ChatRequest, reservedSessionId?: string): Promise<ChatResponse> {
+    let agentSessionId = reservedSessionId;
     try {
       const { message, sessionId, streamEventCallback } = request;
+      let agent: ClaudeAgent;
 
-      if (!this.currentAgent || (sessionId && this.currentAgent.getSessionId() !== sessionId)) {
-        if (!sessionId) {
-          const textContent = extractTextFromMessage(message);
-          const title = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
-
-          await this.initializeAgent({
-            sessionId: undefined,
-            title,
-          });
-        } else {
-          await this.initializeAgent({ sessionId });
-        }
+      if (sessionId) {
+        agent = await this.getAgentForSession(sessionId);
+      } else if (this.currentAgent) {
+        agent = this.currentAgent;
+      } else {
+        const textContent = extractTextFromMessage(message);
+        const title = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+        agent = await this.initializeAgent({ sessionId: undefined, title });
       }
 
-      if (!this.currentAgent) {
-        throw new AgentQueryError('Agent not initialized', 'AGENT_NOT_INITIALIZED');
-      }
-
-      const agentSessionId = this.currentAgent.getSessionId();
-
-      // Mark this session as being processed
-      this.processingSession = agentSessionId;
+      agentSessionId = agent.getSessionId();
+      this.currentAgent = agent; // Legacy/current-info compatibility only.
+      this.processingSessions.add(agentSessionId);
+      this.runningAgents.set(agentSessionId, agent);
 
       try {
-        const eventStream = this.currentAgent.run(message);
+        const eventStream = agent.run(message);
 
         for await (const event of eventStream) {
           if (streamEventCallback) {
@@ -382,11 +406,9 @@ export class ClaudeAgentService {
           sessionId: agentSessionId,
         };
       } finally {
-        // Clear processing flag
-        this.processingSession = null;
-
-        // Process next queued request for this session
-        this.processQueue(agentSessionId);
+        if (this.runningAgents.get(agentSessionId) === agent) {
+          this.runningAgents.delete(agentSessionId);
+        }
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -394,6 +416,11 @@ export class ClaudeAgentService {
         success: false,
         error: getErrorMessage(error),
       };
+    } finally {
+      if (agentSessionId) {
+        this.processingSessions.delete(agentSessionId);
+        void this.processQueue(agentSessionId);
+      }
     }
   }
 
@@ -429,10 +456,7 @@ export class ClaudeAgentService {
         }
       }
 
-      const targetAgent =
-        this.currentAgent?.getSessionId() === targetSessionId
-          ? this.currentAgent
-          : getAgentBySessionId(targetSessionId);
+      const targetAgent = this.getLiveAgent(targetSessionId);
 
       if (!targetAgent) {
         return {
@@ -459,14 +483,16 @@ export class ClaudeAgentService {
    * Approve a pending tool call
    */
   approveToolCall(
+    sessionId: string,
     toolUseId: string,
     updatedInput?: Record<string, unknown>
   ): { success: boolean; error?: string } {
-    if (!this.currentAgent) {
-      return { success: false, error: 'No active agent' };
+    const targetAgent = this.getLiveAgent(sessionId);
+    if (!targetAgent) {
+      return { success: false, error: `No active agent for session ${sessionId}` };
     }
 
-    const result = this.currentAgent.approveToolCall(toolUseId, updatedInput);
+    const result = targetAgent.approveToolCall(toolUseId, updatedInput);
     return { success: result, error: result ? undefined : 'No pending approval for this tool' };
   }
 
@@ -474,14 +500,16 @@ export class ClaudeAgentService {
    * Reject a pending tool call
    */
   rejectToolCall(
+    sessionId: string,
     toolUseId: string,
     message?: string
   ): { success: boolean; error?: string } {
-    if (!this.currentAgent) {
-      return { success: false, error: 'No active agent' };
+    const targetAgent = this.getLiveAgent(sessionId);
+    if (!targetAgent) {
+      return { success: false, error: `No active agent for session ${sessionId}` };
     }
 
-    const result = this.currentAgent.rejectToolCall(toolUseId, message);
+    const result = targetAgent.rejectToolCall(toolUseId, message);
     return { success: result, error: result ? undefined : 'No pending approval for this tool' };
   }
 
@@ -516,8 +544,9 @@ export class ClaudeAgentService {
    */
   async getSessionHistory(sessionId: string): Promise<HistoryMessage[]> {
     try {
-      if (this.currentAgent && this.currentAgent.getSessionId() === sessionId) {
-        return await this.currentAgent.getHistory();
+      const liveAgent = this.getLiveAgent(sessionId);
+      if (liveAgent) {
+        return await liveAgent.getHistory();
       }
 
       const session = this.sessionManager.loadSession(sessionId);
@@ -777,10 +806,7 @@ export class ClaudeAgentService {
     this.sessionManager.updateSessionPermissionMode(targetSessionId, mode);
 
     // Apply to the live agent if one exists for this session
-    const targetAgent =
-      this.currentAgent?.getSessionId() === targetSessionId
-        ? this.currentAgent
-        : getAgentBySessionId(targetSessionId);
+    const targetAgent = this.getLiveAgent(targetSessionId);
     if (targetAgent) {
       await targetAgent.setPermissionMode(mode);
     }
@@ -791,10 +817,7 @@ export class ClaudeAgentService {
     if (!targetSessionId) {
       return 'default';
     }
-    const targetAgent =
-      this.currentAgent?.getSessionId() === targetSessionId
-        ? this.currentAgent
-        : getAgentBySessionId(targetSessionId);
+    const targetAgent = this.getLiveAgent(targetSessionId);
     if (targetAgent) {
       return targetAgent.getPermissionMode();
     }
@@ -807,14 +830,23 @@ export class ClaudeAgentService {
    * Setting sources are managed per-agent via ClaudeAgent.setSettingSources()
    */
 
-  setSettingSources(sources: SettingSource[]): void {
-    if (this.currentAgent) {
-      this.currentAgent.setSettingSources(sources);
+  async setSettingSources(sources: SettingSource[], sessionId?: string): Promise<void> {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    if (!targetSessionId) {
+      throw new AgentQueryError('No session to set setting sources on', 'NO_ACTIVE_SESSION');
+    }
+    this.sessionManager.updateSessionSettingSources(targetSessionId, sources);
+    const targetAgent = this.getLiveAgent(targetSessionId);
+    if (targetAgent) {
+      targetAgent.setSettingSources(sources);
     }
   }
 
-  getSettingSources(): SettingSource[] {
-    return this.currentAgent?.getSettingSources() || [...ALL_SETTING_SOURCES];
+  getSettingSources(sessionId?: string): SettingSource[] {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    return (targetSessionId ? this.getLiveAgent(targetSessionId)?.getSettingSources() : undefined)
+      ?? (targetSessionId ? this.sessionManager.loadSession(targetSessionId)?.settingSources : undefined)
+      ?? [...ALL_SETTING_SOURCES];
   }
 
   /**
@@ -823,15 +855,23 @@ export class ClaudeAgentService {
    * to the session record so switching sessions shows the correct model.
    */
 
-  async setModel(model: string): Promise<void> {
-    if (this.currentAgent) {
-      await this.currentAgent.setModel(model);
-      this.sessionManager.updateSessionModel(this.currentAgent.getSessionId(), model);
+  async setModel(model: string, sessionId?: string): Promise<void> {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    if (!targetSessionId) {
+      throw new AgentQueryError('No session to set model on', 'NO_ACTIVE_SESSION');
+    }
+    this.sessionManager.updateSessionModel(targetSessionId, model);
+    const targetAgent = this.getLiveAgent(targetSessionId);
+    if (targetAgent) {
+      await targetAgent.setModel(model);
     }
   }
 
-  getModelName(): string {
-    return this.currentAgent?.getModelName() || ClaudeModel.SONNET_4_6;
+  getModelName(sessionId?: string): string {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    return (targetSessionId ? this.getLiveAgent(targetSessionId)?.getModelName()
+      ?? this.sessionManager.loadSession(targetSessionId)?.modelName : undefined)
+      ?? ClaudeModel.SONNET_4_6;
   }
 
   /**
@@ -840,15 +880,24 @@ export class ClaudeAgentService {
    * persisted to the session record so switching sessions shows the correct level.
    */
 
-  async setEffortLevel(level: EffortLevel): Promise<void> {
-    if (this.currentAgent) {
-      await this.currentAgent.setEffortLevel(level);
-      this.sessionManager.updateSessionEffortLevel(this.currentAgent.getSessionId(), level);
+  async setEffortLevel(level: EffortLevel, sessionId?: string): Promise<void> {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    if (!targetSessionId) {
+      throw new AgentQueryError('No session to set effort level on', 'NO_ACTIVE_SESSION');
+    }
+    this.sessionManager.updateSessionEffortLevel(targetSessionId, level);
+    const targetAgent = this.getLiveAgent(targetSessionId);
+    if (targetAgent) {
+      await targetAgent.setEffortLevel(level);
     }
   }
 
-  getEffortLevel(): EffortLevel | undefined {
-    return this.currentAgent?.getEffortLevel();
+  getEffortLevel(sessionId?: string): EffortLevel | undefined {
+    const targetSessionId = sessionId ?? this.currentAgent?.getSessionId();
+    return targetSessionId
+      ? this.getLiveAgent(targetSessionId)?.getEffortLevel()
+        ?? this.sessionManager.loadSession(targetSessionId)?.effortLevel
+      : undefined;
   }
 }
 

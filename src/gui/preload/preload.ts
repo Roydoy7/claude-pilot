@@ -67,9 +67,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Unified streaming event listener
     onStreamEvent: (callback: (data: StreamEventData) => void) => {
-      ipcRenderer.on(IpcChannels.agent.streamEvent, (_event, data: StreamEventData) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: StreamEventData) => {
         callback(data);
-      });
+      };
+      ipcRenderer.on(IpcChannels.agent.streamEvent, listener);
+      return () => ipcRenderer.removeListener(IpcChannels.agent.streamEvent, listener);
     },
 
     cancelRequest: (sessionId?: string): Promise<{ success: boolean; error?: string }> =>
@@ -77,16 +79,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Tool approval via canUseTool callback
     onToolApprovalRequest: (callback: (data: { sessionId: string; toolUseId: string; toolName: string; toolInput: Record<string, unknown> }) => void) => {
-      ipcRenderer.on(IpcChannels.agent.toolApprovalRequest, (_event, data) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { sessionId: string; toolUseId: string; toolName: string; toolInput: Record<string, unknown> }) => {
         callback(data);
-      });
+      };
+      ipcRenderer.on(IpcChannels.agent.toolApprovalRequest, listener);
+      return () => ipcRenderer.removeListener(IpcChannels.agent.toolApprovalRequest, listener);
     },
 
-    approveTool: (toolUseId: string, updatedInput?: Record<string, unknown>): Promise<{ success: boolean; error?: string }> =>
-      invokeChannel(IpcChannels.agent.approveTool, toolUseId, updatedInput),
+    approveTool: (sessionId: string, toolUseId: string, updatedInput?: Record<string, unknown>): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.approveTool, sessionId, toolUseId, updatedInput),
 
-    rejectTool: (toolUseId: string, message?: string): Promise<{ success: boolean; error?: string }> =>
-      invokeChannel(IpcChannels.agent.rejectTool, toolUseId, message),
+    rejectTool: (sessionId: string, toolUseId: string, message?: string): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.rejectTool, sessionId, toolUseId, message),
 
     getPermissionMode: (sessionId?: string): Promise<{ success: boolean; mode: PermissionMode }> =>
       invokeChannel(IpcChannels.agent.getPermissionMode, sessionId),
@@ -94,23 +98,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setPermissionMode: (mode: PermissionMode, sessionId?: string): Promise<{ success: boolean; error?: string }> =>
       invokeChannel(IpcChannels.agent.setPermissionMode, mode, sessionId),
 
-    getSettingSources: (): Promise<{ success: boolean; sources: SettingSource[] }> =>
-      invokeChannel(IpcChannels.agent.getSettingSources),
+    getSettingSources: (sessionId?: string): Promise<{ success: boolean; sources: SettingSource[] }> =>
+      invokeChannel(IpcChannels.agent.getSettingSources, sessionId),
 
-    setSettingSources: (sources: SettingSource[]): Promise<{ success: boolean; error?: string }> =>
-      invokeChannel(IpcChannels.agent.setSettingSources, sources),
+    setSettingSources: (sources: SettingSource[], sessionId?: string): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.setSettingSources, sources, sessionId),
 
-    getModelName: (): Promise<{ success: boolean; modelName: string }> =>
-      invokeChannel(IpcChannels.agent.getModelName),
+    getModelName: (sessionId?: string): Promise<{ success: boolean; modelName: string }> =>
+      invokeChannel(IpcChannels.agent.getModelName, sessionId),
 
-    setModel: (model: string): Promise<{ success: boolean; error?: string }> =>
-      invokeChannel(IpcChannels.agent.setModel, model),
+    setModel: (model: string, sessionId?: string): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.setModel, model, sessionId),
 
-    getEffortLevel: (): Promise<{ success: boolean; effortLevel?: EffortLevel }> =>
-      invokeChannel(IpcChannels.agent.getEffortLevel),
+    getEffortLevel: (sessionId?: string): Promise<{ success: boolean; effortLevel?: EffortLevel }> =>
+      invokeChannel(IpcChannels.agent.getEffortLevel, sessionId),
 
-    setEffortLevel: (level: EffortLevel): Promise<{ success: boolean; error?: string }> =>
-      invokeChannel(IpcChannels.agent.setEffortLevel, level),
+    setEffortLevel: (level: EffortLevel, sessionId?: string): Promise<{ success: boolean; error?: string }> =>
+      invokeChannel(IpcChannels.agent.setEffortLevel, level, sessionId),
   },
 
   // Session management

@@ -17,8 +17,8 @@ import { SessionAgent } from './SessionAgent.js';
 import type { MessageListItem, ElectronAPI, StreamEventData, ToolApprovalRequestEvent } from '../../preload/preload-types';
 import type { StreamEvent, UsageMetadata } from '../../../core/agents/claude-agent.js';
 
-const onStreamEvent = vi.fn();
-const onToolApprovalRequest = vi.fn();
+const onStreamEvent = vi.fn((_callback: unknown) => vi.fn());
+const onToolApprovalRequest = vi.fn((_callback: unknown) => vi.fn());
 const approveTool = vi.fn().mockResolvedValue({ success: true });
 const rejectTool = vi.fn().mockResolvedValue({ success: true });
 const getHistory = vi.fn().mockResolvedValue([]);
@@ -377,7 +377,7 @@ describe('SessionAgent - approve/reject tools', () => {
     expect(pendingApprovalsHistory[pendingApprovalsHistory.length - 1]).toEqual(new Map());
     const items = displayItemsHistory[displayItemsHistory.length - 1];
     expect(items[0]).toMatchObject({ type: 'tool_call', needsApproval: false });
-    expect(approveTool).toHaveBeenCalledWith('tool_5');
+    expect(approveTool).toHaveBeenCalledWith(agent.getSessionId(), 'tool_5');
   });
 
   it('rejectTools marks the tool as rejected and notifies the backend with feedback', async () => {
@@ -392,7 +392,7 @@ describe('SessionAgent - approve/reject tools', () => {
     expect(rejectedToolsHistory[rejectedToolsHistory.length - 1]).toEqual(new Set(['tool_6']));
     const items = displayItemsHistory[displayItemsHistory.length - 1];
     expect(items[0]).toMatchObject({ type: 'tool_call', needsApproval: false, wasRejected: true });
-    expect(rejectTool).toHaveBeenCalledWith('tool_6', 'not needed');
+    expect(rejectTool).toHaveBeenCalledWith(agent.getSessionId(), 'tool_6', 'not needed');
   });
 });
 
@@ -416,14 +416,61 @@ describe('SessionAgent - getters', () => {
 });
 
 describe('SessionAgent - deactivate', () => {
-  it('marks the agent inactive and clears the status item', () => {
+  it('keeps processing background events and publishes them when reactivated', () => {
     const { agent, emit, displayItemsHistory } = createHarness(nextSessionId());
 
     emit({ type: 'state', state: { thinking: true } });
     agent.deactivate();
 
+    const notificationsBeforeBackgroundEvent = displayItemsHistory.length;
+    emit({ type: 'text_delta', text: 'Completed in background' });
+
     expect(agent.isActiveSession()).toBe(false);
+    expect(displayItemsHistory).toHaveLength(notificationsBeforeBackgroundEvent);
+
+    agent.activate();
     const items = displayItemsHistory[displayItemsHistory.length - 1];
-    expect(items).toEqual([]);
+    expect(items).toContainEqual(expect.objectContaining({
+      type: 'message',
+      content: 'Completed in background',
+    }));
+  });
+
+  it('isolates background events between two cached sessions', () => {
+    const listenerStart = onStreamEvent.mock.calls.length;
+    const sessionA = nextSessionId();
+    const sessionB = nextSessionId();
+    const a = createHarness(sessionA);
+    const b = createHarness(sessionB);
+
+    a.agent.deactivate();
+    const aNotificationsBefore = a.displayItemsHistory.length;
+    const bNotificationsBefore = b.displayItemsHistory.length;
+
+    const listeners = onStreamEvent.mock.calls.slice(listenerStart)
+      .map((call) => call[0] as (data: StreamEventData) => void);
+    for (const listener of listeners) {
+      listener({ sessionId: sessionA, event: { type: 'text_delta', text: 'A only' } });
+    }
+
+    expect(a.displayItemsHistory).toHaveLength(aNotificationsBefore);
+    expect(b.displayItemsHistory).toHaveLength(bNotificationsBefore);
+
+    a.agent.activate();
+    expect(a.displayItemsHistory[a.displayItemsHistory.length - 1]).toContainEqual(
+      expect.objectContaining({ type: 'message', content: 'A only' }),
+    );
+    expect(b.agent.getDisplayItems()).toEqual([]);
+  });
+
+  it('unsubscribes both IPC listeners when destroyed', () => {
+    const { agent } = createHarness(nextSessionId());
+    const streamUnsubscribe = onStreamEvent.mock.results[onStreamEvent.mock.results.length - 1].value as ReturnType<typeof vi.fn>;
+    const approvalUnsubscribe = onToolApprovalRequest.mock.results[onToolApprovalRequest.mock.results.length - 1].value as ReturnType<typeof vi.fn>;
+
+    agent.destroy();
+
+    expect(streamUnsubscribe).toHaveBeenCalledOnce();
+    expect(approvalUnsubscribe).toHaveBeenCalledOnce();
   });
 });

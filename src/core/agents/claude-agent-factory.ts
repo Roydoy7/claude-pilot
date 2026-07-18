@@ -173,6 +173,7 @@ export async function createAgentFromSessionData(
     cwd: session.cwd,
     additionalDirectories: session.additionalDirectories,
     permissionMode: session.permissionMode ?? 'default',
+    settingSources: session.settingSources,
     thinking: getThinkingConfig(session.modelName),
   };
 

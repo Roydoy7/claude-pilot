@@ -72,7 +72,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(sessionId || null);
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, string>>(new Map());
   const [rejectedTools, setRejectedTools] = useState<Set<string>>(new Set());
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [processingSessionCounts, setProcessingSessionCounts] = useState<Map<string, number>>(new Map());
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [settingSources, setSettingSources] = useState<SettingSource[]>(['user', 'project', 'local']);
   const [slashCommands, setSlashCommands] = useState<string[]>(['/compact','/init','/clear']);
@@ -96,9 +96,11 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
   // Load default configuration from settings
   useEffect(() => {
+    let cancelled = false;
     async function loadDefaultConfig() {
       try {
         const settings = await window.electronAPI.settings.get();
+        if (cancelled) return;
         // Only use settings if no defaults were provided via props
         setSessionConfig(prev => ({
           agentId: defaultAgentId || settings.defaultAgentId || prev.agentId,
@@ -111,6 +113,9 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
       }
     }
     loadDefaultConfig();
+    return () => {
+      cancelled = true;
+    };
   }, [defaultAgentId, defaultModel, defaultEffortLevel]);
 
   // Load available models for the model selector
@@ -132,6 +137,9 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
   // SessionAgent cache - persists across session switches
   const sessionAgentCacheRef = useRef<SessionAgentCache>(new SessionAgentCache());
   const currentAgentRef = useRef<SessionAgent | null>(null);
+  const currentSessionIdRef = useRef<string | null>(sessionId || null);
+  currentSessionIdRef.current = currentSessionId;
+  const isProcessing = currentSessionId ? (processingSessionCounts.get(currentSessionId) ?? 0) > 0 : false;
 
   // Callbacks ref - stable reference, registered ONCE per agent
   const callbacksRef = useRef({
@@ -143,12 +151,12 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
   // Load permission mode, setting sources, and slash commands on mount
   useEffect(() => {
     window.electronAPI.agent.getPermissionMode().then((result) => {
-      if (result.success) {
+      if (result.success && !currentSessionIdRef.current) {
         setPermissionMode(result.mode);
       }
     });
     window.electronAPI.agent.getSettingSources().then((result) => {
-      if (result.success) {
+      if (result.success && !currentSessionIdRef.current) {
         setSettingSources(result.sources);
       }
     });
@@ -159,6 +167,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
     if (!sessionId) {
       currentAgentRef.current = null;
+      currentSessionIdRef.current = null;
       setCurrentSessionId(null);
       setSessionStarted(false);
       setItems([]);
@@ -175,6 +184,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
     // Get or create agent
     const agent = sessionAgentCacheRef.current.getOrCreate(sessionId, callbacksRef.current);
     currentAgentRef.current = agent;
+    currentSessionIdRef.current = sessionId;
 
     // Activate (loads history if needed, but doesn't block)
     sessionAgentCacheRef.current.switchTo(sessionId);
@@ -189,8 +199,13 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
     // Sync permission mode from backend for this session
     window.electronAPI.agent.getPermissionMode(sessionId).then((result) => {
-      if (result.success) {
+      if (result.success && currentSessionIdRef.current === sessionId) {
         setPermissionMode(result.mode);
+      }
+    });
+    window.electronAPI.agent.getSettingSources(sessionId).then((result) => {
+      if (result.success && currentSessionIdRef.current === sessionId) {
+        setSettingSources(result.sources);
       }
     });
   }, [sessionId]);
@@ -219,15 +234,25 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
       return;
     }
 
+    const targetSessionId = currentSessionId;
+
     try {
-      const result = await window.electronAPI.agent.cancelRequest(currentSessionId);
+      const result = await window.electronAPI.agent.cancelRequest(targetSessionId);
       if (!result.success) {
         console.error('Failed to cancel request:', result.error);
       }
-      setIsProcessing(false);
+      setProcessingSessionCounts((prev) => {
+        const next = new Map(prev);
+        next.delete(targetSessionId);
+        return next;
+      });
     } catch (error) {
       console.error('Failed to cancel request:', error);
-      setIsProcessing(false);
+      setProcessingSessionCounts((prev) => {
+        const next = new Map(prev);
+        next.delete(targetSessionId);
+        return next;
+      });
     }
   };
 
@@ -239,9 +264,10 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
       setPermissionMode(mode);
       return;
     }
+    const targetSessionId = currentSessionId;
     try {
-      const result = await window.electronAPI.agent.setPermissionMode(mode, currentSessionId);
-      if (result.success) {
+      const result = await window.electronAPI.agent.setPermissionMode(mode, targetSessionId);
+      if (result.success && currentSessionIdRef.current === targetSessionId) {
         setPermissionMode(mode);
       } else {
         console.error('Failed to set permission mode:', result.error);
@@ -253,9 +279,14 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
   // Handle setting sources change
   const handleSettingSourcesChange = async (sources: SettingSource[]) => {
+    const targetSessionId = currentSessionId;
+    if (!targetSessionId) {
+      setSettingSources(sources);
+      return;
+    }
     try {
-      const result = await window.electronAPI.agent.setSettingSources(sources);
-      if (result.success) {
+      const result = await window.electronAPI.agent.setSettingSources(sources, targetSessionId);
+      if (result.success && currentSessionIdRef.current === targetSessionId) {
         setSettingSources(sources);
       } else {
         console.error('Failed to set setting sources:', result.error);
@@ -274,6 +305,7 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
   // Handle model change - takes effect immediately for an active session,
   // persisted to the session record by the backend
   const handleModelChange = async (model: string) => {
+    const targetSessionId = currentSessionId;
     const supportedLevels = getSupportedEffortLevelsSafe(model);
     const fallbackEffortLevel = supportedLevels.includes(sessionConfig.effortLevel)
       ? sessionConfig.effortLevel
@@ -281,13 +313,13 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
     if (sessionStarted && currentSessionId) {
       try {
-        const result = await window.electronAPI.agent.setModel(model);
+        const result = await window.electronAPI.agent.setModel(model, targetSessionId!);
         if (!result.success) {
           console.error('Failed to set model:', result.error);
           return;
         }
         if (fallbackEffortLevel && fallbackEffortLevel !== sessionConfig.effortLevel) {
-          const effortResult = await window.electronAPI.agent.setEffortLevel(fallbackEffortLevel);
+          const effortResult = await window.electronAPI.agent.setEffortLevel(fallbackEffortLevel, targetSessionId!);
           if (!effortResult.success) {
             console.error('Failed to set effort level:', effortResult.error);
           }
@@ -298,19 +330,22 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
       }
     }
 
-    setSessionConfig(prev => ({
-      ...prev,
-      modelName: model,
-      effortLevel: fallbackEffortLevel ?? prev.effortLevel,
-    }));
+    if (currentSessionIdRef.current === targetSessionId) {
+      setSessionConfig(prev => ({
+        ...prev,
+        modelName: model,
+        effortLevel: fallbackEffortLevel ?? prev.effortLevel,
+      }));
+    }
   };
 
   // Handle thinking effort level change - takes effect immediately for an
   // active session, persisted to the session record by the backend
   const handleEffortLevelChange = async (level: EffortLevel) => {
+    const targetSessionId = currentSessionId;
     if (sessionStarted && currentSessionId) {
       try {
-        const result = await window.electronAPI.agent.setEffortLevel(level);
+        const result = await window.electronAPI.agent.setEffortLevel(level, targetSessionId!);
         if (!result.success) {
           console.error('Failed to set effort level:', result.error);
           return;
@@ -321,7 +356,9 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
       }
     }
 
-    setSessionConfig(prev => ({ ...prev, effortLevel: level }));
+    if (currentSessionIdRef.current === targetSessionId) {
+      setSessionConfig(prev => ({ ...prev, effortLevel: level }));
+    }
   };
 
   // Handle slash command selection - send as message
@@ -361,6 +398,8 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
   const handleSendMessage = async (message: MessageContent) => {
     let effectiveSessionId = currentSessionId;
+    let targetAgent = currentAgentRef.current;
+    const wasNewSession = !sessionStarted || !currentSessionId;
 
     // If session hasn't started, create it first
     if (!sessionStarted || !currentSessionId) {
@@ -405,10 +444,12 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
 
         sessionAgentCacheRef.current.switchTo(result.session.id);
         currentAgentRef.current = agent;
+        targetAgent = agent;
 
         // Set state AFTER SessionAgent is ready
         // This will trigger useEffect, but getOrCreate will return the same agent (from cache)
         setCurrentSessionId(result.session.id);
+        currentSessionIdRef.current = result.session.id;
         setSessionStarted(true);
 
         // If a non-default permission mode was selected before the session existed, apply it now
@@ -433,14 +474,20 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
     };
 
     // Add to SessionAgent so it's part of displayItems
-    if (currentAgentRef.current) {
-      currentAgentRef.current.addUserMessage(userMessageItem);
+    if (targetAgent) {
+      targetAgent.addUserMessage(userMessageItem);
     } else {
       console.error('[ChatArea handleSendMessage] ERROR: currentAgentRef.current is null!');
     }
 
     // Set processing state
-    setIsProcessing(true);
+    if (effectiveSessionId) {
+      setProcessingSessionCounts((prev) => {
+        const next = new Map(prev);
+        next.set(effectiveSessionId!, (next.get(effectiveSessionId!) ?? 0) + 1);
+        return next;
+      });
+    }
 
     try {
       // Send message - backend will handle streaming and history updates
@@ -457,18 +504,18 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
       // No need to manually update items here
 
       // Update session ID if this was a new session
-      if (response.sessionId && response.sessionId !== currentSessionId) {
+      if (response.sessionId && currentSessionIdRef.current === effectiveSessionId && response.sessionId !== currentSessionId) {
         setCurrentSessionId(response.sessionId);
       }
 
       // If this was the first message, update title
       const sessionIdToUse = currentSessionId || response.sessionId;
-      if (items.length === 0 && sessionIdToUse) {
+      if (wasNewSession && sessionIdToUse) {
         try {
           const textContent = extractTextFromMessage(message);
           const title = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
           const result = await window.electronAPI.session.updateTitle(sessionIdToUse, title);
-          if (result.success && result.session && onSessionUpdate) {
+          if (result.success && result.session && onSessionUpdate && currentSessionIdRef.current === sessionIdToUse) {
             onSessionUpdate(result.session);
           }
         } catch (error) {
@@ -486,10 +533,20 @@ export function ChatArea({ sessionId, defaultAgentId, defaultModel, defaultEffor
         role: 'assistant',
         content: `Error: ${getErrorMessage(error)}`,
       };
-      setItems((prev) => [...prev, errorMessageItem]);
+      targetAgent?.addLocalMessage(errorMessageItem);
     } finally {
-      // Clear processing state when request completes or fails
-      setIsProcessing(false);
+      if (effectiveSessionId) {
+        setProcessingSessionCounts((prev) => {
+          const next = new Map(prev);
+          const remaining = (next.get(effectiveSessionId!) ?? 1) - 1;
+          if (remaining > 0) {
+            next.set(effectiveSessionId!, remaining);
+          } else {
+            next.delete(effectiveSessionId!);
+          }
+          return next;
+        });
+      }
     }
   };
 

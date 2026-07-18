@@ -291,6 +291,7 @@ interface PendingToolApproval {
  * Handler for tool approval requests - notifies UI to show approval dialog
  */
 export type ToolApprovalRequestHandler = (
+  sessionId: string,
   toolUseId: string,
   toolName: string,
   toolInput: Record<string, unknown>
@@ -566,7 +567,7 @@ export class ClaudeAgent {
 
       // Notify UI about the pending approval via handler
       if (this.toolApprovalRequestHandler) {
-        this.toolApprovalRequestHandler(options.toolUseID, toolName, toolInput);
+        this.toolApprovalRequestHandler(this.sessionId, options.toolUseID, toolName, toolInput);
       }
       logDecision('awaiting-ui', options.toolUseID, toolName);
 

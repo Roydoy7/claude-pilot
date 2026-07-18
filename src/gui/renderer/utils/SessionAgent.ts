@@ -78,6 +78,9 @@ export class SessionAgent {
   // Sequential event queue - preserves event order even if new events
   // arrive while a previous one is still being handled.
   private eventQueue: SequentialEventQueue<StreamEvent>;
+  private unsubscribeStreamEvent?: () => void;
+  private unsubscribeToolApproval?: () => void;
+  private stateRevision = 0;
 
   constructor(sessionId: string, callbacks: SessionAgentCallbacks) {
     this.sessionId = sessionId;
@@ -92,9 +95,9 @@ export class SessionAgent {
    */
   private setupListeners() {
     // Listen for unified streaming events
-    window.electronAPI.agent.onStreamEvent((data) => {
+    this.unsubscribeStreamEvent = window.electronAPI.agent.onStreamEvent((data) => {
       // Filter by sessionId
-      if (!this.isActive || data.sessionId !== this.sessionId) {
+      if (data.sessionId !== this.sessionId) {
         return;
       }
 
@@ -102,11 +105,13 @@ export class SessionAgent {
     });
 
     // Listen for tool approval requests (from canUseTool callback)
-    window.electronAPI.agent.onToolApprovalRequest((data) => {
+    this.unsubscribeToolApproval = window.electronAPI.agent.onToolApprovalRequest((data) => {
       // Filter by sessionId
-      if (!this.isActive || data.sessionId !== this.sessionId) {
+      if (data.sessionId !== this.sessionId) {
         return;
       }
+
+      this.stateRevision += 1;
 
       const next = markToolNeedsApproval(this.displayItems, data.toolUseId);
       this.pendingApprovals.set(data.toolUseId, data.toolUseId);
@@ -119,17 +124,29 @@ export class SessionAgent {
         console.warn('[SessionAgent] Tool approval request for unknown tool:', data.toolUseId);
       }
 
-      this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+      this.notifyPendingApprovalsChanged();
     });
   }
 
   /**
    * Notify UI that displayItems changed (WPF-style notification pattern)
    */
-  private notifyDisplayItemsChanged() {
-    if (this.callbacks.onDisplayItemsChange) {
+  private notifyDisplayItemsChanged(force = false) {
+    if ((this.isActive || force) && this.callbacks.onDisplayItemsChange) {
       // Return a shallow copy to prevent external modifications
       this.callbacks.onDisplayItemsChange([...this.displayItems]);
+    }
+  }
+
+  private notifyPendingApprovalsChanged(force = false) {
+    if (this.isActive || force) {
+      this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+    }
+  }
+
+  private notifyRejectedToolsChanged(force = false) {
+    if (this.isActive || force) {
+      this.callbacks.onRejectedToolsChange?.(new Set(this.rejectedTools));
     }
   }
 
@@ -138,6 +155,7 @@ export class SessionAgent {
    * Called sequentially from event queue to guarantee order
    */
   private processStreamEvent(event: StreamEvent) {
+    this.stateRevision += 1;
     // Any content arriving means the API request that was being retried has
     // succeeded - drop the retry banner before applying the event.
     switch (event.type) {
@@ -163,7 +181,7 @@ export class SessionAgent {
         this.notifyDisplayItemsChanged();
 
         // Also notify callback for backward compatibility
-        if (this.callbacks.onStateChange) {
+        if (this.isActive && this.callbacks.onStateChange) {
           this.callbacks.onStateChange(event.state);
         }
         break;
@@ -253,7 +271,7 @@ export class SessionAgent {
 
           if (hadPendingApproval) {
             this.pendingApprovals.delete(event.toolCallId);
-            this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+            this.notifyPendingApprovalsChanged();
           }
 
           this.notifyDisplayItemsChanged();
@@ -298,7 +316,7 @@ export class SessionAgent {
         this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
         if (this.pendingApprovals.size > 0) {
           this.pendingApprovals.clear();
-          this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+          this.notifyPendingApprovalsChanged();
         }
         this.notifyDisplayItemsChanged();
         break;
@@ -344,7 +362,7 @@ export class SessionAgent {
   async approveTools(toolCallIds: string[]): Promise<void> {
     // Remove from pending approvals
     toolCallIds.forEach((id) => this.pendingApprovals.delete(id));
-    this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
+    this.notifyPendingApprovalsChanged();
 
     // Immediately update displayItems to reflect approval - UI should respond instantly
     this.displayItems = applyToolApprovals(this.displayItems, toolCallIds);
@@ -353,7 +371,7 @@ export class SessionAgent {
     // Call backend for each tool (new canUseTool callback-based API)
     for (const toolCallId of toolCallIds) {
       try {
-        await window.electronAPI.agent.approveTool(toolCallId);
+        await window.electronAPI.agent.approveTool(this.sessionId, toolCallId);
       } catch (error) {
         console.error('[SessionAgent] Failed to approve tool:', toolCallId, error);
       }
@@ -372,8 +390,8 @@ export class SessionAgent {
       this.pendingApprovals.delete(id);
       this.rejectedTools.add(id);
     });
-    this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
-    this.callbacks.onRejectedToolsChange?.(new Set(this.rejectedTools));
+    this.notifyPendingApprovalsChanged();
+    this.notifyRejectedToolsChanged();
 
     // Immediately update displayItems to reflect rejection - UI should respond instantly
     this.displayItems = applyToolRejections(this.displayItems, toolCallIds);
@@ -382,7 +400,7 @@ export class SessionAgent {
     // Call backend for each tool (new canUseTool callback-based API)
     for (const toolCallId of toolCallIds) {
       try {
-        await window.electronAPI.agent.rejectTool(toolCallId, feedback);
+        await window.electronAPI.agent.rejectTool(this.sessionId, toolCallId, feedback);
       } catch (error) {
         console.error('[SessionAgent] Failed to reject tool:', toolCallId, error);
       }
@@ -411,16 +429,17 @@ export class SessionAgent {
 
     // CRITICAL: Immediately notify current displayItems to UI
     // This ensures UI shows the cached content immediately, not waiting for async history fetch
-    this.notifyDisplayItemsChanged();
+    this.notifyDisplayItemsChanged(true);
 
     // Only fetch history if we haven't loaded it yet
     // For new sessions created in this session, displayItems will already have user message
     // and we don't want to overwrite it with empty history
     if (!this.hasLoadedHistory) {
+      const revisionAtRequest = this.stateRevision;
       window.electronAPI.session.getHistory(this.sessionId).then((history) => {
         // Only load if history is not empty (existing session being resumed)
         // For new sessions, history will be empty and we skip to avoid clearing displayItems
-        if (history.length > 0) {
+        if (history.length > 0 && this.stateRevision === revisionAtRequest) {
           this.loadCompleteHistory(history);
         }
         this.hasLoadedHistory = true;
@@ -431,8 +450,8 @@ export class SessionAgent {
     }
 
     // Notify callbacks of current state
-    this.callbacks.onPendingApprovalsChange?.(new Map(this.pendingApprovals));
-    this.callbacks.onRejectedToolsChange?.(new Set(this.rejectedTools));
+    this.notifyPendingApprovalsChanged(true);
+    this.notifyRejectedToolsChanged(true);
   }
 
   /**
@@ -465,6 +484,7 @@ export class SessionAgent {
    * Slash commands are not displayed as user messages, only status is shown
    */
   addUserMessage(userMessage: MessageListItem) {
+    this.stateRevision += 1;
     // Check if this is a slash command
     const commandName = userMessage.content ? this.getSlashCommand(userMessage.content) : null;
 
@@ -486,22 +506,18 @@ export class SessionAgent {
     this.notifyDisplayItemsChanged();
   }
 
+  addLocalMessage(message: MessageListItem) {
+    this.stateRevision += 1;
+    this.displayItems = addItemKeepingStatusAtEnd(this.displayItems, message);
+    this.notifyDisplayItemsChanged();
+  }
+
   /**
    * Deactivate this session agent (when switching away)
    * Agent is cached but stops processing events
    */
   deactivate() {
     this.isActive = false;
-
-    // Clear streaming state when deactivating
-    this.streamingState = createStreamingTextState();
-
-    // Clear status item
-    this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
-    this.notifyDisplayItemsChanged();
-
-    // Also notify callback for backward compatibility
-    this.callbacks.onStateChange?.({ thinking: false });
   }
 
   /**
@@ -509,6 +525,10 @@ export class SessionAgent {
    */
   destroy() {
     this.isActive = false;
+    this.unsubscribeStreamEvent?.();
+    this.unsubscribeToolApproval?.();
+    this.unsubscribeStreamEvent = undefined;
+    this.unsubscribeToolApproval = undefined;
     this.pendingApprovals.clear();
     this.rejectedTools.clear();
 
@@ -517,12 +537,6 @@ export class SessionAgent {
 
     // Clear status item
     this.displayItems = updateStatusItem(this.displayItems, { thinking: false });
-    this.notifyDisplayItemsChanged();
-
-    // Also notify callback for backward compatibility
-    this.callbacks.onStateChange?.({ thinking: false });
-
-    // Event listeners will be cleaned up by removeAllListeners in preload.ts
   }
 
   /**

@@ -182,16 +182,16 @@ export interface ChannelMap {
   'agent:streamEvent': { args: [data: StreamEventData]; result: void };
   'agent:cancelRequest': { args: [sessionId?: string]; result: { success: boolean; error?: string } };
   'agent:toolApprovalRequest': { args: [data: ToolApprovalRequestEvent]; result: void };
-  'agent:approveTool': { args: [toolUseId: string, updatedInput?: Record<string, unknown>]; result: { success: boolean; error?: string } };
-  'agent:rejectTool': { args: [toolUseId: string, message?: string]; result: { success: boolean; error?: string } };
+  'agent:approveTool': { args: [sessionId: string, toolUseId: string, updatedInput?: Record<string, unknown>]; result: { success: boolean; error?: string } };
+  'agent:rejectTool': { args: [sessionId: string, toolUseId: string, message?: string]; result: { success: boolean; error?: string } };
   'agent:getPermissionMode': { args: [sessionId?: string]; result: { success: boolean; mode: PermissionMode } };
   'agent:setPermissionMode': { args: [mode: PermissionMode, sessionId?: string]; result: { success: boolean; error?: string } };
-  'agent:getSettingSources': { args: []; result: { success: boolean; sources: SettingSource[] } };
-  'agent:setSettingSources': { args: [sources: SettingSource[]]; result: { success: boolean; error?: string } };
-  'agent:getModelName': { args: []; result: { success: boolean; modelName: string } };
-  'agent:setModel': { args: [model: string]; result: { success: boolean; error?: string } };
-  'agent:getEffortLevel': { args: []; result: { success: boolean; effortLevel?: EffortLevel } };
-  'agent:setEffortLevel': { args: [level: EffortLevel]; result: { success: boolean; error?: string } };
+  'agent:getSettingSources': { args: [sessionId?: string]; result: { success: boolean; sources: SettingSource[] } };
+  'agent:setSettingSources': { args: [sources: SettingSource[], sessionId?: string]; result: { success: boolean; error?: string } };
+  'agent:getModelName': { args: [sessionId?: string]; result: { success: boolean; modelName: string } };
+  'agent:setModel': { args: [model: string, sessionId?: string]; result: { success: boolean; error?: string } };
+  'agent:getEffortLevel': { args: [sessionId?: string]; result: { success: boolean; effortLevel?: EffortLevel } };
+  'agent:setEffortLevel': { args: [level: EffortLevel, sessionId?: string]; result: { success: boolean; error?: string } };
 
   // Session
   'session:list': { args: []; result: Session[] };

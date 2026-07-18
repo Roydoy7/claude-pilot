@@ -88,20 +88,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   // Set up tool approval request handler once at initialization
   // This handler notifies the frontend when a tool needs user approval
   const toolApprovalRequestHandler: ToolApprovalRequestHandler = (
+    sessionId: string,
     toolUseId: string,
     toolName: string,
     toolInput: Record<string, unknown>
   ) => {
     console.log('[IPC] toolApprovalRequestHandler invoked:', { toolUseId, toolName });
-    const sessionId = claudeAgentService.getCurrentSessionId();
-    if (sessionId) {
-      mainWindow.webContents.send(IpcChannels.agent.toolApprovalRequest, {
-        sessionId,
-        toolUseId,
-        toolName,
-        toolInput,
-      });
-    }
+    mainWindow.webContents.send(IpcChannels.agent.toolApprovalRequest, {
+      sessionId,
+      toolUseId,
+      toolName,
+      toolInput,
+    });
   };
 
   // Register the handler with the service
@@ -162,10 +160,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     IpcChannels.agent.approveTool,
     async (
       _event,
+      sessionId: string,
       toolUseId: string,
       updatedInput?: Record<string, unknown>
     ) => {
-      return claudeAgentService.approveToolCall(toolUseId, updatedInput);
+      return claudeAgentService.approveToolCall(sessionId, toolUseId, updatedInput);
     }
   );
 
@@ -176,10 +175,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     IpcChannels.agent.rejectTool,
     async (
       _event,
+      sessionId: string,
       toolUseId: string,
       message?: string
     ) => {
-      return claudeAgentService.rejectToolCall(toolUseId, message);
+      return claudeAgentService.rejectToolCall(sessionId, toolUseId, message);
     }
   );
 
@@ -207,17 +207,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current setting sources
    */
-  handleIpc(IpcChannels.agent.getSettingSources, async () => {
-    const sources = claudeAgentService.getSettingSources();
+  handleIpc(IpcChannels.agent.getSettingSources, async (_event, sessionId?: string) => {
+    const sources = claudeAgentService.getSettingSources(sessionId);
     return { success: true, sources };
   });
 
   /**
    * Set setting sources
    */
-  handleIpc(IpcChannels.agent.setSettingSources, async (_event, sources: string[]) => {
+  handleIpc(IpcChannels.agent.setSettingSources, async (_event, sources: string[], sessionId?: string) => {
     try {
-      claudeAgentService.setSettingSources(sources as import('../../core/agents/claude-agent.js').SettingSource[]);
+      await claudeAgentService.setSettingSources(sources as import('../../core/agents/claude-agent.js').SettingSource[], sessionId);
       return { success: true };
     } catch (error) {
       console.error('[IPC] setSettingSources error:', error);
@@ -228,17 +228,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current model name
    */
-  handleIpc(IpcChannels.agent.getModelName, async () => {
-    const modelName = claudeAgentService.getModelName();
+  handleIpc(IpcChannels.agent.getModelName, async (_event, sessionId?: string) => {
+    const modelName = claudeAgentService.getModelName(sessionId);
     return { success: true, modelName };
   });
 
   /**
    * Set model
    */
-  handleIpc(IpcChannels.agent.setModel, async (_event, model: string) => {
+  handleIpc(IpcChannels.agent.setModel, async (_event, model: string, sessionId?: string) => {
     try {
-      await claudeAgentService.setModel(model);
+      await claudeAgentService.setModel(model, sessionId);
       return { success: true };
     } catch (error) {
       console.error('[IPC] setModel error:', error);
@@ -249,17 +249,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   /**
    * Get current thinking effort level
    */
-  handleIpc(IpcChannels.agent.getEffortLevel, async () => {
-    const effortLevel = claudeAgentService.getEffortLevel();
+  handleIpc(IpcChannels.agent.getEffortLevel, async (_event, sessionId?: string) => {
+    const effortLevel = claudeAgentService.getEffortLevel(sessionId);
     return { success: true, effortLevel };
   });
 
   /**
    * Set thinking effort level
    */
-  handleIpc(IpcChannels.agent.setEffortLevel, async (_event, level: EffortLevel) => {
+  handleIpc(IpcChannels.agent.setEffortLevel, async (_event, level: EffortLevel, sessionId?: string) => {
     try {
-      await claudeAgentService.setEffortLevel(level);
+      await claudeAgentService.setEffortLevel(level, sessionId);
       return { success: true };
     } catch (error) {
       console.error('[IPC] setEffortLevel error:', error);

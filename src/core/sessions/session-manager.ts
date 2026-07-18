@@ -10,7 +10,7 @@ import os from 'os';
 import { getSessionsDir, getConfigDir } from '../storage/storage.js';
 import { SessionPersistenceError } from '../errors.js';
 import type { EffortLevel } from '../providers/model-list-manager.js';
-import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk';
+import type { PermissionMode, SettingSource } from '@anthropic-ai/claude-agent-sdk';
 
 export interface Session {
   id: string; //This is our local UUID session ID, created by frontend
@@ -20,6 +20,7 @@ export interface Session {
   modelName: string;
   effortLevel?: EffortLevel; // Thinking effort level (omitted for models that don't support it)
   permissionMode?: PermissionMode; // Last selected permission mode, restored when agent is recreated
+  settingSources?: SettingSource[]; // SDK settings scopes enabled for this session
   cwd: string; // Current working directory for this session (aligns with SDK Options.cwd)
   additionalDirectories?: string[]; // Additional directories beyond cwd (aligns with SDK Options.additionalDirectories)
   // messages field removed - conversation history now stored in agent memory
@@ -274,6 +275,17 @@ export class SessionManager {
     }
 
     session.permissionMode = permissionMode;
+    session.updatedAt = Date.now();
+    this.saveSession(session);
+  }
+
+  updateSessionSettingSources(sessionId: string, settingSources: SettingSource[]): void {
+    const session = this.loadSession(sessionId);
+    if (!session) {
+      throw new SessionPersistenceError(`Session ${sessionId} not found`, 'SESSION_NOT_FOUND');
+    }
+
+    session.settingSources = [...settingSources];
     session.updatedAt = Date.now();
     this.saveSession(session);
   }

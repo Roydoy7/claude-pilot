@@ -345,20 +345,20 @@ export interface ElectronAPI {
   agent: {
     chat: (request: ChatRequest) => Promise<ChatResponse>;
     getCurrentInfo: () => Promise<CurrentAgentInfo | null>;
-    onStreamEvent: (callback: (data: StreamEventData) => void) => void;
+    onStreamEvent: (callback: (data: StreamEventData) => void) => () => void;
     cancelRequest: (sessionId?: string) => Promise<{ success: boolean; error?: string }>;
     // Tool approval via canUseTool callback
-    onToolApprovalRequest: (callback: (data: ToolApprovalRequestEvent) => void) => void;
-    approveTool: (toolUseId: string, updatedInput?: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
-    rejectTool: (toolUseId: string, message?: string) => Promise<{ success: boolean; error?: string }>;
+    onToolApprovalRequest: (callback: (data: ToolApprovalRequestEvent) => void) => () => void;
+    approveTool: (sessionId: string, toolUseId: string, updatedInput?: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+    rejectTool: (sessionId: string, toolUseId: string, message?: string) => Promise<{ success: boolean; error?: string }>;
     getPermissionMode: (sessionId?: string) => Promise<{ success: boolean; mode: PermissionMode }>;
     setPermissionMode: (mode: PermissionMode, sessionId?: string) => Promise<{ success: boolean; error?: string }>;
-    getSettingSources: () => Promise<{ success: boolean; sources: SettingSource[] }>;
-    setSettingSources: (sources: SettingSource[]) => Promise<{ success: boolean; error?: string }>;
-    getModelName: () => Promise<{ success: boolean; modelName: string }>;
-    setModel: (model: string) => Promise<{ success: boolean; error?: string }>;
-    getEffortLevel: () => Promise<{ success: boolean; effortLevel?: EffortLevel }>;
-    setEffortLevel: (level: EffortLevel) => Promise<{ success: boolean; error?: string }>;
+    getSettingSources: (sessionId?: string) => Promise<{ success: boolean; sources: SettingSource[] }>;
+    setSettingSources: (sources: SettingSource[], sessionId?: string) => Promise<{ success: boolean; error?: string }>;
+    getModelName: (sessionId?: string) => Promise<{ success: boolean; modelName: string }>;
+    setModel: (model: string, sessionId?: string) => Promise<{ success: boolean; error?: string }>;
+    getEffortLevel: (sessionId?: string) => Promise<{ success: boolean; effortLevel?: EffortLevel }>;
+    setEffortLevel: (level: EffortLevel, sessionId?: string) => Promise<{ success: boolean; error?: string }>;
   };
 
   // Session management
