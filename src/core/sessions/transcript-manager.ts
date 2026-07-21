@@ -124,7 +124,8 @@ function cwdToProjectName(cwd: string): string {
     .replace(/[^\x00-\x7F]/g, '-')
     .replace(/\//g, '-')
     .replace(/\./g, '-')
-    .replace(/_/g, '-');
+    .replace(/_/g, '-')
+    .replace(' ', '-'); // Replace spaces with hyphens
 }
 
 /**

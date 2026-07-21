@@ -24,7 +24,7 @@ describe('ClaudeModel', () => {
     expect(ClaudeModel.OPUS_4_7).toBe('claude-opus-4-7');
     expect(ClaudeModel.OPUS_4_6).toBe('claude-opus-4-6');
     expect(ClaudeModel.SONNET_4_6).toBe('claude-sonnet-4-6');
-    expect(ClaudeModel.HAIKU_4_5).toBe('claude-haiku-4-5');
+    expect(ClaudeModel.HAIKU_4_5).toBe('claude-haiku-4-5-20251001');
   });
 });
 
