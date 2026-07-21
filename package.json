@@ -1,6 +1,6 @@
 {
   "name": "claude-pilot",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Claude-powered AI assistant application",
   "main": "dist/main/main.js",
   "author": "Ray <roydoy7@gmail.com>",
