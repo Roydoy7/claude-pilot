@@ -1,11 +1,14 @@
 # Claude Pilot
 
-基于 [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript) 构建的桌面 AI 助手（Electron + React）。内置多个专家角色（Office 办公助手、金融顾问），通过本地 MCP 工具实现文档处理、格式转换、数据分析等能力。
+基于 [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript) 构建的桌面 AI 助手（Electron + React）。内置多个专家角色（Office 办公助手、金融顾问），通过本地 MCP 工具实现文档处理、格式转换、数据分析等能力，并支持多智能体协作（Subagent）。
 
 ## 功能特性
 
-- **Office 办公助手**：读取、编辑、转换 PDF / Word / Excel / PowerPoint，自动化日常办公流程
+- **Office 办公助手**：读取、编辑、转换 PDF / Word / Excel / PowerPoint，自动化日常办公流程；内置独立子智能体 `office-quality-reviewer` 对输出物进行质量审核
 - **金融顾问**：基于 Yahoo Finance 实时数据分析美股、日股，提供报价、基本面、历史价格、市场概览、选股器等（数据均来自实时调用，不使用估算或记忆数据）
+- **多模型支持**：支持选择 Claude Fable 5、Opus 4.8、Opus 4.7、Opus 4.6、Sonnet 4.6、Haiku 4.5；支持 Effort Level 调节（`low` / `medium` / `high` / `xhigh` / `max`）
+- **多会话管理**：支持同时运行多个独立会话，会话切换时自动隔离状态
+- **子智能体（Subagent）**：Agent 可在运行时派生子智能体处理专项任务，UI 实时展示子智能体活动状态与心跳
 - **浏览器自动化**：内置浏览器工具（`mcp__browser__*`），支持网页导航、截图、点击、输入、多标签管理、JS 执行等
 - **文档格式转换**：集成 LibreOffice（Office 文档）与 Calibre（电子书格式）实现多格式互转
 - **Python / TypeScript 代码执行**：内置 Python 3.13 嵌入式运行时（含 pandas、openpyxl、xlwings 等）与 TypeScript 沙箱执行工具
@@ -16,6 +19,7 @@
 
 - **操作系统**：Windows（当前唯一经过验证支持的平台；项目内嵌的 Python、LibreOffice、Calibre 均为 Windows 版本，且依赖 `pywin32`/PowerShell）
 - **Node.js**：`>= 22.12.0`（Electron 42 的最低要求）
+- **版本**：当前为 `v0.1.5`
 - **Claude 账号或 API Key**：用于调用 Claude 模型（见下方「认证配置」）
 
 ## 安装步骤
@@ -109,14 +113,21 @@ npm run build
 ```
 src/
 ├── core/                 # 与 UI 无关的核心逻辑
-│   ├── agents/           # Agent 加载、MCP server 注册
+│   ├── agents/           # Agent 加载、MCP server 注册、子智能体工厂
 │   ├── agent-defs/       # 内置角色定义（每个子目录为一个 agent）
 │   │   ├── office-assist/
 │   │   └── financial-advisor/
 │   ├── auth/             # 认证（API Key / OAuth）
+│   ├── config/           # 工作区管理
+│   ├── context/          # 系统上下文与 reminders 注入
+│   ├── providers/        # 模型列表管理（支持的模型、thinking 配置、effort level）
+│   ├── services/         # Claude Agent Service（消息流、工具审批、会话隔离）
+│   ├── sessions/         # 多会话管理与 transcript 持久化
 │   ├── settings/         # 应用设置管理
 │   ├── skills/           # Skills 市场与管理
-│   └── tools/            # 共享 MCP 工具服务器（docx / xlsx / pptx / pdf / image / convert / finance / python / typescript / browser）
+│   ├── storage/          # 通用本地存储
+│   ├── templates/        # 提示词模板管理
+│   └── tools/            # 共享 MCP 工具服务器（docx / xlsx / pptx / pdf / image / convert / python / typescript / browser）
 ├── gui/
 │   ├── main/              # Electron 主进程
 │   ├── preload/           # 安全 IPC 桥接
@@ -128,16 +139,39 @@ src/
 
 每个 agent 是 `src/core/agent-defs/<id>/` 下的一个目录，包含以下文件：
 
-| 文件 | 说明 |
+| 文件/目录 | 说明 |
 |---|---|
 | `description.md` | 第一行为显示名称，其余行为描述 |
 | `system-prompt.md` | Agent 的完整 system prompt |
 | `tools.md` | 声明 agent 可用的工具（见下方格式说明） |
 | `prompts.md` | 每行一条示例提示词，显示在输入框下方 |
 | `skills/<name>/` | 标记目录，指定 agent 默认加载的内置 skills |
-| `tools/<name>.ts|.py` | Agent 私有的本地工具脚本（可选） |
+| `tools/<name>.ts\|.py` | Agent 私有的本地工具脚本（可选） |
+| `agents/<name>.md` | 该 agent 可派生的子智能体定义（可选，见下方） |
 
 新增一个 `agent-defs/<id>/` 目录即可创建新 agent，无需修改代码中的 agent 列表。
+
+### 子智能体（Subagent）
+
+在 agent 目录的 `agents/` 子目录下放置 `.md` 文件，即可为该 agent 定义可派生的子智能体。文件使用 frontmatter 声明元数据：
+
+```markdown
+---
+name: office-quality-reviewer
+description: 对 Office 交付物进行独立质量审核
+tools: Read, Glob, mcp__docx__docx, mcp__pdf__process
+model: inherit
+maxTurns: 12
+skills:
+  - office-quality
+---
+
+子智能体的 system prompt...
+```
+
+- `model: inherit` 表示继承主 agent 的模型选择
+- 子智能体在运行时由主 agent 通过 SDK 的 `TaskCreate` 工具派生
+- UI 会实时展示子智能体的活动状态与心跳
 
 ### tools.md 格式
 
