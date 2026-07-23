@@ -636,25 +636,30 @@ export class SkillManager {
   }
 
   /**
+   * Copy a list of subagent source files into {cwd}/.claude/agents/, leaving
+   * any unrelated files in that directory intact. Returns the installed paths.
+   */
+  async installSubagentFiles(subagentPaths: string[], cwd: string): Promise<string[]> {
+    const installed: string[] = [];
+    if (subagentPaths.length === 0) {
+      return installed;
+    }
+    const targetDir = path.join(cwd, '.claude', 'agents');
+    await fs.mkdir(targetDir, { recursive: true });
+    for (const sourcePath of subagentPaths) {
+      const targetPath = path.join(targetDir, path.basename(sourcePath));
+      await fs.copyFile(sourcePath, targetPath);
+      installed.push(targetPath);
+    }
+    return installed;
+  }
+
+  /**
    * Install this host agent's bundled Claude subagents into the project scope.
    * Files are copied individually so unrelated user-defined subagents remain intact.
    */
   async installSubagentsForAgent(agentId: string, cwd: string): Promise<string[]> {
     const agentDef = await getAgentDefinition(agentId);
-    const targetDir = path.join(cwd, '.claude', 'agents');
-    const installed: string[] = [];
-
-    if (agentDef.defaultSubagents.length === 0) {
-      return installed;
-    }
-
-    await fs.mkdir(targetDir, { recursive: true });
-    for (const sourcePath of agentDef.defaultSubagents) {
-      const targetPath = path.join(targetDir, path.basename(sourcePath));
-      await fs.copyFile(sourcePath, targetPath);
-      installed.push(targetPath);
-    }
-
-    return installed;
+    return this.installSubagentFiles(agentDef.defaultSubagents, cwd);
   }
 }

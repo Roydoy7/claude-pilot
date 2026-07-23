@@ -11,104 +11,14 @@ import { describe, it, expect } from 'vitest';
 import { getAgentDefinitions, getAgentDefinition, loadAgentDefinitionsFrom } from './agent-loader.js';
 
 describe('getAgentDefinitions', () => {
-  it('loads the office-assist agent definition', async () => {
+  it('loads at least one agent definition', async () => {
     const definitions = await getAgentDefinitions();
-    const officeAssist = definitions.find((d) => d.id === 'office-assist');
 
-    expect(officeAssist).toBeDefined();
-    expect(officeAssist?.displayName).toBe('Office Assistant');
-    expect(officeAssist?.description.length).toBeGreaterThan(0);
-    expect(officeAssist?.systemPrompt.length).toBeGreaterThan(0);
-  });
-
-  it('expands SDK_TOOLS and SAFE_TOOLS macros', async () => {
-    const officeAssist = await getAgentDefinition('office-assist');
-
-    expect(officeAssist.tools).toContain('Read');
-    expect(officeAssist.tools).toContain('Write');
-    expect(officeAssist.tools).toContain('Bash');
-    expect(officeAssist.tools).toContain('Agent');
-    expect(officeAssist.safeTools).toContain('Read');
-    expect(officeAssist.safeTools).toContain('Agent(office-quality-reviewer)');
-    expect(officeAssist.safeTools).not.toContain('Write');
-    expect(officeAssist.safeTools).not.toContain('Bash');
-  });
-
-  it('resolves MCP servers from #MCP-TOOLS', async () => {
-    const officeAssist = await getAgentDefinition('office-assist');
-
-    // Verify a representative set of servers are resolved — don't lock the exact list
-    // so adding new tools to tools.md doesn't break this test.
-    const serverKeys = Object.keys(officeAssist.mcpServers);
-    expect(serverKeys).toContain('convert');
-    expect(serverKeys).toContain('docx');
-    expect(serverKeys).toContain('python');
-    expect(serverKeys.length).toBeGreaterThanOrEqual(3);
-    expect(officeAssist.autoApprovedMcpTools).toContain('mcp__convert__convert');
-  });
-
-  it('lists default skills from skills/ subdirectories', async () => {
-    const officeAssist = await getAgentDefinition('office-assist');
-
-    expect(officeAssist.defaultSkills.map((p) => path.basename(p)).sort()).toEqual(
-      ['docx-processor', 'excel-processor', 'office-quality', 'pdf-processor', 'pptx-processor'].sort(),
-    );
-  });
-
-  it('lists bundled Claude subagents from agents/', async () => {
-    const officeAssist = await getAgentDefinition('office-assist');
-    const financialAdvisor = await getAgentDefinition('financial-advisor');
-
-    expect(officeAssist.defaultSubagents.map((p) => path.basename(p))).toEqual([
-      'office-quality-reviewer.md',
-    ]);
-    expect(financialAdvisor.defaultSubagents).toEqual([]);
-    expect(financialAdvisor.tools).not.toContain('Agent');
-  });
-
-  it('registers agent-local tools from tools/ as the local MCP server', async () => {
-    const financialAdvisor = await getAgentDefinition('financial-advisor');
-
-    // Verify local server is registered alongside shared servers — don't lock the exact list.
-    const serverKeys = Object.keys(financialAdvisor.mcpServers);
-    expect(serverKeys).toContain('local');
-    expect(serverKeys).toContain('python');
-    expect(financialAdvisor.mcpServers['local']?.name).toBe('local');
-    expect(financialAdvisor.autoApprovedMcpTools).toContain('mcp__local__get_quote');
-    expect(financialAdvisor.autoApprovedMcpTools).toContain('mcp__local__get_sec_xbrl_facts');
-    expect(financialAdvisor.autoApprovedMcpTools.filter((name) => name.startsWith('mcp__local__'))).toHaveLength(14);
-  });
-
-  it('does not register a local server for agents without a tools/ directory', async () => {
-    const officeAssist = await getAgentDefinition('office-assist');
-
-    expect(officeAssist.mcpServers['local']).toBeUndefined();
-  });
-
-  it('parses bundled subagent frontmatter into subagentDefs for the SDK agents option', async () => {
-    const officeAssist = await getAgentDefinition('office-assist');
-
-    const reviewer = officeAssist.subagentDefs['office-quality-reviewer'];
-    expect(reviewer).toBeDefined();
-    expect(reviewer?.description).toContain('Independently reviews');
-    expect(reviewer?.prompt).toContain('independent office deliverable reviewer');
-    expect(reviewer?.tools).toContain('Read');
-    expect(reviewer?.tools).toContain('mcp__docx__docx');
-    expect(reviewer?.model).toBeUndefined(); // 'inherit' omits the field
-    expect(reviewer?.maxTurns).toBe(12);
-    expect(reviewer?.skills).toEqual([
-      'office-quality',
-      'docx-processor',
-      'excel-processor',
-      'pptx-processor',
-      'pdf-processor',
-    ]);
-  });
-
-  it('has an empty subagentDefs for agents without an agents/ directory', async () => {
-    const financialAdvisor = await getAgentDefinition('financial-advisor');
-
-    expect(financialAdvisor.subagentDefs).toEqual({});
+    expect(definitions.length).toBeGreaterThan(0);
+    const first = definitions[0]!;
+    expect(first.id.length).toBeGreaterThan(0);
+    expect(first.displayName.length).toBeGreaterThan(0);
+    expect(first.systemPrompt.length).toBeGreaterThan(0);
   });
 });
 
@@ -223,6 +133,123 @@ describe('loadAgentDefinitionsFrom', () => {
 
       expect(loadErrors).toEqual([]);
       expect(definitions.find((d) => d.id === 'plain-agent')?.subagentDefs).toEqual({});
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('expands SDK_TOOLS and SAFE_TOOLS macros', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      const dir = await writeAgentFolder(agentDefsPath, 'macro-agent');
+      await fs.promises.writeFile(
+        path.join(dir, 'tools.md'),
+        '#TOOLS\nSDK_TOOLS\n#SAFE-TOOLS\nSAFE_TOOLS\n',
+        'utf-8',
+      );
+
+      const { definitions } = await loadAgentDefinitionsFrom(agentDefsPath);
+      const def = definitions.find((d) => d.id === 'macro-agent')!;
+
+      expect(def.tools).toContain('Read');
+      expect(def.tools).toContain('Write');
+      expect(def.tools).toContain('Bash');
+      expect(def.safeTools).toContain('Read');
+      expect(def.safeTools).not.toContain('Write');
+      expect(def.safeTools).not.toContain('Bash');
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves MCP servers from #MCP-TOOLS and marks safe ones as auto-approved', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      const dir = await writeAgentFolder(agentDefsPath, 'mcp-agent');
+      await fs.promises.writeFile(
+        path.join(dir, 'tools.md'),
+        '#TOOLS\nRead\n#SAFE-TOOLS\nRead\n#MCP-TOOLS\nmcp__convert__convert\n#SAFE-MCP-TOOLS\nmcp__convert__convert\n',
+        'utf-8',
+      );
+
+      const { definitions } = await loadAgentDefinitionsFrom(agentDefsPath);
+      const def = definitions.find((d) => d.id === 'mcp-agent')!;
+
+      expect(Object.keys(def.mcpServers)).toContain('convert');
+      expect(def.autoApprovedMcpTools).toContain('mcp__convert__convert');
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('loads default skills from skills/ subdirectory', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      const dir = await writeAgentFolder(agentDefsPath, 'skilled-agent');
+      await fs.promises.mkdir(path.join(dir, 'skills', 'skill-a'), { recursive: true });
+      await fs.promises.mkdir(path.join(dir, 'skills', 'skill-b'), { recursive: true });
+
+      const { definitions } = await loadAgentDefinitionsFrom(agentDefsPath);
+      const def = definitions.find((d) => d.id === 'skilled-agent')!;
+
+      expect(def.defaultSkills.map((p) => path.basename(p)).sort()).toEqual(['skill-a', 'skill-b']);
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('registers a local MCP server for agents with a tools/ directory', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      const dir = await writeAgentFolder(agentDefsPath, 'tool-agent');
+      const toolsDir = path.join(dir, 'tools');
+      await fs.promises.mkdir(toolsDir);
+      await fs.promises.writeFile(
+        path.join(toolsDir, 'my_tool.py'),
+        '# ---\n# description: A test tool.\n# safe: true\n# ---\nimport sys, json\nprint(json.dumps({}))\n',
+        'utf-8',
+      );
+
+      const { definitions } = await loadAgentDefinitionsFrom(agentDefsPath);
+      const def = definitions.find((d) => d.id === 'tool-agent')!;
+
+      expect(Object.keys(def.mcpServers)).toContain('local');
+      expect(def.mcpServers['local']?.name).toBe('local');
+      expect(def.autoApprovedMcpTools).toContain('mcp__local__my_tool');
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('does not register a local server for agents without a tools/ directory', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      await writeAgentFolder(agentDefsPath, 'no-tools-agent');
+
+      const { definitions } = await loadAgentDefinitionsFrom(agentDefsPath);
+      const def = definitions.find((d) => d.id === 'no-tools-agent')!;
+
+      expect(def.mcpServers['local']).toBeUndefined();
+    } finally {
+      await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
+    }
+  });
+
+  it('lists subagent files from agents/ directory', async () => {
+    const agentDefsPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-agent-defs-'));
+    try {
+      await writeSubagentFile(
+        agentDefsPath,
+        'host-agent',
+        'sub-worker.md',
+        '---\nname: sub-worker\ndescription: Does work.\ntools: Read\n---\n\nYou are a worker.\n',
+      );
+
+      const { definitions } = await loadAgentDefinitionsFrom(agentDefsPath);
+      const def = definitions.find((d) => d.id === 'host-agent')!;
+
+      expect(def.defaultSubagents.map((p) => path.basename(p))).toEqual(['sub-worker.md']);
+      expect(def.subagentDefs['sub-worker']).toBeDefined();
     } finally {
       await fs.promises.rm(agentDefsPath, { recursive: true, force: true });
     }

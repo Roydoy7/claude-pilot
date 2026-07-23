@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SkillManager } from './skill-manager.js';
 
@@ -18,25 +19,34 @@ afterEach(async () => {
   }
 });
 
-describe('installSubagentsForAgent', () => {
-  it('installs bundled subagents without removing project-defined agents', async () => {
-    tempDir = await fs.mkdtemp(path.join(process.cwd(), '.subagent-install-test-'));
+describe('installSubagentFiles', () => {
+  it('copies files into .claude/agents/ without removing project-defined agents', async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-subagent-test-'));
     const agentsDir = path.join(tempDir, '.claude', 'agents');
     const customAgent = path.join(agentsDir, 'custom-agent.md');
     await fs.mkdir(agentsDir, { recursive: true });
     await fs.writeFile(customAgent, 'project-defined agent', 'utf-8');
 
-    const installed = await SkillManager.getInstance().installSubagentsForAgent('office-assist', tempDir);
+    // Create a temp source subagent file
+    const sourceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-subagent-src-'));
+    const sourceFile = path.join(sourceDir, 'my-reviewer.md');
+    await fs.writeFile(sourceFile, '---\nname: my-reviewer\ndescription: Reviews things.\n---\n\nYou are a reviewer.\n', 'utf-8');
 
-    expect(installed).toEqual([path.join(agentsDir, 'office-quality-reviewer.md')]);
-    expect(await fs.readFile(customAgent, 'utf-8')).toBe('project-defined agent');
-    expect(await fs.readFile(installed[0], 'utf-8')).toContain('name: office-quality-reviewer');
+    try {
+      const installed = await SkillManager.getInstance().installSubagentFiles([sourceFile], tempDir);
+
+      expect(installed).toEqual([path.join(agentsDir, 'my-reviewer.md')]);
+      expect(await fs.readFile(customAgent, 'utf-8')).toBe('project-defined agent');
+      expect(await fs.readFile(installed[0]!, 'utf-8')).toContain('name: my-reviewer');
+    } finally {
+      await fs.rm(sourceDir, { recursive: true, force: true });
+    }
   });
 
-  it('does not create an agents directory when none are bundled', async () => {
-    tempDir = await fs.mkdtemp(path.join(process.cwd(), '.subagent-install-test-'));
+  it('returns empty array and does not create agents dir when given no paths', async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-pilot-subagent-test-'));
 
-    const installed = await SkillManager.getInstance().installSubagentsForAgent('financial-advisor', tempDir);
+    const installed = await SkillManager.getInstance().installSubagentFiles([], tempDir);
 
     expect(installed).toEqual([]);
     await expect(fs.stat(path.join(tempDir, '.claude', 'agents'))).rejects.toMatchObject({ code: 'ENOENT' });
